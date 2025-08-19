@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
   header: {
     padding: 20,
     paddingTop: 40,
-    paddingBottom: 30,
+    paddingBottom: 30
   },
   welcomeText: {
     color: '#ffffff',
