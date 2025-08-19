@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,13 +11,18 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery, useMutation } from 'convex/react';
-import { api } from '../../convex/_generated/api';
+import { communityPosts as postsSample } from '../data/sampleData';
 
 const CommunityScreen = () => {
-  const posts = useQuery(api.communityPosts.getAll) ?? [];
-  const createPost = useMutation(api.communityPosts.create);
-  const likePost = useMutation(api.communityPosts.like);
+  const [localPosts, setLocalPosts] = useState<any[]>(
+    postsSample.map((p: any) => ({
+      ...p,
+      _id: p.id ?? p._id ?? Math.random().toString(),
+      createdAt: Date.parse(p.timestamp ?? new Date().toISOString()),
+      comments: (p.comments ?? []).map((c: any) => ({ ...c, _id: c.id ?? c._id ?? Math.random().toString(), createdAt: Date.parse(c.timestamp ?? new Date().toISOString()) })),
+    }))
+  );
+  const posts = localPosts;
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showNewPostModal, setShowNewPostModal] = useState(false);
   const [newPost, setNewPost] = useState({
@@ -43,7 +48,7 @@ const CommunityScreen = () => {
   };
 
   const handleLike = async (postId: string) => {
-    await likePost({ id: postId as any });
+    setLocalPosts(prev => prev.map(p => p._id === postId ? { ...p, likes: (p.likes ?? 0) + 1 } : p));
   };
 
   const handleCreatePost = async () => {
@@ -52,12 +57,19 @@ const CommunityScreen = () => {
       return;
     }
 
-    await createPost({
-      author: 'Current User',
-      title: newPost.title,
-      content: newPost.content,
-      category: newPost.category,
-    });
+    setLocalPosts(prev => [
+      {
+        _id: Math.random().toString(),
+        author: 'Current User',
+        title: newPost.title,
+        content: newPost.content,
+        category: newPost.category,
+        createdAt: Date.now(),
+        likes: 0,
+        comments: [],
+      },
+      ...prev,
+    ]);
     setNewPost({ title: '', content: '', category: 'General' });
     setShowNewPostModal(false);
   };

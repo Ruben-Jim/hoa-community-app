@@ -9,8 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery } from 'convex/react';
-import { api } from '../../convex/_generated/api';
+import { fees as feesSample, fines as finesSample } from '../data/sampleData';
 
 const FeesScreen = () => {
   const [activeTab, setActiveTab] = useState<'fees' | 'fines'>('fees');
@@ -67,8 +66,8 @@ const FeesScreen = () => {
     );
   };
 
-  const fees = useQuery(api.fees.getAll) ?? [];
-  const fines = useQuery(api.fines.getAll) ?? [];
+  const fees = feesSample.map((f: any) => ({ ...f, _id: f.id ?? f._id ?? Math.random().toString() }));
+  const fines = finesSample.map((f: any) => ({ ...f, _id: f.id ?? f._id ?? Math.random().toString() }));
   const totalFees = fees.reduce((sum: number, fee: any) => sum + fee.amount, 0);
   const totalFines = fines.reduce((sum: number, fine: any) => sum + fine.amount, 0);
   const overdueFines = fines.filter((fine: any) => fine.status === 'Overdue').reduce((sum: number, fine: any) => sum + fine.amount, 0);

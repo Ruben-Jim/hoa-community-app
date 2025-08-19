@@ -11,13 +11,20 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery } from 'convex/react';
-import { api } from '../../convex/_generated/api';
+import { hoaInfo as hoaInfoSample, emergencyNotifications as emergencySample, communityPosts as postsSample } from '../data/sampleData';
 
 const HomeScreen = () => {
-  const hoaInfo = useQuery(api.hoaInfo.get);
-  const emergencyNotifications = useQuery(api.emergencyNotifications.getActive) ?? [];
-  const communityPosts = useQuery(api.communityPosts.getAll) ?? [];
+  const hoaInfo: any = hoaInfoSample;
+  const emergencyNotifications: any[] = emergencySample
+    .map((n: any) => ({ ...n, _id: n.id ?? n._id ?? Math.random().toString(), createdAt: Date.parse(n.timestamp ?? new Date().toISOString()) }))
+    .filter((n: any) => n.isActive);
+  const communityPosts: any[] = postsSample
+    .map((p: any) => ({
+      ...p,
+      _id: p.id ?? p._id ?? Math.random().toString(),
+      createdAt: Date.parse(p.timestamp ?? new Date().toISOString()),
+      comments: (p.comments ?? []).map((c: any) => ({ ...c, _id: c.id ?? c._id ?? Math.random().toString(), createdAt: Date.parse(c.timestamp ?? new Date().toISOString()) })),
+    }));
 
   const handleContact = (type: 'phone' | 'email') => {
     if (type === 'phone') {

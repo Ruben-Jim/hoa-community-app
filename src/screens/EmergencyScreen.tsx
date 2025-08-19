@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,13 +11,16 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery, useMutation } from 'convex/react';
-import { api } from '../../convex/_generated/api';
+import { emergencyNotifications as emergencySample } from '../data/sampleData';
 
 const EmergencyScreen = () => {
-  const notifications = useQuery(api.emergencyNotifications.getAll) ?? [];
-  const createNotification = useMutation(api.emergencyNotifications.create);
-  const deactivateNotification = useMutation(api.emergencyNotifications.deactivate);
+  const [notifications, setNotifications] = useState<any[]>(
+    emergencySample.map((n: any) => ({
+      ...n,
+      _id: n.id ?? n._id ?? Math.random().toString(),
+      createdAt: Date.parse(n.timestamp ?? new Date().toISOString()),
+    }))
+  );
   const [selectedPriority, setSelectedPriority] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showNewAlertModal, setShowNewAlertModal] = useState(false);
@@ -97,14 +100,16 @@ const EmergencyScreen = () => {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
-    await createNotification({
+    setNotifications(prev => [{
+      _id: Math.random().toString(),
       title: newAlert.title,
       content: newAlert.content,
       type: newAlert.type,
       priority: newAlert.priority,
       category: newAlert.category,
       isActive: true,
-    });
+      createdAt: Date.now(),
+    }, ...prev]);
     setNewAlert({
       title: '',
       content: '',
@@ -116,7 +121,7 @@ const EmergencyScreen = () => {
   };
 
   const handleDeactivate = async (id: string) => {
-    await deactivateNotification({ id: id as any });
+    setNotifications(prev => prev.map(n => n._id === id ? { ...n, isActive: false } : n));
   };
 
   return (
