@@ -10,6 +10,7 @@ import {
   TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 
@@ -119,7 +120,8 @@ const EmergencyScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
       {/* Header with New Alert Button */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Emergency Alerts</Text>
@@ -411,12 +413,17 @@ const EmergencyScreen = () => {
           </View>
         </View>
       </Modal>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+    backgroundColor: '#f3f4f6',
+  },
+  safeArea: {
     flex: 1,
     backgroundColor: '#f3f4f6',
   },

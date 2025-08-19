@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 
@@ -44,7 +45,8 @@ const HomeScreen = () => {
   const activeNotifications = emergencyNotifications.filter((n: any) => n.isActive);
 
   return (
-    <ScrollView style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.container}>
       {/* Header */}
       <LinearGradient
         colors={['#2563eb', '#1d4ed8']}
@@ -153,12 +155,17 @@ const HomeScreen = () => {
           </View>
         </View>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+    backgroundColor: '#f3f4f6',
+  },
+  safeArea: {
     flex: 1,
     backgroundColor: '#f3f4f6',
   },

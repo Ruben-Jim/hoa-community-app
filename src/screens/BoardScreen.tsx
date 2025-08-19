@@ -9,6 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 
@@ -32,7 +33,8 @@ const BoardScreen = () => {
   const members = useQuery(api.boardMembers.getAll) ?? [];
 
   return (
-    <ScrollView style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Board of Directors</Text>
         <Text style={styles.headerSubtitle}>
@@ -94,12 +96,17 @@ const BoardScreen = () => {
           For urgent matters, please contact the HOA office directly.
         </Text>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+    backgroundColor: '#f3f4f6',
+  },
+  safeArea: {
     flex: 1,
     backgroundColor: '#f3f4f6',
   },

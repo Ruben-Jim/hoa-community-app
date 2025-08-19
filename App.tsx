@@ -5,6 +5,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { ConvexProvider, ConvexReactClient } from 'convex/react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import HomeScreen from './src/screens/HomeScreen';
 import BoardScreen from './src/screens/BoardScreen';
@@ -25,24 +26,27 @@ export default function App() {
 
   if (!convex) {
     return (
-      <View style={styles.setupContainer}>
-        <Text style={styles.setupTitle}>Convex not configured</Text>
-        <Text style={styles.setupText}>
-          Start the Convex dev server and set your URL to enable data features.
-        </Text>
-        <Text style={styles.setupCode}>npx convex dev</Text>
-        <Text style={styles.setupText}>
-          Then set EXPO_PUBLIC_CONVEX_URL or add expo.extra.convexUrl in app.json.
-        </Text>
-        <StatusBar style="auto" />
-      </View>
+      <SafeAreaProvider>
+        <View style={styles.setupContainer}>
+          <Text style={styles.setupTitle}>Convex not configured</Text>
+          <Text style={styles.setupText}>
+            Start the Convex dev server and set your URL to enable data features.
+          </Text>
+          <Text style={styles.setupCode}>npx convex dev</Text>
+          <Text style={styles.setupText}>
+            Then set EXPO_PUBLIC_CONVEX_URL or add expo.extra.convexUrl in app.json.
+          </Text>
+          <StatusBar style="auto" />
+        </View>
+      </SafeAreaProvider>
     );
   }
 
   return (
     <ConvexProvider client={convex}>
-      <NavigationContainer>
-        <Tab.Navigator
+      <SafeAreaProvider>
+        <NavigationContainer>
+          <Tab.Navigator
           screenOptions={({ route }) => ({
             headerShown: false,
             tabBarActiveTintColor: '#2563eb',
@@ -61,16 +65,17 @@ export default function App() {
               return <Ionicons name={name as any} size={size} color={color} />;
             },
           })}
-        >
-          <Tab.Screen name="Home" component={HomeScreen} />
-          <Tab.Screen name="Board" component={BoardScreen} />
-          <Tab.Screen name="Community" component={CommunityScreen} />
-          <Tab.Screen name="Covenants" component={CovenantsScreen} />
-          <Tab.Screen name="Emergency" component={EmergencyScreen} />
-          <Tab.Screen name="Fees" component={FeesScreen} />
-        </Tab.Navigator>
-        <StatusBar style="auto" />
-      </NavigationContainer>
+          >
+            <Tab.Screen name="Home" component={HomeScreen} />
+            <Tab.Screen name="Board" component={BoardScreen} />
+            <Tab.Screen name="Community" component={CommunityScreen} />
+            <Tab.Screen name="Covenants" component={CovenantsScreen} />
+            <Tab.Screen name="Emergency" component={EmergencyScreen} />
+            <Tab.Screen name="Fees" component={FeesScreen} />
+          </Tab.Navigator>
+          <StatusBar style="auto" />
+        </NavigationContainer>
+      </SafeAreaProvider>
     </ConvexProvider>
   );
 }

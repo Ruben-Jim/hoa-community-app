@@ -9,6 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 
@@ -69,7 +70,8 @@ const CovenantsScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.container}>
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
@@ -194,12 +196,17 @@ const CovenantsScreen = () => {
           please contact the architectural committee or HOA board.
         </Text>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+    backgroundColor: '#f3f4f6',
+  },
+  safeArea: {
     flex: 1,
     backgroundColor: '#f3f4f6',
   },
