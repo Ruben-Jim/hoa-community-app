@@ -1,5 +1,35 @@
 # HOA Community App
 
+Development setup:
+
+1. Install dependencies
+```
+npm install
+```
+
+2. Start Convex (applies schema and generates types)
+```
+npx convex dev
+```
+This will print a Convex deployment URL. Copy it.
+
+3. Export the Convex URL for Expo
+```
+export EXPO_PUBLIC_CONVEX_URL="https://your-team-...convex.cloud"
+```
+
+4. Start Expo
+```
+npm start
+```
+
+Notes
+- Schema is defined in `convex/schema.ts`. Keep `npx convex dev` running during development.
+- Server functions are in `convex/*.ts`.
+- Client uses `convex/react` hooks with `api` from `convex/_generated/api`.
+
+# HOA Community App
+
 A comprehensive React Native mobile application for HOA (Homeowners Association) communities to manage communication, information sharing, and emergency notifications.
 
 ## Features

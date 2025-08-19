@@ -4,6 +4,42 @@ import { v } from "convex/values";
 export const getAll = query({
   args: {},
   handler: async (ctx) => {
+    const fines = await ctx.db.query("fines").order("desc").collect();
+    return fines;
+  },
+});
+
+export const create = mutation({
+  args: {
+    violation: v.string(),
+    amount: v.number(),
+    dateIssued: v.string(),
+    dueDate: v.string(),
+    status: v.union(
+      v.literal("Pending"),
+      v.literal("Paid"),
+      v.literal("Overdue")
+    ),
+    description: v.string(),
+    residentId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const id = await ctx.db.insert("fines", {
+      ...args,
+      createdAt: now,
+      updatedAt: now,
+    });
+    return id;
+  },
+});
+
+import { query, mutation } from "./_generated/server";
+import { v } from "convex/values";
+
+export const getAll = query({
+  args: {},
+  handler: async (ctx) => {
     return await ctx.db.query("fines").order("desc").collect();
   },
 });
