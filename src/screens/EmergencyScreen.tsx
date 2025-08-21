@@ -140,80 +140,89 @@ const EmergencyScreen = () => {
       </View>
 
       {/* Priority Filter */}
-      <SafeAreaView style={styles.filterContainer}>
-        <View style={styles.filterContent}>
-          <Text style={styles.filterLabel}>Priority:</Text>
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterContainer}
+        contentContainerStyle={styles.filterContent}
+      >
+        <Text style={styles.filterLabel}>Priority:</Text>
+        <TouchableOpacity
+          style={[
+            styles.filterButton,
+            !selectedPriority && styles.filterButtonActive
+          ]}
+          onPress={() => setSelectedPriority(null)}
+        >
+          <Text style={[
+            styles.filterButtonText,
+            !selectedPriority && styles.filterButtonTextActive
+          ]}>
+            All
+          </Text>
+        </TouchableOpacity>
+        
+        {priorities.map((priority) => (
           <TouchableOpacity
+            key={priority}
             style={[
               styles.filterButton,
-              !selectedPriority && styles.filterButtonActive
+              selectedPriority === priority && styles.filterButtonActive
             ]}
-            onPress={() => setSelectedPriority(null)}
+            onPress={() => setSelectedPriority(priority)}
           >
             <Text style={[
               styles.filterButtonText,
-              !selectedPriority && styles.filterButtonTextActive
+              selectedPriority === priority && styles.filterButtonTextActive
             ]}>
-              All
+              {priority}
             </Text>
           </TouchableOpacity>
-          {priorities.map((priority) => (
-            <TouchableOpacity
-              key={priority}
-              style={[
-                styles.filterButton,
-                selectedPriority === priority && styles.filterButtonActive
-              ]}
-              onPress={() => setSelectedPriority(priority)}
-            >
-              <Text style={[
-                styles.filterButtonText,
-                selectedPriority === priority && styles.filterButtonTextActive
-              ]}>
-                {priority}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </SafeAreaView>
+        ))}
+      </ScrollView>
 
       {/* Category Filter */}
-      <SafeAreaView style={styles.filterContainer}>
-        <View style={styles.filterContent}>
-          <Text style={styles.filterLabel}>Category:</Text>
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterContainer}
+        contentContainerStyle={styles.filterContent}
+        
+      >
+        <Text style={styles.filterLabel}>Category:</Text>
+        <TouchableOpacity
+          style={[
+            styles.filterButton,
+            !selectedCategory && styles.filterButtonActive
+          ]}
+          onPress={() => setSelectedCategory(null)}
+        >
+          <Text style={[
+            styles.filterButtonText,
+            !selectedCategory && styles.filterButtonTextActive
+          ]}>
+            All
+          </Text>
+        </TouchableOpacity>
+        
+        {categories.map((category) => (
           <TouchableOpacity
+            key={category}
             style={[
               styles.filterButton,
-              !selectedCategory && styles.filterButtonActive
+              selectedCategory === category && styles.filterButtonActive
             ]}
-            onPress={() => setSelectedCategory(null)}
+            onPress={() => setSelectedCategory(category)}
           >
             <Text style={[
               styles.filterButtonText,
-              !selectedCategory && styles.filterButtonTextActive
+              selectedCategory === category && styles.filterButtonTextActive
             ]}>
-              All
+              {category}
             </Text>
           </TouchableOpacity>
-          {categories.map((category) => (
-            <TouchableOpacity
-              key={category}
-              style={[
-                styles.filterButton,
-                selectedCategory === category && styles.filterButtonActive
-              ]}
-              onPress={() => setSelectedCategory(category)}
-            >
-              <Text style={[
-                styles.filterButtonText,
-                selectedCategory === category && styles.filterButtonTextActive
-              ]}>
-                {category}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </SafeAreaView>
+        ))}
+      </ScrollView>
 
       {/* Active Alerts Summary */}
       {activeNotifications.length > 0 && (
@@ -455,11 +464,11 @@ const styles = StyleSheet.create({
   filterContainer: {
     backgroundColor: '#ffffff',
     
+    
   },
   filterContent: {
     paddingHorizontal: 15,
     alignItems: 'center',
-    flexDirection: 'row',
   },
   filterLabel: {
     fontSize: 14,
