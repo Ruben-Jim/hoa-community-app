@@ -465,6 +465,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     
     
+    
   },
   filterContent: {
     paddingHorizontal: 15,
