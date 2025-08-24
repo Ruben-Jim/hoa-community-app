@@ -16,13 +16,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { useAuth } from '../context/AuthContext';
-import BoardMemberIndicator from '../components/BoardMemberIndicator';
-import { webCompatibleAlert } from '../utils/webCompatibleAlert';
+import { 
+  hoaInfo as hoaInfoData, 
+  emergencyNotifications as emergencyData, 
+  communityPosts as postsData 
+} from '../data/Data';
 
 const HomeScreen = () => {
-  const { user, signOut } = useAuth();
-  const hoaInfo = useQuery(api.hoaInfo.get);
+  const hoaInfo = useQuery(api.hoaInfo.get) ?? hoaInfoData;
   const emergencyNotifications = useQuery(api.emergencyNotifications.getActive);
   const communityPosts = useQuery(api.communityPosts.getAll);
 
@@ -127,11 +128,11 @@ const HomeScreen = () => {
       </View>
 
       {/* Active Notifications */}
-      {activeNotifications.length > 0 && (
+      {emergencyNotifications && activeNotifications.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Active Alerts</Text>
           {activeNotifications.slice(0, 2).map((notification: any) => (
-            <View key={notification._id} style={styles.notificationCard}>
+            <View key={notification._id || notification.id} style={styles.notificationCard}>
               <View style={styles.notificationHeader}>
                 <Ionicons 
                   name={notification.type === 'Emergency' ? 'warning' : 'information-circle'} 
@@ -142,7 +143,7 @@ const HomeScreen = () => {
               </View>
               <Text style={styles.notificationContent}>{notification.content}</Text>
               <Text style={styles.notificationTime}>
-                {formatDate(new Date(notification.createdAt).toISOString())}
+                {formatDate(notification.createdAt ? new Date(notification.createdAt).toISOString() : notification.timestamp || new Date().toISOString())}
               </Text>
             </View>
           ))}
@@ -150,43 +151,32 @@ const HomeScreen = () => {
       )}
 
       {/* Recent Community Posts */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Recent Community Posts</Text>
-        {communityPosts?.slice(0, 2).map((post: any) => (
-          <View key={post._id} style={styles.postCard}>
-            <View style={styles.postHeader}>
-              <View style={styles.postAuthorInfo}>
-                <View style={styles.postAvatar}>
-                  {post.authorProfileImage ? (
-                    <Image 
-                      source={{ uri: post.authorProfileImage }} 
-                      style={styles.postAvatarImage}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <Ionicons name="person" size={20} color="#6b7280" />
-                  )}
-                </View>
+        {communityPosts && communityPosts.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Recent Community Posts</Text>
+          {communityPosts.slice(0, 2).map((post: any) => (
+            <View key={post._id || post.id} style={styles.postCard}>
+              <View style={styles.postHeader}>
                 <Text style={styles.postAuthor}>{post.author}</Text>
+                <Text style={styles.postCategory}>{post.category}</Text>
               </View>
-              <Text style={styles.postCategory}>{post.category}</Text>
-            </View>
-            <Text style={styles.postTitle}>{post.title}</Text>
-            <Text style={styles.postContent} numberOfLines={2}>
-              {post.content}
-            </Text>
-            <View style={styles.postFooter}>
-              <Text style={styles.postTime}>{formatDate(new Date(post.createdAt).toISOString())}</Text>
-              <View style={styles.postStats}>
-                <Ionicons name="heart" size={16} color="#6b7280" />
-                <Text style={styles.postStatsText}>{post.likes}</Text>
-                <Ionicons name="chatbubble" size={16} color="#6b7280" />
-                <Text style={styles.postStatsText}>{post.comments?.length ?? 0}</Text>
+              <Text style={styles.postTitle}>{post.title}</Text>
+              <Text style={styles.postContent} numberOfLines={2}>
+                {post.content}
+              </Text>
+              <View style={styles.postFooter}>
+                <Text style={styles.postTime}>{formatDate(post.createdAt ? new Date(post.createdAt).toISOString() : post.timestamp || new Date().toISOString())}</Text>
+                <View style={styles.postStats}>
+                  <Ionicons name="heart" size={16} color="#6b7280" />
+                  <Text style={styles.postStatsText}>{post.likes || 0}</Text>
+                  <Ionicons name="chatbubble" size={16} color="#6b7280" />
+                  <Text style={styles.postStatsText}>{post.comments?.length ?? 0}</Text>
+                </View>
               </View>
             </View>
-          </View>
-        ))}
-      </View>
+          ))}
+        </View>
+      )}
 
       {/* Office Information */}
       <View style={styles.section}>
