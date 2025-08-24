@@ -120,45 +120,46 @@ const CommunityScreen = () => {
       </View>
 
       {/* Category Filter */}
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        style={styles.categoryContainer}
-        contentContainerStyle={styles.categoryContent}
-      >
-        <TouchableOpacity
-          style={[
-            styles.categoryButton,
-            !selectedCategory && styles.categoryButtonActive
-          ]}
-          onPress={() => setSelectedCategory(null)}
+      <SafeAreaView style={styles.categoryContainer}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryContent}
         >
-          <Text style={[
-            styles.categoryButtonText,
-            !selectedCategory && styles.categoryButtonTextActive
-          ]}>
-            All
-          </Text>
-        </TouchableOpacity>
-        
-        {categories.map((category) => (
           <TouchableOpacity
-            key={category}
             style={[
               styles.categoryButton,
-              selectedCategory === category && styles.categoryButtonActive
+              !selectedCategory && styles.categoryButtonActive
             ]}
-            onPress={() => setSelectedCategory(category)}
+            onPress={() => setSelectedCategory(null)}
           >
             <Text style={[
               styles.categoryButtonText,
-              selectedCategory === category && styles.categoryButtonTextActive
+              !selectedCategory && styles.categoryButtonTextActive
             ]}>
-              {category}
+              All
             </Text>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
+          
+          {categories.map((category) => (
+            <TouchableOpacity
+              key={category}
+              style={[
+                styles.categoryButton,
+                selectedCategory === category && styles.categoryButtonActive
+              ]}
+              onPress={() => setSelectedCategory(category)}
+            >
+              <Text style={[
+                styles.categoryButtonText,
+                selectedCategory === category && styles.categoryButtonTextActive
+              ]}>
+                {category}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </SafeAreaView>
 
       {/* Posts List */}
       <ScrollView style={styles.postsContainer}>
@@ -353,6 +354,8 @@ const styles = StyleSheet.create({
   categoryContainer: {
     backgroundColor: '#ffffff',
     paddingVertical: 10,
+    paddingBottom: -20,
+    paddingTop: -40, 
   },
   categoryContent: {
     paddingHorizontal: 15,
