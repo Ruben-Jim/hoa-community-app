@@ -10,21 +10,18 @@ import {
   ImageBackground,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { hoaInfo as hoaInfoSample, emergencyNotifications as emergencySample, communityPosts as postsSample } from '../data/sampleData';
+import { useQuery } from 'convex/react';
+import { api } from '../../convex/_generated/api';
+import { hoaInfo as hoaInfoData } from '../data/sampleData';
+import { useAuth } from '../context/AuthContext';
 
 const HomeScreen = () => {
-  const hoaInfo: any = hoaInfoSample;
-  const emergencyNotifications: any[] = emergencySample
-    .map((n: any) => ({ ...n, _id: n.id ?? n._id ?? Math.random().toString(), createdAt: Date.parse(n.timestamp ?? new Date().toISOString()) }))
-    .filter((n: any) => n.isActive);
-  const communityPosts: any[] = postsSample
-    .map((p: any) => ({
-      ...p,
-      _id: p.id ?? p._id ?? Math.random().toString(),
-      createdAt: Date.parse(p.timestamp ?? new Date().toISOString()),
-      comments: (p.comments ?? []).map((c: any) => ({ ...c, _id: c.id ?? c._id ?? Math.random().toString(), createdAt: Date.parse(c.timestamp ?? new Date().toISOString()) })),
-    }));
+  const { user, signOut } = useAuth();
+  const hoaInfo = useQuery(api.hoaInfo.get) ?? hoaInfoData;
+  const emergencyNotifications = useQuery(api.emergencyNotifications.getActive);
+  const communityPosts = useQuery(api.communityPosts.getAll);
 
   const handleContact = (type: 'phone' | 'email') => {
     if (type === 'phone') {
@@ -45,26 +42,57 @@ const HomeScreen = () => {
     );
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+  const handleSignOut = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign Out', style: 'destructive', onPress: signOut }
+      ]
+    );
   };
 
-  const activeNotifications = emergencyNotifications.filter((n: any) => n.isActive);
+  const formatDate = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleDateString();
+    } catch (error) {
+      return 'Invalid date';
+    }
+  };
+
+  const activeNotifications = emergencyNotifications?.filter((n: any) => n.isActive) ?? [];
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container}>
       {/* Header */}
-      <ImageBackground
-        source={require('../../assets/hoa.png')}
+      <LinearGradient
+        colors={['#2563eb', '#1d4ed8']}
         style={styles.header}
-        imageStyle={styles.headerImage}
       >
-        <View style={styles.headerOverlay} />
-        <Text style={styles.welcomeText}>Welcome to</Text>
-        <Text style={styles.hoaName}>{hoaInfo?.name ?? 'HOA'}</Text>
-        <Text style={styles.subtitle}>Your Community Connection</Text>
-      </ImageBackground>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={styles.welcomeText}>Welcome to</Text>
+            <Text style={styles.hoaName}>{hoaInfo?.name ?? 'HOA'}</Text>
+            <Text style={styles.subtitle}>Your Community Connection</Text>
+          </View>
+          <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+            <Ionicons name="log-out-outline" size={24} color="#ffffff" />
+          </TouchableOpacity>
+        </View>
+        
+        {user && (
+          <View style={styles.userInfo}>
+            <Text style={styles.userName}>
+              Welcome back, {user.firstName} {user.lastName}
+            </Text>
+            <Text style={styles.userRole}>
+              {user.isBoardMember ? 'Board Member' : 'Resident'} • {user.address}
+            </Text>
+          </View>
+        )}
+      </LinearGradient>
 
       {/* Quick Actions */}
       <View style={styles.quickActions}>
@@ -119,7 +147,7 @@ const HomeScreen = () => {
       {/* Recent Community Posts */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Recent Community Posts</Text>
-        {communityPosts.slice(0, 2).map((post: any) => (
+        {communityPosts?.slice(0, 2).map((post: any) => (
           <View key={post._id} style={styles.postCard}>
             <View style={styles.postHeader}>
               <Text style={styles.postAuthor}>{post.author}</Text>
@@ -195,6 +223,29 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+  },
+  signOutButton: {
+    padding: 8,
+  },
+  userInfo: {
+    marginTop: 10,
+  },
+  userName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  userRole: {
+    fontSize: 14,
+    color: '#e0e7ff',
+    opacity: 0.9,
   },
   welcomeText: {
     color: '#ffffff',

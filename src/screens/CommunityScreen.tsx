@@ -11,27 +11,40 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../../convex/_generated/api';
 import { communityPosts as postsSample } from '../data/sampleData';
+import { useAuth } from '../context/AuthContext';
 
 const CommunityScreen = () => {
-  const [localPosts, setLocalPosts] = useState<any[]>(
-    postsSample.map((p: any) => ({
-      ...p,
-      _id: p.id ?? p._id ?? Math.random().toString(),
-      createdAt: Date.parse(p.timestamp ?? new Date().toISOString()),
-      comments: (p.comments ?? []).map((c: any) => ({ ...c, _id: c.id ?? c._id ?? Math.random().toString(), createdAt: Date.parse(c.timestamp ?? new Date().toISOString()) })),
-    }))
-  );
-  const posts = localPosts;
+  const { user } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showNewPostModal, setShowNewPostModal] = useState(false);
+  const [showCommentModal, setShowCommentModal] = useState(false);
+  const [selectedPostForComment, setSelectedPostForComment] = useState<any>(null);
+  const [newComment, setNewComment] = useState('');
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
   const [newPost, setNewPost] = useState({
     title: '',
     content: '',
     category: 'General' as any,
   });
 
+  // Convex queries
+  const posts = useQuery(api.communityPosts.getAll) ?? postsSample.map((p: any) => ({
+    ...p,
+    _id: p.id ?? p._id ?? Math.random().toString(),
+    createdAt: Date.parse(p.timestamp ?? new Date().toISOString()),
+    comments: (p.comments ?? []).map((c: any) => ({ ...c, _id: c.id ?? c._id ?? Math.random().toString(), createdAt: Date.parse(c.timestamp ?? new Date().toISOString()) })),
+  }));
+
+  // Convex mutations
+  const createPost = useMutation(api.communityPosts.create);
+  const addComment = useMutation(api.communityPosts.addComment);
+  const likePost = useMutation(api.communityPosts.like);
+
   const categories = ['General', 'Event', 'Complaint', 'Suggestion', 'Lost & Found'];
+  const COMMENTS_PREVIEW_LIMIT = 2; // Show only 2 comments initially
 
   const filteredPosts = posts.filter((post: any) =>
     !selectedCategory || post.category === selectedCategory
@@ -48,7 +61,68 @@ const CommunityScreen = () => {
   };
 
   const handleLike = async (postId: string) => {
-    setLocalPosts(prev => prev.map(p => p._id === postId ? { ...p, likes: (p.likes ?? 0) + 1 } : p));
+    try {
+      await likePost({ id: postId as any });
+    } catch (error) {
+      // Silently handle like errors
+      Alert.alert('Error', 'Failed to like post');
+    }
+  };
+
+  const toggleComments = (postId: string) => {
+    setExpandedComments(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(postId)) {
+        newSet.delete(postId);
+      } else {
+        newSet.add(postId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleCommentPress = (post: any) => {
+    if (!user) {
+      Alert.alert('Error', 'Please sign in to comment');
+      return;
+    }
+    setSelectedPostForComment(post);
+    setShowCommentModal(true);
+  };
+
+  const handleAddComment = async () => {
+    if (!newComment.trim()) {
+      Alert.alert('Error', 'Please enter a comment');
+      return;
+    }
+
+    if (!selectedPostForComment) {
+      Alert.alert('Error', 'No post selected');
+      return;
+    }
+
+    if (!user) {
+      Alert.alert('Error', 'Please sign in to comment');
+      return;
+    }
+
+    try {
+      await addComment({
+        postId: selectedPostForComment._id as any,
+        author: `${user.firstName} ${user.lastName}`,
+        content: newComment.trim(),
+      });
+
+      // Auto-expand comments for the post that just got a new comment
+      setExpandedComments(prev => new Set(prev).add(selectedPostForComment._id));
+
+      setNewComment('');
+      setShowCommentModal(false);
+      setSelectedPostForComment(null);
+    } catch (error) {
+      // Silently handle comment errors
+      Alert.alert('Error', 'Failed to add comment');
+    }
   };
 
   const handleCreatePost = async () => {
@@ -57,21 +131,25 @@ const CommunityScreen = () => {
       return;
     }
 
-    setLocalPosts(prev => [
-      {
-        _id: Math.random().toString(),
-        author: 'Current User',
+    if (!user) {
+      Alert.alert('Error', 'Please sign in to create a post');
+      return;
+    }
+
+    try {
+      await createPost({
         title: newPost.title,
         content: newPost.content,
         category: newPost.category,
-        createdAt: Date.now(),
-        likes: 0,
-        comments: [],
-      },
-      ...prev,
-    ]);
-    setNewPost({ title: '', content: '', category: 'General' });
-    setShowNewPostModal(false);
+        author: `${user.firstName} ${user.lastName}`,
+      });
+
+      setNewPost({ title: '', content: '', category: 'General' });
+      setShowNewPostModal(false);
+    } catch (error) {
+      // Silently handle post creation errors
+      Alert.alert('Error', 'Failed to create post');
+    }
   };
 
   const getCategoryIcon = (category: string) => {
@@ -205,10 +283,13 @@ const CommunityScreen = () => {
                   onPress={() => handleLike(post._id)}
                 >
                   <Ionicons name="heart" size={16} color="#6b7280" />
-                  <Text style={styles.actionText}>{post.likes}</Text>
+                  <Text style={styles.actionText}>{post.likes ?? 0}</Text>
                 </TouchableOpacity>
                 
-                <TouchableOpacity style={styles.actionButton}>
+                <TouchableOpacity 
+                  style={styles.actionButton}
+                  onPress={() => handleCommentPress(post)}
+                >
                   <Ionicons name="chatbubble" size={16} color="#6b7280" />
                   <Text style={styles.actionText}>{post.comments?.length ?? 0}</Text>
                 </TouchableOpacity>
@@ -222,14 +303,63 @@ const CommunityScreen = () => {
               {/* Comments */}
               {post.comments && post.comments.length > 0 && (
                 <View style={styles.commentsSection}>
-                  <Text style={styles.commentsTitle}>Comments</Text>
-                  {post.comments.map((comment: any, index: number) => (
+                  <View style={styles.commentsHeader}>
+                    <Text style={styles.commentsTitle}>
+                      Comments ({post.comments.length})
+                    </Text>
+                    {post.comments.length > COMMENTS_PREVIEW_LIMIT && (
+                      <TouchableOpacity
+                        style={styles.viewAllButton}
+                        onPress={() => toggleComments(post._id)}
+                      >
+                        <Text style={styles.viewAllButtonText}>
+                          {expandedComments.has(post._id) ? 'Show Less' : 'View All'}
+                        </Text>
+                        <Ionicons 
+                          name={expandedComments.has(post._id) ? 'chevron-up' : 'chevron-down'} 
+                          size={16} 
+                          color="#2563eb" 
+                        />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  
+                  {/* Preview Comments (always visible) */}
+                  {post.comments.slice(0, COMMENTS_PREVIEW_LIMIT).map((comment: any, index: number) => (
                     <View key={comment._id ?? index} style={styles.commentItem}>
-                      <Text style={styles.commentAuthor}>{comment.author}</Text>
+                      <View style={styles.commentHeader}>
+                        <Text style={styles.commentAuthor}>{comment.author}</Text>
+                        <Text style={styles.commentTime}>
+                          {formatDate(comment.createdAt ? new Date(comment.createdAt).toISOString() : comment.timestamp || new Date().toISOString())}
+                        </Text>
+                      </View>
                       <Text style={styles.commentContent}>{comment.content}</Text>
-                      <Text style={styles.commentTime}>{formatDate(new Date(comment.createdAt).toISOString())}</Text>
                     </View>
                   ))}
+                  
+                  {/* Expanded Comments (when toggled) */}
+                  {expandedComments.has(post._id) && post.comments.length > COMMENTS_PREVIEW_LIMIT && (
+                    <View style={styles.expandedComments}>
+                      <View style={styles.commentsDivider} />
+                      <ScrollView 
+                        style={styles.expandedCommentsScroll}
+                        showsVerticalScrollIndicator={false}
+                        nestedScrollEnabled={true}
+                      >
+                        {post.comments.slice(COMMENTS_PREVIEW_LIMIT).map((comment: any, index: number) => (
+                          <View key={comment._id ?? `expanded-${index}`} style={styles.commentItem}>
+                            <View style={styles.commentHeader}>
+                              <Text style={styles.commentAuthor}>{comment.author}</Text>
+                              <Text style={styles.commentTime}>
+                                {formatDate(comment.createdAt ? new Date(comment.createdAt).toISOString() : comment.timestamp || new Date().toISOString())}
+                              </Text>
+                            </View>
+                            <Text style={styles.commentContent}>{comment.content}</Text>
+                          </View>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
                 </View>
               )}
             </View>
@@ -306,6 +436,59 @@ const CommunityScreen = () => {
             >
               <Text style={styles.createButtonText}>Create Post</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Comment Modal */}
+      <Modal
+        visible={showCommentModal}
+        animationType="slide"
+        transparent={true}
+      >
+        <View style={styles.commentModalOverlay}>
+          <View style={styles.commentModalContainer}>
+            <View style={styles.commentModalHeader}>
+              <View style={styles.commentModalHeaderContent}>
+                <Text style={styles.modalTitle}>Add Comment</Text>
+                {selectedPostForComment && (
+                  <Text style={styles.commentPostTitle}>
+                    on "{selectedPostForComment.title}"
+                  </Text>
+                )}
+              </View>
+              <TouchableOpacity onPress={() => setShowCommentModal(false)}>
+                <Ionicons name="close" size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.commentModalContent}>
+              <Text style={styles.inputLabel}>Comment</Text>
+              <TextInput
+                style={[styles.textInput, styles.commentInput]}
+                placeholder="Write your comment..."
+                value={newComment}
+                onChangeText={(text) => setNewComment(text)}
+                multiline
+                textAlignVertical="top"
+              />
+            </View>
+
+            <View style={styles.commentModalFooter}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowCommentModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.createButton}
+                onPress={handleAddComment}
+              >
+                <Text style={styles.createButtonText}>Add Comment</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -486,15 +669,60 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
   },
+  commentsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   commentsTitle: {
     fontSize: 14,
     fontWeight: '600',
     color: '#374151',
-    marginBottom: 8,
+  },
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e0e7ff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  viewAllButtonText: {
+    fontSize: 12,
+    color: '#2563eb',
+    fontWeight: '600',
+    marginRight: 4,
+  },
+  expandedComments: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  commentsDivider: {
+    height: 1,
+    backgroundColor: '#e5e7eb',
+    marginVertical: 12,
+  },
+  expandedCommentsScroll: {
+    maxHeight: 200, // Limit height for scrollable expanded comments
   },
   commentItem: {
-    marginBottom: 8,
+    marginBottom: 12,
     paddingLeft: 12,
+    paddingRight: 8,
+    paddingVertical: 8,
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#e5e7eb',
+  },
+  commentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
   },
   commentAuthor: {
     fontSize: 12,
@@ -504,12 +732,11 @@ const styles = StyleSheet.create({
   commentContent: {
     fontSize: 12,
     color: '#6b7280',
-    marginTop: 2,
+    lineHeight: 16,
   },
   commentTime: {
     fontSize: 10,
     color: '#9ca3af',
-    marginTop: 2,
   },
   modalContainer: {
     flex: 1,
@@ -606,6 +833,50 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#ffffff',
     fontWeight: '600',
+  },
+  commentModalHeader: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    flex: 1,
+  },
+  commentPostTitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  commentInput: {
+    height: 100, // Adjust height for comment input
+  },
+  commentModalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  commentModalContainer: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 20,
+    maxHeight: '50%', // Limit to half screen height
+    minHeight: 300, // Ensure minimum height for usability
+  },
+  commentModalHeaderContent: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    flex: 1,
+  },
+  commentModalContent: {
+    marginTop: 20,
+    flex: 1,
+  },
+  commentModalFooter: {
+    flexDirection: 'row',
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    marginTop: 20,
   },
 });
 
