@@ -7,9 +7,9 @@ import {
   TouchableOpacity,
   Alert,
   Linking,
+  ImageBackground,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { hoaInfo as hoaInfoSample, emergencyNotifications as emergencySample, communityPosts as postsSample } from '../data/sampleData';
 
@@ -55,14 +55,16 @@ const HomeScreen = () => {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container}>
       {/* Header */}
-      <LinearGradient
-        colors={['#2563eb', '#1d4ed8']}
+      <ImageBackground
+        source={require('../../assets/hoa.png')}
         style={styles.header}
+        imageStyle={styles.headerImage}
       >
+        <View style={styles.headerOverlay} />
         <Text style={styles.welcomeText}>Welcome to</Text>
         <Text style={styles.hoaName}>{hoaInfo?.name ?? 'HOA'}</Text>
         <Text style={styles.subtitle}>Your Community Connection</Text>
-      </LinearGradient>
+      </ImageBackground>
 
       {/* Quick Actions */}
       <View style={styles.quickActions}>
@@ -179,24 +181,46 @@ const styles = StyleSheet.create({
   header: {
     padding: 20,
     paddingTop: 40,
-    paddingBottom: 30
+    paddingBottom: 30,
+    position: 'relative',
+  },
+  headerImage: {
+    borderRadius: 0,
+    resizeMode: "repeat",
+  },
+  headerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
   },
   welcomeText: {
     color: '#ffffff',
     fontSize: 16,
     opacity: 0.9,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
   },
   hoaName: {
     color: '#ffffff',
     fontSize: 28,
     fontWeight: 'bold',
     marginTop: 5,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
   },
   subtitle: {
     color: '#ffffff',
     fontSize: 14,
     opacity: 0.8,
     marginTop: 5,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
   },
   quickActions: {
     flexDirection: 'row',
