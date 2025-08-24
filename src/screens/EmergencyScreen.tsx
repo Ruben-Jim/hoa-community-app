@@ -135,10 +135,12 @@ const EmergencyScreen = () => {
       </View>
 
       {/* Priority Filter */}
-      <ScrollView 
+      
+
+      <SafeAreaView style={styles.filterContainer}>
+        <ScrollView 
         horizontal 
         showsHorizontalScrollIndicator={false}
-        style={styles.filterContainer}
         contentContainerStyle={styles.filterContent}
       >
         <Text style={styles.filterLabel}>Priority:</Text>
@@ -174,10 +176,13 @@ const EmergencyScreen = () => {
             </Text>
           </TouchableOpacity>
         ))}
-      </ScrollView>
+        </ScrollView>
+       </SafeAreaView>
+
 
       {/* Category Filter */}
-      <ScrollView 
+      <SafeAreaView style={styles.filterContainer}>
+        <ScrollView 
         horizontal 
         showsHorizontalScrollIndicator={false}
         style={styles.filterContainer}
@@ -216,7 +221,9 @@ const EmergencyScreen = () => {
             </Text>
           </TouchableOpacity>
         ))}
-      </ScrollView>
+        </ScrollView>
+      </SafeAreaView>
+
 
       {/* Active Alerts Summary */}
       {activeNotifications.length > 0 && (
@@ -458,6 +465,8 @@ const styles = StyleSheet.create({
   filterContainer: {
     backgroundColor: '#ffffff',
     paddingVertical: 10,
+    paddingTop: -35,
+    paddingBottom: -20,
   },
   filterContent: {
     paddingHorizontal: 15,

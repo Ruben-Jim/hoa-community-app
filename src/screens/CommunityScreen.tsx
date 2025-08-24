@@ -108,10 +108,10 @@ const CommunityScreen = () => {
       </View>
 
       {/* Category Filter */}
-      <ScrollView 
+      <SafeAreaView style={styles.categoryContainer}>
+        <ScrollView 
         horizontal 
         showsHorizontalScrollIndicator={false}
-        style={styles.categoryContainer}
         contentContainerStyle={styles.categoryContent}
       >
         <TouchableOpacity
@@ -146,7 +146,8 @@ const CommunityScreen = () => {
             </Text>
           </TouchableOpacity>
         ))}
-      </ScrollView>
+        </ScrollView>
+      </SafeAreaView>
 
       {/* Posts List */}
       <ScrollView style={styles.postsContainer}>
@@ -341,6 +342,9 @@ const styles = StyleSheet.create({
   categoryContainer: {
     backgroundColor: '#ffffff',
     paddingVertical: 10,
+    paddingBottom: -20,
+    paddingTop: -40
+
   },
   categoryContent: {
     paddingHorizontal: 15,
