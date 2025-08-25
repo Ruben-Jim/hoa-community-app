@@ -232,11 +232,17 @@ const SignupScreen = () => {
                 </Text>
               </TouchableOpacity>
             </View>
+            
+            {/* Sign Up Button */}
+            {/* <TouchableOpacity style={styles.signUpButton} onPress={() => navigation.navigate('Signup')}>
+              <Text style={styles.signUpButtonText}>Signup</Text>
+            </TouchableOpacity> */}
 
             {/* Sign Up Button */}
             <TouchableOpacity style={styles.signUpButton} onPress={handleSignUp}>
               <Text style={styles.signUpButtonText}>Create Account</Text>
             </TouchableOpacity>
+
 
             {/* Login Link */}
             <View style={styles.loginLink}>
