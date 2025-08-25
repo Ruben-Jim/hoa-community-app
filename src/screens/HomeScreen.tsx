@@ -180,13 +180,13 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 20,
-    paddingTop: 40,
-    paddingBottom: 30,
+    paddingTop: 80,
+    paddingBottom: 60,
     position: 'relative',
   },
   headerImage: {
     borderRadius: 0,
-    resizeMode: "repeat",
+    resizeMode: "cover",
   },
   headerOverlay: {
     position: 'absolute',
