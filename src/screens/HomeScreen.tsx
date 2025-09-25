@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { hoaInfo as hoaInfoSample, emergencyNotifications as emergencySample, communityPosts as postsSample } from '../data/sampleData';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const HomeScreen = () => {
   const hoaInfo: any = hoaInfoSample;
@@ -55,16 +56,14 @@ const HomeScreen = () => {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container}>
       {/* Header */}
-      <ImageBackground
-        source={require('../../assets/hoa.png')}
+      <LinearGradient
+        colors={['#2563eb', '#1d4ed8']}
         style={styles.header}
-        imageStyle={styles.headerImage}
       >
-        <View style={styles.headerOverlay} />
         <Text style={styles.welcomeText}>Welcome to</Text>
         <Text style={styles.hoaName}>{hoaInfo?.name ?? 'HOA'}</Text>
         <Text style={styles.subtitle}>Your Community Connection</Text>
-      </ImageBackground>
+      </LinearGradient>
 
       {/* Quick Actions */}
       <View style={styles.quickActions}>
