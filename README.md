@@ -91,15 +91,13 @@ A comprehensive React Native mobile application for HOA (Homeowners Association)
 
 The app uses Convex as the backend database with the following tables:
 
-- **boardMembers**: Board member information and contact details
-- **covenants**: HOA rules and regulations
-- **fees**: Monthly dues and assessments
-- **fines**: Violation tracking and penalties
 - **communityPosts**: Community forum posts
 - **comments**: Post comments and replies
 - **emergencyNotifications**: Emergency alerts and notifications
-- **hoaInfo**: General HOA information
 - **residents**: Resident directory
+- **Later**:
+    - **fees**: Monthly dues and assessments
+    - **fines**: Violation tracking and penalties 
 
 ## Setup Instructions
 
