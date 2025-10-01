@@ -56,10 +56,10 @@ const MainApp = () => {
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Board" component={BoardScreen} />
-      <Tab.Screen name="Community" component={CommunityScreen} />
       <Tab.Screen name="Covenants" component={CovenantsScreen} />
+      <Tab.Screen name="Community" component={CommunityScreen} />
       <Tab.Screen name="Emergency" component={EmergencyScreen} />
-      <Tab.Screen name="Fees" component={FeesScreen} />
+      {/* <Tab.Screen name="Fees" component={FeesScreen} /> */}
     </Tab.Navigator>
   );
 };

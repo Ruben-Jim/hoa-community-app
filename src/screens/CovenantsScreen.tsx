@@ -159,7 +159,7 @@ const CovenantsScreen = () => {
                   style={styles.moreButton}
                   onPress={() => Alert.alert('Covenant Details', covenant.description)}
                 >
-                  <Ionicons name="ellipsis-vertical" size={20} color="#6b7280" />
+                  {/* <Ionicons name="ellipsis-vertical" size={20} color="#6b7280" /> */}
                 </TouchableOpacity>
               </View>
               
