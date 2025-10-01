@@ -2,13 +2,14 @@
   "homepage": "https://Ruben-Jim.github.io/hoa-community-app",
   "name": "hoa-community-app",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
     "convex:dev": "convex dev",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "lint": "expo lint",
     "deploy": "gh-pages --nojekyll -d dist",
     "predeploy": "expo export -p web"
   },
