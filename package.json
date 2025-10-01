@@ -2,7 +2,7 @@
   "homepage": "https://Ruben-Jim.github.io/hoa-community-app",
   "name": "hoa-community-app",
   "version": "1.0.0",
-  "main": "expo-router/entry",
+  "main": "index.ts",
   "scripts": {
     "start": "expo start",
     "convex:dev": "convex dev",
