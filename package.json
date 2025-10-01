@@ -1,4 +1,5 @@
 {
+  "homepage": "https://Ruben-Jim.github.io/hoa-community-app",
   "name": "hoa-community-app",
   "version": "1.0.0",
   "main": "index.ts",
@@ -7,7 +8,9 @@
     "convex:dev": "convex dev",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "deploy": "gh-pages -d dist",
+    "predeploy": "expo export -p web"
   },
   "dependencies": {
     "@expo/metro-runtime": "~5.0.4",
@@ -21,6 +24,7 @@
     "expo-linking": "^7.1.7",
     "expo-notifications": "^0.31.4",
     "expo-status-bar": "~2.2.3",
+    "gh-pages": "^6.3.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-native": "0.79.5",
