@@ -25,6 +25,9 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "experiments":{
+      "typedRoutes": true
+    },
     "extra": {
       "convexUrl": "${EXPO_PUBLIC_CONVEX_URL}"
     }
