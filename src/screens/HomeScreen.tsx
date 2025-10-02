@@ -127,11 +127,11 @@ const HomeScreen = () => {
       </View>
 
       {/* Active Notifications */}
-      {emergencyNotifications && activeNotifications.length > 0 && (
+      {activeNotifications.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Active Alerts</Text>
           {activeNotifications.slice(0, 2).map((notification: any) => (
-            <View key={notification._id || notification.id} style={styles.notificationCard}>
+            <View key={notification._id} style={styles.notificationCard}>
               <View style={styles.notificationHeader}>
                 <Ionicons 
                   name={notification.type === 'Emergency' ? 'warning' : 'information-circle'} 
@@ -142,7 +142,7 @@ const HomeScreen = () => {
               </View>
               <Text style={styles.notificationContent}>{notification.content}</Text>
               <Text style={styles.notificationTime}>
-                {formatDate(notification.createdAt ? new Date(notification.createdAt).toISOString() : notification.timestamp || new Date().toISOString())}
+                {formatDate(new Date(notification.createdAt).toISOString())}
               </Text>
             </View>
           ))}
@@ -150,32 +150,43 @@ const HomeScreen = () => {
       )}
 
       {/* Recent Community Posts */}
-      {communityPosts && communityPosts.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Community Posts</Text>
-          {communityPosts.slice(0, 2).map((post: any) => (
-            <View key={post._id || post.id} style={styles.postCard}>
-              <View style={styles.postHeader}>
-                <Text style={styles.postAuthor}>{post.author}</Text>
-                <Text style={styles.postCategory}>{post.category}</Text>
-              </View>
-              <Text style={styles.postTitle}>{post.title}</Text>
-              <Text style={styles.postContent} numberOfLines={2}>
-                {post.content}
-              </Text>
-              <View style={styles.postFooter}>
-                <Text style={styles.postTime}>{formatDate(post.createdAt ? new Date(post.createdAt).toISOString() : post.timestamp || new Date().toISOString())}</Text>
-                <View style={styles.postStats}>
-                  <Ionicons name="heart" size={16} color="#6b7280" />
-                  <Text style={styles.postStatsText}>{post.likes || 0}</Text>
-                  <Ionicons name="chatbubble" size={16} color="#6b7280" />
-                  <Text style={styles.postStatsText}>{post.comments?.length ?? 0}</Text>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Recent Community Posts</Text>
+        {communityPosts?.slice(0, 2).map((post: any) => (
+          <View key={post._id} style={styles.postCard}>
+            <View style={styles.postHeader}>
+              <View style={styles.postAuthorInfo}>
+                <View style={styles.postAvatar}>
+                  {post.authorProfileImage ? (
+                    <Image 
+                      source={{ uri: post.authorProfileImage }} 
+                      style={styles.postAvatarImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <Ionicons name="person" size={20} color="#6b7280" />
+                  )}
                 </View>
+                <Text style={styles.postAuthor}>{post.author}</Text>
+              </View>
+              <Text style={styles.postCategory}>{post.category}</Text>
+            </View>
+            <Text style={styles.postTitle}>{post.title}</Text>
+            <Text style={styles.postContent} numberOfLines={2}>
+              {post.content}
+            </Text>
+            <View style={styles.postFooter}>
+              <Text style={styles.postTime}>{formatDate(new Date(post.createdAt).toISOString())}</Text>
+              <View style={styles.postStats}>
+                <Ionicons name="heart" size={16} color="#6b7280" />
+                <Text style={styles.postStatsText}>{post.likes}</Text>
+                <Ionicons name="chatbubble" size={16} color="#6b7280" />
+                <Text style={styles.postStatsText}>{post.comments?.length ?? 0}</Text>
               </View>
             </View>
-          ))}
-        </View>
-      )}
+          </View>
+        ))}
+      </View>
 
       {/* Office Information */}
       <View style={styles.section}>
