@@ -95,35 +95,7 @@ export default function App() {
     <SafeAreaProvider>
       <AuthProvider>
         <NavigationContainer>
-          <Tab.Navigator
-          screenOptions={({ route }) => ({
-            headerShown: false,
-            tabBarActiveTintColor: '#2563eb',
-            tabBarInactiveTintColor: '#9ca3af',
-            tabBarStyle: { backgroundColor: '#ffffff' },
-            tabBarIcon: ({ color, size }) => {
-              const iconMap: Record<string, any> = {
-                Home: 'home',
-                Board: 'people',
-                Community: 'chatbubbles',
-                Covenants: 'document-text',
-                Emergency: 'warning',
-                Fees: 'card',
-                Admin: 'settings',
-              };
-              const name = iconMap[route.name] ?? 'ellipse';
-              return <Ionicons name={name as any} size={size} color={color} />;
-            },
-          })}
-          >
-            <Tab.Screen name="Home" component={HomeScreen} />
-            <Tab.Screen name="Covenants" component={CovenantsScreen} />
-            <Tab.Screen name="Board" component={BoardScreen} />
-            <Tab.Screen name="Community" component={CommunityScreen} />
-            <Tab.Screen name="Emergency" component={EmergencyScreen} />
-            {isBoardMember && <Tab.Screen name="Admin" component={AdminScreen} />}
-            {/* <Tab.Screen name="Fees" component={FeesScreen} /> */}
-          </Tab.Navigator>
+          <MainApp />
           <StatusBar style="auto" />
         </NavigationContainer>
       </AuthProvider>
