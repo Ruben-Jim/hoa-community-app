@@ -28,6 +28,8 @@ const SignupScreen = () => {
     firstName: '',
     lastName: '',
     email: '',
+    password: '',
+    confirmPassword: '',
     phone: '',
     address: '',
     unitNumber: '',
@@ -53,6 +55,18 @@ const SignupScreen = () => {
       newErrors.email = 'Please enter a valid email';
     }
 
+    if (!formData.password.trim()) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+    }
+
+    if (!formData.confirmPassword.trim()) {
+      newErrors.confirmPassword = 'Please confirm your password';
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+
     if (!formData.phone.trim()) {
       newErrors.phone = 'Phone number is required';
     }
@@ -71,10 +85,11 @@ const SignupScreen = () => {
     }
 
     try {
-      const userData: Omit<User, '_id' | 'createdAt' | 'updatedAt' | 'isActive' | 'password'> = {
+      const userData: Omit<User, '_id' | 'createdAt' | 'updatedAt' | 'isActive'> = {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         email: formData.email.trim().toLowerCase(),
+        password: formData.password,
         phone: formData.phone.trim(),
         address: formData.address.trim(),
         unitNumber: formData.unitNumber.trim() || undefined,
@@ -157,6 +172,31 @@ const SignupScreen = () => {
               autoCorrect={false}
             />
             {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
+
+            {/* Password Fields */}
+            <Text style={styles.label}>Password *</Text>
+            <TextInput
+              style={[styles.input, errors.password ? styles.inputError : null]}
+              placeholder="Enter password (min 6 characters)"
+              value={formData.password}
+              onChangeText={(text) => updateFormData('password', text)}
+              secureTextEntry={true}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
+
+            <Text style={styles.label}>Confirm Password *</Text>
+            <TextInput
+              style={[styles.input, errors.confirmPassword ? styles.inputError : null]}
+              placeholder="Confirm your password"
+              value={formData.confirmPassword}
+              onChangeText={(text) => updateFormData('confirmPassword', text)}
+              secureTextEntry={true}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {errors.confirmPassword ? <Text style={styles.errorText}>{errors.confirmPassword}</Text> : null}
 
             {/* Phone */}
             <Text style={styles.label}>Phone Number *</Text>

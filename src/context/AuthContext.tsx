@@ -6,7 +6,7 @@ import { User, AuthState } from '../types';
 
 interface AuthContextType extends AuthState {
   signIn: (user: User) => Promise<void>;
-  signUp: (userData: Omit<User, '_id' | 'createdAt' | 'updatedAt' | 'isActive' | 'password'>) => Promise<void>;
+  signUp: (userData: Omit<User, '_id' | 'createdAt' | 'updatedAt' | 'isActive'>) => Promise<void>;
   signOut: () => Promise<void>;
   updateUser: (updates: Partial<User>) => Promise<void>;
 }
@@ -87,18 +87,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const signUp = async (userData: Omit<User, '_id' | 'createdAt' | 'updatedAt' | 'isActive' | 'password'>) => {
+  const signUp = async (userData: Omit<User, '_id' | 'createdAt' | 'updatedAt' | 'isActive'>) => {
     try {
       const residentId = await createResident({
         firstName: userData.firstName,
         lastName: userData.lastName,
         email: userData.email,
+        password: userData.password,
         phone: userData.phone,
         address: userData.address,
         unitNumber: userData.unitNumber,
         isResident: userData.isResident,
         isBoardMember: userData.isBoardMember,
-        password: 'demo123', // In production, this would be hashed
       });
 
       const newUser: User = {
