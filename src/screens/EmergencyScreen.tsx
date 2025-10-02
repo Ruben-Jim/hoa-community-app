@@ -13,8 +13,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
+import { useAuth } from '../context/AuthContext';
+import BoardMemberIndicator from '../components/BoardMemberIndicator';
 
 const EmergencyScreen = () => {
+  const { user } = useAuth();
   const notifications = useQuery(api.emergencyNotifications.getAll) ?? [];
   const createNotification = useMutation(api.emergencyNotifications.create);
   const deactivateNotification = useMutation(api.emergencyNotifications.deactivate);
@@ -32,6 +35,9 @@ const EmergencyScreen = () => {
   const priorities = ['High', 'Medium', 'Low'];
   const categories = ['Security', 'Maintenance', 'Event', 'Lost Pet', 'Other'];
   const types = ['Emergency', 'Alert', 'Info'];
+
+  // Check if user is a board member
+  const isBoardMember = user?.isBoardMember && user?.isActive;
 
   const filteredNotifications = notifications.filter((notification: any) => {
     const matchesPriority = !selectedPriority || notification.priority === selectedPriority;
@@ -93,10 +99,17 @@ const EmergencyScreen = () => {
   };
 
   const handleCreateAlert = async () => {
+    // Check if user is a board member
+    if (!isBoardMember) {
+      Alert.alert('Access Denied', 'Only board members can create emergency alerts.');
+      return;
+    }
+
     if (!newAlert.title.trim() || !newAlert.content.trim()) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
+    
     await createNotification({
       title: newAlert.title,
       content: newAlert.content,
@@ -116,12 +129,19 @@ const EmergencyScreen = () => {
   };
 
   const handleDeactivate = async (id: string) => {
+    // Check if user is a board member
+    if (!isBoardMember) {
+      Alert.alert('Access Denied', 'Only board members can deactivate emergency alerts.');
+      return;
+    }
+    
     await deactivateNotification({ id: id as any });
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
+<<<<<<< HEAD
       {/* Header with New Alert Button */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Emergency Alerts</Text>
@@ -232,194 +252,311 @@ const EmergencyScreen = () => {
           <Text style={styles.summaryText}>
             {activeNotifications.length} active alert{activeNotifications.length !== 1 ? 's' : ''}
           </Text>
+=======
+        {/* Header with New Alert Button (Board Members Only) */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.headerTitle}>Emergency Alerts</Text>
+            <BoardMemberIndicator />
+          </View>
+          {isBoardMember && (
+            <TouchableOpacity
+              style={styles.newAlertButton}
+              onPress={() => setShowNewAlertModal(true)}
+            >
+              <Ionicons name="add" size={20} color="#ffffff" />
+              <Text style={styles.newAlertButtonText}>New Alert</Text>
+            </TouchableOpacity>
+          )}
+>>>>>>> PC/Experiments
         </View>
-      )}
 
-      {/* Notifications List */}
-      <ScrollView style={styles.notificationsContainer}>
-        {filteredNotifications.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="checkmark-circle" size={48} color="#10b981" />
-            <Text style={styles.emptyStateText}>No alerts found</Text>
-            <Text style={styles.emptyStateSubtext}>
-              All clear! No active alerts at this time.
+        {/* Priority Filter */}
+
+
+        <SafeAreaView style={styles.filterContainer}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterContent}
+          >
+            <Text style={styles.filterLabel}>Priority:</Text>
+            <TouchableOpacity
+              style={[
+                styles.filterButton,
+                !selectedPriority && styles.filterButtonActive
+              ]}
+              onPress={() => setSelectedPriority(null)}
+            >
+              <Text style={[
+                styles.filterButtonText,
+                !selectedPriority && styles.filterButtonTextActive
+              ]}>
+                All
+              </Text>
+            </TouchableOpacity>
+
+            {priorities.map((priority) => (
+              <TouchableOpacity
+                key={priority}
+                style={[
+                  styles.filterButton,
+                  selectedPriority === priority && styles.filterButtonActive
+                ]}
+                onPress={() => setSelectedPriority(priority)}
+              >
+                <Text style={[
+                  styles.filterButtonText,
+                  selectedPriority === priority && styles.filterButtonTextActive
+                ]}>
+                  {priority}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </SafeAreaView>
+
+
+        {/* Category Filter */}
+        <SafeAreaView style={styles.filterContainer}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.filterContainer}
+            contentContainerStyle={styles.filterContent}
+          >
+            <Text style={styles.filterLabel}>Category:</Text>
+            <TouchableOpacity
+              style={[
+                styles.filterButton,
+                !selectedCategory && styles.filterButtonActive
+              ]}
+              onPress={() => setSelectedCategory(null)}
+            >
+              <Text style={[
+                styles.filterButtonText,
+                !selectedCategory && styles.filterButtonTextActive
+              ]}>
+                All
+              </Text>
+            </TouchableOpacity>
+
+            {categories.map((category) => (
+              <TouchableOpacity
+                key={category}
+                style={[
+                  styles.filterButton,
+                  selectedCategory === category && styles.filterButtonActive
+                ]}
+                onPress={() => setSelectedCategory(category)}
+              >
+                <Text style={[
+                  styles.filterButtonText,
+                  selectedCategory === category && styles.filterButtonTextActive
+                ]}>
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </SafeAreaView>
+
+
+        {/* Active Alerts Summary */}
+        {activeNotifications.length > 0 && (
+          <View style={styles.summaryCard}>
+            <Ionicons name="warning" size={24} color="#dc2626" />
+            <Text style={styles.summaryText}>
+              {activeNotifications.length} active alert{activeNotifications.length !== 1 ? 's' : ''}
             </Text>
           </View>
-        ) : (
-          filteredNotifications.map((notification: any) => (
-            <View key={notification._id} style={styles.notificationCard}>
-              <View style={styles.notificationHeader}>
-                <View style={styles.notificationIcon}>
-                  <Ionicons 
-                    name={getPriorityIcon(notification.priority) as any} 
-                    size={24} 
-                    color={getPriorityColor(notification.priority)} 
-                  />
-                </View>
-                <View style={styles.notificationInfo}>
-                  <Text style={styles.notificationTitle}>{notification.title}</Text>
-                  <View style={styles.notificationMeta}>
-                    <View style={styles.priorityBadge}>
-                      <Text style={[styles.priorityText, { color: getPriorityColor(notification.priority) }]}>
-                        {notification.priority}
-                      </Text>
-                    </View>
-                    <View style={styles.categoryBadge}>
-                      <Ionicons 
-                        name={getCategoryIcon(notification.category) as any} 
-                        size={12} 
-                        color="#6b7280" 
-                      />
-                      <Text style={styles.categoryText}>{notification.category}</Text>
+        )}
+
+        {/* Notifications List */}
+        <ScrollView style={styles.notificationsContainer}>
+          {filteredNotifications.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="checkmark-circle" size={48} color="#10b981" />
+              <Text style={styles.emptyStateText}>No alerts found</Text>
+              <Text style={styles.emptyStateSubtext}>
+                All clear! No active alerts at this time.
+              </Text>
+            </View>
+          ) : (
+            filteredNotifications.map((notification: any) => (
+              <View key={notification._id} style={styles.notificationCard}>
+                <View style={styles.notificationHeader}>
+                  <View style={styles.notificationIcon}>
+                    <Ionicons
+                      name={getPriorityIcon(notification.priority) as any}
+                      size={24}
+                      color={getPriorityColor(notification.priority)}
+                    />
+                  </View>
+                  <View style={styles.notificationInfo}>
+                    <Text style={styles.notificationTitle}>{notification.title}</Text>
+                    <View style={styles.notificationMeta}>
+                      <View style={styles.priorityBadge}>
+                        <Text style={[styles.priorityText, { color: getPriorityColor(notification.priority) }]}>
+                          {notification.priority}
+                        </Text>
+                      </View>
+                      <View style={styles.categoryBadge}>
+                        <Ionicons
+                          name={getCategoryIcon(notification.category) as any}
+                          size={12}
+                          color="#6b7280"
+                        />
+                        <Text style={styles.categoryText}>{notification.category}</Text>
+                      </View>
                     </View>
                   </View>
+                  <View style={styles.notificationStatus}>
+                    <View style={[
+                      styles.statusDot,
+                      { backgroundColor: notification.isActive ? '#10b981' : '#9ca3af' }
+                    ]} />
+                    <Text style={styles.statusText}>
+                      {notification.isActive ? 'Active' : 'Inactive'}
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.notificationStatus}>
-                  <View style={[
-                    styles.statusDot,
-                    { backgroundColor: notification.isActive ? '#10b981' : '#9ca3af' }
-                  ]} />
-                  <Text style={styles.statusText}>
-                    {notification.isActive ? 'Active' : 'Inactive'}
+
+                <Text style={styles.notificationContent}>{notification.content}</Text>
+
+                <View style={styles.notificationFooter}>
+                  <Text style={styles.notificationTime}>
+                    {formatDate(new Date(notification.createdAt).toISOString())}
                   </Text>
+
+                  {notification.isActive && isBoardMember && (
+                    <TouchableOpacity
+                      style={styles.deactivateButton}
+                      onPress={() => handleDeactivate(notification._id)}
+                    >
+                      <Text style={styles.deactivateButtonText}>Deactivate</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
-              
-              <Text style={styles.notificationContent}>{notification.content}</Text>
-              
-              <View style={styles.notificationFooter}>
-                <Text style={styles.notificationTime}>
-                  {formatDate(new Date(notification.createdAt).toISOString())}
-                </Text>
-                
-                {notification.isActive && (
+            ))
+          )}
+        </ScrollView>
+
+        {/* New Alert Modal */}
+        <Modal
+          visible={showNewAlertModal}
+          animationType="slide"
+          presentationStyle="pageSheet"
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Create Emergency Alert</Text>
+              <TouchableOpacity onPress={() => setShowNewAlertModal(false)}>
+                <Ionicons name="close" size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalContent}>
+              <Text style={styles.inputLabel}>Alert Type</Text>
+              <View style={styles.selectorContainer}>
+                {types.map((type) => (
                   <TouchableOpacity
-                    style={styles.deactivateButton}
-                    onPress={() => handleDeactivate(notification._id)}
+                    key={type}
+                    style={[
+                      styles.selectorOption,
+                      newAlert.type === type && styles.selectorOptionActive
+                    ]}
+                    onPress={() => setNewAlert(prev => ({ ...prev, type }))}
                   >
-                    <Text style={styles.deactivateButtonText}>Deactivate</Text>
+                    <Text style={[
+                      styles.selectorOptionText,
+                      newAlert.type === type && styles.selectorOptionTextActive
+                    ]}>
+                      {type}
+                    </Text>
                   </TouchableOpacity>
-                )}
+                ))}
               </View>
-            </View>
-          ))
-        )}
-      </ScrollView>
 
-      {/* New Alert Modal */}
-      <Modal
-        visible={showNewAlertModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Create Emergency Alert</Text>
-            <TouchableOpacity onPress={() => setShowNewAlertModal(false)}>
-              <Ionicons name="close" size={24} color="#6b7280" />
-            </TouchableOpacity>
+              <Text style={styles.inputLabel}>Priority</Text>
+              <View style={styles.selectorContainer}>
+                {priorities.map((priority) => (
+                  <TouchableOpacity
+                    key={priority}
+                    style={[
+                      styles.selectorOption,
+                      newAlert.priority === priority && styles.selectorOptionActive
+                    ]}
+                    onPress={() => setNewAlert(prev => ({ ...prev, priority }))}
+                  >
+                    <Text style={[
+                      styles.selectorOptionText,
+                      newAlert.priority === priority && styles.selectorOptionTextActive
+                    ]}>
+                      {priority}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.inputLabel}>Category</Text>
+              <View style={styles.selectorContainer}>
+                {categories.map((category) => (
+                  <TouchableOpacity
+                    key={category}
+                    style={[
+                      styles.selectorOption,
+                      newAlert.category === category && styles.selectorOptionActive
+                    ]}
+                    onPress={() => setNewAlert(prev => ({ ...prev, category }))}
+                  >
+                    <Text style={[
+                      styles.selectorOptionText,
+                      newAlert.category === category && styles.selectorOptionTextActive
+                    ]}>
+                      {category}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.inputLabel}>Title</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Enter alert title..."
+                value={newAlert.title}
+                onChangeText={(text) => setNewAlert(prev => ({ ...prev, title: text }))}
+              />
+
+              <Text style={styles.inputLabel}>Content</Text>
+              <TextInput
+                style={[styles.textInput, styles.contentInput]}
+                placeholder="Enter alert details..."
+                value={newAlert.content}
+                onChangeText={(text) => setNewAlert(prev => ({ ...prev, content: text }))}
+                multiline
+                textAlignVertical="top"
+              />
+            </View>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowNewAlertModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.createButton}
+                onPress={handleCreateAlert}
+              >
+                <Text style={styles.createButtonText}>Create Alert</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-
-          <View style={styles.modalContent}>
-            <Text style={styles.inputLabel}>Alert Type</Text>
-            <View style={styles.selectorContainer}>
-              {types.map((type) => (
-                <TouchableOpacity
-                  key={type}
-                  style={[
-                    styles.selectorOption,
-                    newAlert.type === type && styles.selectorOptionActive
-                  ]}
-                  onPress={() => setNewAlert(prev => ({ ...prev, type }))}
-                >
-                  <Text style={[
-                    styles.selectorOptionText,
-                    newAlert.type === type && styles.selectorOptionTextActive
-                  ]}>
-                    {type}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.inputLabel}>Priority</Text>
-            <View style={styles.selectorContainer}>
-              {priorities.map((priority) => (
-                <TouchableOpacity
-                  key={priority}
-                  style={[
-                    styles.selectorOption,
-                    newAlert.priority === priority && styles.selectorOptionActive
-                  ]}
-                  onPress={() => setNewAlert(prev => ({ ...prev, priority }))}
-                >
-                  <Text style={[
-                    styles.selectorOptionText,
-                    newAlert.priority === priority && styles.selectorOptionTextActive
-                  ]}>
-                    {priority}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.inputLabel}>Category</Text>
-            <View style={styles.selectorContainer}>
-              {categories.map((category) => (
-                <TouchableOpacity
-                  key={category}
-                  style={[
-                    styles.selectorOption,
-                    newAlert.category === category && styles.selectorOptionActive
-                  ]}
-                  onPress={() => setNewAlert(prev => ({ ...prev, category }))}
-                >
-                  <Text style={[
-                    styles.selectorOptionText,
-                    newAlert.category === category && styles.selectorOptionTextActive
-                  ]}>
-                    {category}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.inputLabel}>Title</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="Enter alert title..."
-              value={newAlert.title}
-              onChangeText={(text) => setNewAlert(prev => ({ ...prev, title: text }))}
-            />
-
-            <Text style={styles.inputLabel}>Content</Text>
-            <TextInput
-              style={[styles.textInput, styles.contentInput]}
-              placeholder="Enter alert details..."
-              value={newAlert.content}
-              onChangeText={(text) => setNewAlert(prev => ({ ...prev, content: text }))}
-              multiline
-              textAlignVertical="top"
-            />
-          </View>
-
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={() => setShowNewAlertModal(false)}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.createButton}
-              onPress={handleCreateAlert}
-            >
-              <Text style={styles.createButtonText}>Create Alert</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        </Modal>
       </View>
     </SafeAreaView>
   );
@@ -442,6 +579,11 @@ const styles = StyleSheet.create({
     padding: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   headerTitle: {
     fontSize: 20,

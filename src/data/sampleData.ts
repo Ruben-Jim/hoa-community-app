@@ -163,9 +163,16 @@ export const communityPosts: CommunityPost[] = [
       {
         id: '1',
         author: 'Mary Johnson',
+        content: 'I\'ll be participating! Looking forward to it.be participating! Looking forward to it.be participating! Looking forward to it.be participating! Looking forward to it.be participating! Looking forward to it.',
+        timestamp: '2024-07-20T11:00:00Z'
+      },
+      {
+        id: '2',
+        author: 'Mary Johnson',
         content: 'I\'ll be participating! Looking forward to it.',
         timestamp: '2024-07-20T11:00:00Z'
-      }
+      },
+
     ]
   },
   {

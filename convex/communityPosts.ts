@@ -9,7 +9,20 @@ export const getAll = query({
       .order("desc")
       .collect();
     
-    // Get comments for each post
+    // Get all active residents once for profile image lookup
+    const residents = await ctx.db
+      .query("residents")
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+    
+    // Create a map for quick lookup by full name
+    const residentsByName = new Map();
+    residents.forEach(resident => {
+      const fullName = `${resident.firstName} ${resident.lastName}`;
+      residentsByName.set(fullName, resident);
+    });
+    
+    // Get comments for each post with author profile images
     const postsWithComments = await Promise.all(
       posts.map(async (post) => {
         const comments = await ctx.db
@@ -17,7 +30,24 @@ export const getAll = query({
           .withIndex("by_post", (q) => q.eq("postId", post._id))
           .order("asc")
           .collect();
-        return { ...post, comments };
+        
+        // Get author profile image for each comment
+        const commentsWithProfileImages = comments.map(comment => {
+          const authorResident = residentsByName.get(comment.author);
+          return {
+            ...comment,
+            authorProfileImage: authorResident?.profileImage || null
+          };
+        });
+        
+        // Get author profile image for the post
+        const authorResident = residentsByName.get(post.author);
+        
+        return { 
+          ...post, 
+          comments: commentsWithProfileImages,
+          authorProfileImage: authorResident?.profileImage || null
+        };
       })
     );
     
@@ -40,6 +70,19 @@ export const getByCategory = query({
       .order("desc")
       .collect();
     
+    // Get all active residents once for profile image lookup
+    const residents = await ctx.db
+      .query("residents")
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+    
+    // Create a map for quick lookup by full name
+    const residentsByName = new Map();
+    residents.forEach(resident => {
+      const fullName = `${resident.firstName} ${resident.lastName}`;
+      residentsByName.set(fullName, resident);
+    });
+    
     const postsWithComments = await Promise.all(
       posts.map(async (post) => {
         const comments = await ctx.db
@@ -47,7 +90,24 @@ export const getByCategory = query({
           .withIndex("by_post", (q) => q.eq("postId", post._id))
           .order("asc")
           .collect();
-        return { ...post, comments };
+        
+        // Get author profile image for each comment
+        const commentsWithProfileImages = comments.map(comment => {
+          const authorResident = residentsByName.get(comment.author);
+          return {
+            ...comment,
+            authorProfileImage: authorResident?.profileImage || null
+          };
+        });
+        
+        // Get author profile image for the post
+        const authorResident = residentsByName.get(post.author);
+        
+        return { 
+          ...post, 
+          comments: commentsWithProfileImages,
+          authorProfileImage: authorResident?.profileImage || null
+        };
       })
     );
     
@@ -172,5 +232,26 @@ export const removeComment = mutation({
   args: { id: v.id("comments") },
   handler: async (ctx, args) => {
     await ctx.db.delete(args.id);
+  },
+});
+
+// Get all comments for admin management
+export const getAllComments = query({
+  args: {},
+  handler: async (ctx) => {
+    const comments = await ctx.db
+      .query("comments")
+      .order("desc")
+      .collect();
+    
+    // Get post information for each comment
+    const commentsWithPosts = await Promise.all(
+      comments.map(async (comment) => {
+        const post = await ctx.db.get(comment.postId);
+        return { ...comment, postTitle: post?.title || 'Deleted Post' };
+      })
+    );
+    
+    return commentsWithPosts;
   },
 }); 

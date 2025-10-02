@@ -7,12 +7,16 @@ import {
   TouchableOpacity,
   Alert,
   Linking,
+  ImageBackground,
+  Platform,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
+<<<<<<< HEAD
 import { 
   hoaInfo as hoaInfoData, 
   emergencyNotifications as emergencyData, 
@@ -21,6 +25,15 @@ import {
 
 const HomeScreen = () => {
   const hoaInfo = useQuery(api.hoaInfo.get) ?? hoaInfoData;
+=======
+import { useAuth } from '../context/AuthContext';
+import BoardMemberIndicator from '../components/BoardMemberIndicator';
+import { webCompatibleAlert } from '../utils/webCompatibleAlert';
+
+const HomeScreen = () => {
+  const { user, signOut } = useAuth();
+  const hoaInfo = useQuery(api.hoaInfo.get);
+>>>>>>> PC/Experiments
   const emergencyNotifications = useQuery(api.emergencyNotifications.getActive);
   const communityPosts = useQuery(api.communityPosts.getAll);
 
@@ -33,14 +46,28 @@ const HomeScreen = () => {
   };
 
   const handleEmergency = () => {
-    Alert.alert(
-      'Emergency Contact',
-      `Call: ${hoaInfo?.emergencyContact ?? ''}`,
-      [
+    webCompatibleAlert({
+      title: 'Emergency Contact',
+      message: `Call: ${hoaInfo?.emergencyContact ?? ''}`,
+      buttons: [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Call Now', onPress: () => hoaInfo?.emergencyContact && Linking.openURL(`tel:${hoaInfo.emergencyContact}`) }
+        { 
+          text: 'Call Now', 
+          onPress: () => hoaInfo?.emergencyContact && Linking.openURL(`tel:${hoaInfo.emergencyContact}`) 
+        }
       ]
-    );
+    });
+  };
+
+  const handleSignOut = () => {
+    webCompatibleAlert({
+      title: 'Sign Out',
+      message: 'Are you sure you want to sign out?',
+      buttons: [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign Out', style: 'destructive', onPress: signOut }
+      ]
+    });
   };
 
   const formatDate = (dateString: string) => {
@@ -58,12 +85,29 @@ const HomeScreen = () => {
       <ScrollView style={styles.container}>
       {/* Header */}
       <LinearGradient
-        colors={['#2563eb', '#1d4ed8']}
+        colors={['#2563eb', '#1d4ed5']}
         style={styles.header}
+
       >
+
         <Text style={styles.welcomeText}>Welcome to</Text>
         <Text style={styles.hoaName}>{hoaInfo?.name ?? 'HOA'}</Text>
         <Text style={styles.subtitle}>Your Community Connection</Text>
+
+              
+        {user && (
+          <View style={styles.userInfo}>
+            <View style={styles.userNameContainer}>
+              <Text style={styles.userName}>
+                Welcome back, {user.firstName} {user.lastName}
+              </Text>
+              <BoardMemberIndicator />
+            </View>
+            <Text style={styles.userRole}>
+              {user.isBoardMember ? 'Board Member' : 'Resident'} • {user.address}
+            </Text>
+          </View>
+        )}
       </LinearGradient>
 
       {/* Quick Actions */}
@@ -117,6 +161,7 @@ const HomeScreen = () => {
       )}
 
       {/* Recent Community Posts */}
+<<<<<<< HEAD
       {communityPosts && communityPosts.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Community Posts</Text>
@@ -138,6 +183,40 @@ const HomeScreen = () => {
                   <Ionicons name="chatbubble" size={16} color="#6b7280" />
                   <Text style={styles.postStatsText}>{post.comments?.length ?? 0}</Text>
                 </View>
+=======
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Recent Community Posts</Text>
+        {communityPosts?.slice(0, 2).map((post: any) => (
+          <View key={post._id} style={styles.postCard}>
+            <View style={styles.postHeader}>
+              <View style={styles.postAuthorInfo}>
+                <View style={styles.postAvatar}>
+                  {post.authorProfileImage ? (
+                    <Image 
+                      source={{ uri: post.authorProfileImage }} 
+                      style={styles.postAvatarImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <Ionicons name="person" size={20} color="#6b7280" />
+                  )}
+                </View>
+                <Text style={styles.postAuthor}>{post.author}</Text>
+              </View>
+              <Text style={styles.postCategory}>{post.category}</Text>
+            </View>
+            <Text style={styles.postTitle}>{post.title}</Text>
+            <Text style={styles.postContent} numberOfLines={2}>
+              {post.content}
+            </Text>
+            <View style={styles.postFooter}>
+              <Text style={styles.postTime}>{formatDate(new Date(post.createdAt).toISOString())}</Text>
+              <View style={styles.postStats}>
+                <Ionicons name="heart" size={16} color="#6b7280" />
+                <Text style={styles.postStatsText}>{post.likes}</Text>
+                <Ionicons name="chatbubble" size={16} color="#6b7280" />
+                <Text style={styles.postStatsText}>{post.comments?.length ?? 0}</Text>
+>>>>>>> PC/Experiments
               </View>
             </View>
           ))}
@@ -183,24 +262,74 @@ const styles = StyleSheet.create({
   header: {
     padding: 20,
     paddingTop: 40,
-    paddingBottom: 30
+    paddingBottom: 30,
+    position: 'relative',
+  },
+  headerImage: {
+    borderRadius: 0,
+    resizeMode: "stretch",
+  },
+  headerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+  },
+  signOutButton: {
+    padding: 8,
+  },
+  userInfo: {
+    marginTop: 10,
+  },
+  userNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  userName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  userRole: {
+    fontSize: 14,
+    color: '#e0e7ff',
+    opacity: 0.9,
   },
   welcomeText: {
     color: '#ffffff',
     fontSize: 16,
     opacity: 0.9,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
   },
   hoaName: {
     color: '#ffffff',
     fontSize: 28,
     fontWeight: 'bold',
     marginTop: 5,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
   },
   subtitle: {
     color: '#ffffff',
     fontSize: 14,
     opacity: 0.8,
     marginTop: 5,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
   },
   quickActions: {
     flexDirection: 'row',
@@ -231,7 +360,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1f2937',
+    color: '#322D2D',
     marginBottom: 15,
   },
   notificationCard: {
@@ -274,6 +403,25 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+  },
+  postAuthorInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  postAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  postAvatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   postAuthor: {
     fontSize: 14,

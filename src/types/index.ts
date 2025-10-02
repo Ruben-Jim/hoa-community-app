@@ -12,7 +12,7 @@ export interface Covenant {
   id: string;
   title: string;
   description: string;
-  category: 'Architecture' | 'Landscaping' | 'Parking' | 'Pets' | 'General';
+  category: string;
   lastUpdated: string;
   pdfUrl?: string;
 }
@@ -35,6 +35,7 @@ export interface Fine {
   dueDate: string;
   status: 'Pending' | 'Paid' | 'Overdue';
   description: string;
+  residentId?: string;
 }
 
 export interface CommunityPost {
@@ -43,7 +44,7 @@ export interface CommunityPost {
   title: string;
   content: string;
   timestamp: string;
-  category: 'General' | 'Event' | 'Complaint' | 'Suggestion' | 'Lost & Found';
+  category: string;
   likes: number;
   comments: Comment[];
 }
@@ -63,7 +64,7 @@ export interface EmergencyNotification {
   priority: 'High' | 'Medium' | 'Low';
   timestamp: string;
   isActive: boolean;
-  category: 'Security' | 'Maintenance' | 'Event' | 'Lost Pet' | 'Other';
+  category: string;
 }
 
 export interface HOAInfo {
@@ -74,4 +75,30 @@ export interface HOAInfo {
   website?: string;
   officeHours: string;
   emergencyContact: string;
+}
+
+// New authentication types
+export interface User {
+  _id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  address: string;
+  unitNumber?: string;
+  isResident: boolean;
+  isBoardMember: boolean;
+  isActive: boolean;
+  isBlocked: boolean;
+  blockReason?: string;
+  password?: string;
+  profileImage?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface AuthState {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
 } 

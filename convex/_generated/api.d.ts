@@ -21,6 +21,10 @@ import type * as fees from "../fees.js";
 import type * as fines from "../fines.js";
 import type * as hoaInfo from "../hoaInfo.js";
 import type * as residents from "../residents.js";
+<<<<<<< HEAD
+=======
+import type * as storage from "../storage.js";
+>>>>>>> PC/Experiments
 
 /**
  * A utility for referencing Convex functions in your app's API.
@@ -39,6 +43,10 @@ declare const fullApi: ApiFromModules<{
   fines: typeof fines;
   hoaInfo: typeof hoaInfo;
   residents: typeof residents;
+<<<<<<< HEAD
+=======
+  storage: typeof storage;
+>>>>>>> PC/Experiments
 }>;
 export declare const api: FilterApi<
   typeof fullApi,

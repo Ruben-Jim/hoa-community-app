@@ -12,8 +12,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
+import { useAuth } from '../context/AuthContext';
+import BoardMemberIndicator from '../components/BoardMemberIndicator';
 
 const CovenantsScreen = () => {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
@@ -72,6 +75,17 @@ const CovenantsScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <Text style={styles.headerTitle}>Covenants & Rules</Text>
+          <BoardMemberIndicator />
+        </View>
+        <Text style={styles.headerSubtitle}>
+          Community guidelines and regulations
+        </Text>
+      </View>
+      
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
@@ -160,7 +174,7 @@ const CovenantsScreen = () => {
                   style={styles.moreButton}
                   onPress={() => Alert.alert('Covenant Details', covenant.description)}
                 >
-                  <Ionicons name="ellipsis-vertical" size={20} color="#6b7280" />
+                  {/* <Ionicons name="ellipsis-vertical" size={20} color="#6b7280" /> */}
                 </TouchableOpacity>
               </View>
               
@@ -209,6 +223,27 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#f3f4f6',
+  },
+  header: {
+    backgroundColor: '#ffffff',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1f2937',
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: '#6b7280',
   },
   searchContainer: {
     backgroundColor: '#ffffff',
