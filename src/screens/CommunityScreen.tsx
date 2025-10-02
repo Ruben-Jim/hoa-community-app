@@ -8,6 +8,7 @@ import {
   TextInput,
   Alert,
   Modal,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -253,7 +254,15 @@ const CommunityScreen = () => {
               <View style={styles.postHeader}>
                 <View style={styles.postAuthor}>
                   <View style={styles.avatar}>
-                    <Ionicons name="person" size={20} color="#6b7280" />
+                    {post.authorProfileImage ? (
+                      <Image 
+                        source={{ uri: post.authorProfileImage }} 
+                        style={styles.avatarImage}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <Ionicons name="person" size={20} color="#6b7280" />
+                    )}
                   </View>
                   <View>
                     <Text style={styles.authorName}>{post.author}</Text>
@@ -326,7 +335,20 @@ const CommunityScreen = () => {
                   {post.comments.slice(0, COMMENTS_PREVIEW_LIMIT).map((comment: any, index: number) => (
                     <View key={comment._id ?? index} style={styles.commentItem}>
                       <View style={styles.commentHeader}>
-                        <Text style={styles.commentAuthor}>{comment.author}</Text>
+                        <View style={styles.commentAuthorInfo}>
+                          <View style={styles.commentAvatar}>
+                            {comment.authorProfileImage ? (
+                              <Image 
+                                source={{ uri: comment.authorProfileImage }} 
+                                style={styles.commentAvatarImage}
+                                resizeMode="cover"
+                              />
+                            ) : (
+                              <Ionicons name="person" size={16} color="#6b7280" />
+                            )}
+                          </View>
+                          <Text style={styles.commentAuthor}>{comment.author}</Text>
+                        </View>
                         <Text style={styles.commentTime}>
                           {formatDate(comment.createdAt ? new Date(comment.createdAt).toISOString() : comment.timestamp || new Date().toISOString())}
                         </Text>
@@ -347,7 +369,20 @@ const CommunityScreen = () => {
                         {post.comments.slice(COMMENTS_PREVIEW_LIMIT).map((comment: any, index: number) => (
                           <View key={comment._id ?? `expanded-${index}`} style={styles.commentItem}>
                             <View style={styles.commentHeader}>
-                              <Text style={styles.commentAuthor}>{comment.author}</Text>
+                              <View style={styles.commentAuthorInfo}>
+                                <View style={styles.commentAvatar}>
+                                  {comment.authorProfileImage ? (
+                                    <Image 
+                                      source={{ uri: comment.authorProfileImage }} 
+                                      style={styles.commentAvatarImage}
+                                      resizeMode="cover"
+                                    />
+                                  ) : (
+                                    <Ionicons name="person" size={16} color="#6b7280" />
+                                  )}
+                                </View>
+                                <Text style={styles.commentAuthor}>{comment.author}</Text>
+                              </View>
                               <Text style={styles.commentTime}>
                                 {formatDate(comment.createdAt ? new Date(comment.createdAt).toISOString() : comment.timestamp || new Date().toISOString())}
                               </Text>
@@ -615,6 +650,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 8,
   },
+  avatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
   authorName: {
     fontSize: 14,
     fontWeight: '600',
@@ -726,6 +766,25 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 4,
+  },
+  commentAuthorInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  commentAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 6,
+  },
+  commentAvatarImage: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
   },
   commentAuthor: {
     fontSize: 12,

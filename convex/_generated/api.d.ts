@@ -21,6 +21,7 @@ import type * as fees from "../fees.js";
 import type * as fines from "../fines.js";
 import type * as hoaInfo from "../hoaInfo.js";
 import type * as residents from "../residents.js";
+import type * as storage from "../storage.js";
 
 /**
  * A utility for referencing Convex functions in your app's API.
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   fines: typeof fines;
   hoaInfo: typeof hoaInfo;
   residents: typeof residents;
+  storage: typeof storage;
 }>;
 export declare const api: FilterApi<
   typeof fullApi,

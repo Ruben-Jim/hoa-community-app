@@ -6,9 +6,10 @@ export default defineSchema({
     name: v.string(),
     position: v.string(),
     email: v.string(),
-    phone: v.string(),
+    phone: v.optional(v.string()),
+    bio: v.optional(v.string()),
     image: v.optional(v.string()),
-    termEnd: v.string(),
+    termEnd: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   }),
@@ -135,6 +136,7 @@ export default defineSchema({
     isBlocked: v.boolean(),
     blockReason: v.optional(v.string()),
     password: v.optional(v.string()), // In production, this should be hashed
+    profileImage: v.optional(v.string()), // URL to profile image
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_email", ["email"]),

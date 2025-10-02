@@ -92,6 +92,7 @@ export interface User {
   isBlocked: boolean;
   blockReason?: string;
   password?: string;
+  profileImage?: string;
   createdAt: number;
   updatedAt: number;
 }

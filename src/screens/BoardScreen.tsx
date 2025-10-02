@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Linking,
   Alert,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -53,25 +54,42 @@ const BoardScreen = () => {
         <View key={member._id} style={styles.memberCard}>
           <View style={styles.memberHeader}>
             <View style={styles.avatar}>
-              <Ionicons name="person" size={32} color="#6b7280" />
+              {member.image ? (
+                <Image 
+                  source={{ uri: member.image }} 
+                  style={styles.avatarImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Ionicons name="person" size={32} color="#6b7280" />
+              )}
             </View>
             <View style={styles.memberInfo}>
               <Text style={styles.memberName}>{member.name}</Text>
               <Text style={styles.memberPosition}>{member.position}</Text>
-              <Text style={styles.memberTerm}>
-                Term ends: {formatDate(member.termEnd)}
-              </Text>
+              {member.termEnd && (
+                <Text style={styles.memberTerm}>
+                  Term ends: {formatDate(member.termEnd)}
+                </Text>
+              )}
+              {member.bio && (
+                <Text style={styles.memberBio} numberOfLines={3}>
+                  {member.bio}
+                </Text>
+              )}
             </View>
           </View>
 
           <View style={styles.contactSection}>
-            <TouchableOpacity
-              style={styles.contactButton}
-              onPress={() => handleContact(member, 'phone')}
-            >
-              <Ionicons name="call" size={20} color="#2563eb" />
-              <Text style={styles.contactText}>{member.phone}</Text>
-            </TouchableOpacity>
+            {member.phone && (
+              <TouchableOpacity
+                style={styles.contactButton}
+                onPress={() => handleContact(member, 'phone')}
+              >
+                <Ionicons name="call" size={20} color="#2563eb" />
+                <Text style={styles.contactText}>{member.phone}</Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               style={styles.contactButton}
@@ -163,6 +181,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 15,
   },
+  avatarImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
   memberInfo: {
     flex: 1,
     justifyContent: 'center',
@@ -182,6 +205,13 @@ const styles = StyleSheet.create({
   memberTerm: {
     fontSize: 14,
     color: '#6b7280',
+  },
+  memberBio: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontStyle: 'italic',
+    marginTop: 8,
+    lineHeight: 20,
   },
   contactSection: {
     borderTopWidth: 1,

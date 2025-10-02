@@ -40,6 +40,7 @@ export const create = mutation({
     isResident: v.boolean(),
     isBoardMember: v.boolean(),
     password: v.optional(v.string()),
+    profileImage: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     // Check if email already exists

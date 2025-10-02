@@ -90,6 +90,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signUp = async (userData: Omit<User, '_id' | 'createdAt' | 'updatedAt' | 'isActive'>) => {
     try {
+      console.log('👤 Creating resident with profile image:', userData.profileImage);
       const residentId = await createResident({
         firstName: userData.firstName,
         lastName: userData.lastName,
@@ -100,7 +101,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         unitNumber: userData.unitNumber,
         isResident: userData.isResident,
         isBoardMember: userData.isBoardMember,
+        profileImage: userData.profileImage,
       });
+      console.log('✅ Resident created with ID:', residentId);
 
       const newUser: User = {
         ...userData,

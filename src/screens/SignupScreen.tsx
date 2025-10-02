@@ -7,13 +7,16 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import * as ImagePicker from 'expo-image-picker';
+import { useMutation } from 'convex/react';
+import { api } from '../../convex/_generated/api';
+import { useConvex } from 'convex/react';
 import { useAuth } from '../context/AuthContext';
 import { User } from '../types';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
@@ -24,6 +27,9 @@ type SignupScreenNavigationProp = StackNavigationProp<AuthStackParamList, 'Signu
 const SignupScreen = () => {
   const navigation = useNavigation<SignupScreenNavigationProp>();
   const { signUp } = useAuth();
+  const convex = useConvex();
+  const generateUploadUrl = useMutation(api.storage.generateUploadUrl);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -37,6 +43,83 @@ const SignupScreen = () => {
     isBoardMember: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const pickImage = async () => {
+    try {
+      // Request permission
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (permissionResult.granted === false) {
+        Alert.alert('Permission Required', 'Permission to access camera roll is required!');
+        return;
+      }
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setProfileImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
+  const takePhoto = async () => {
+    try {
+      // Request permission
+      const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+      
+      if (permissionResult.granted === false) {
+        Alert.alert('Permission Required', 'Permission to access camera is required!');
+        return;
+      }
+
+      // Launch camera
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setProfileImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error taking photo:', error);
+      Alert.alert('Error', 'Failed to take photo. Please try again.');
+    }
+  };
+
+  const uploadImage = async (imageUri: string): Promise<string> => {
+    try {
+      const uploadUrl = await generateUploadUrl();
+      
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+      
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': blob.type },
+        body: blob,
+      });
+      
+      const { storageId } = await uploadResponse.json();
+      
+      // Get the proper URL from Convex
+      const imageUrl = await convex.query(api.storage.getUrl, { storageId });
+      return imageUrl || storageId;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      throw new Error('Failed to upload image');
+    }
+  };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -85,6 +168,15 @@ const SignupScreen = () => {
     }
 
     try {
+      let profileImageUrl: string | undefined;
+      
+      // Upload profile image if selected
+      if (profileImage) {
+        console.log('📸 Uploading profile image...');
+        profileImageUrl = await uploadImage(profileImage);
+        console.log('✅ Profile image uploaded:', profileImageUrl);
+      }
+
       const userData: Omit<User, '_id' | 'createdAt' | 'updatedAt' | 'isActive'> = {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
@@ -95,12 +187,14 @@ const SignupScreen = () => {
         unitNumber: formData.unitNumber.trim() || undefined,
         isResident: formData.isResident,
         isBoardMember: formData.isBoardMember,
+        isBlocked: false,
+        profileImage: profileImageUrl,
       };
 
       await signUp(userData);
       simpleAlert('Account created successfully!', 'Success');
     } catch (error) {
-      // Silently handle signup errors
+      console.error('Signup error:', error);
       simpleAlert('Failed to create account. Please try again.', 'Error');
     }
   };
@@ -115,15 +209,16 @@ const SignupScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView 
-        style={styles.container} 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={true}
+        keyboardShouldPersistTaps="handled"
+        bounces={true}
+        scrollEnabled={true}
+        keyboardDismissMode="on-drag"
+        decelerationRate="normal"
       >
-        <ScrollView 
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
           {/* Header */}
           <View style={styles.header}>
             <Ionicons name="home" size={48} color="#2563eb" />
@@ -133,6 +228,38 @@ const SignupScreen = () => {
 
           {/* Form */}
           <View style={styles.form}>
+            {/* Profile Image */}
+            <View style={styles.profileImageSection}>
+              <Text style={styles.label}>Profile Picture (Optional)</Text>
+              <View style={styles.profileImageContainer}>
+                {profileImage ? (
+                  <View style={styles.profileImageWrapper}>
+                    <Image source={{ uri: profileImage }} style={styles.profileImage} />
+                    <TouchableOpacity 
+                      style={styles.removeImageButton}
+                      onPress={() => setProfileImage(null)}
+                    >
+                      <Ionicons name="close" size={16} color="#ffffff" />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.profileImagePlaceholder}>
+                    <Ionicons name="person" size={40} color="#9ca3af" />
+                  </View>
+                )}
+              </View>
+              <View style={styles.imagePickerButtons}>
+                <TouchableOpacity style={styles.imagePickerButton} onPress={pickImage}>
+                  <Ionicons name="image" size={20} color="#2563eb" />
+                  <Text style={styles.imagePickerButtonText}>Choose Photo</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.imagePickerButton} onPress={takePhoto}>
+                  <Ionicons name="camera" size={20} color="#2563eb" />
+                  <Text style={styles.imagePickerButtonText}>Take Photo</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
             {/* Name Fields */}
             <View style={styles.row}>
               <View style={styles.halfWidth}>
@@ -298,8 +425,7 @@ const SignupScreen = () => {
               By creating an account, you agree to our Terms of Service and Privacy Policy
             </Text>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -309,14 +435,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f3f4f6',
   },
-  container: {
-    flex: 1,
-  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 30,
   },
   header: {
     alignItems: 'center',
@@ -338,6 +461,7 @@ const styles = StyleSheet.create({
   },
   form: {
     paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   row: {
     flexDirection: 'row',
@@ -433,6 +557,65 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#2563eb',
     fontWeight: '600',
+  },
+  profileImageSection: {
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  profileImageContainer: {
+    marginBottom: 12,
+  },
+  profileImageWrapper: {
+    position: 'relative',
+  },
+  profileImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: '#e5e7eb',
+  },
+  profileImagePlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#f3f4f6',
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#ef4444',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imagePickerButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  imagePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    gap: 6,
+  },
+  imagePickerButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#2563eb',
   },
 });
 
