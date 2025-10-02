@@ -109,6 +109,7 @@ export default function App() {
                 Covenants: 'document-text',
                 Emergency: 'warning',
                 Fees: 'card',
+                Admin: 'settings',
               };
               const name = iconMap[route.name] ?? 'ellipse';
               return <Ionicons name={name as any} size={size} color={color} />;
@@ -120,6 +121,7 @@ export default function App() {
             <Tab.Screen name="Board" component={BoardScreen} />
             <Tab.Screen name="Community" component={CommunityScreen} />
             <Tab.Screen name="Emergency" component={EmergencyScreen} />
+            {isBoardMember && <Tab.Screen name="Admin" component={AdminScreen} />}
             {/* <Tab.Screen name="Fees" component={FeesScreen} /> */}
           </Tab.Navigator>
           <StatusBar style="auto" />
