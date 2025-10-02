@@ -30,7 +30,6 @@ const AdminScreen = () => {
   const covenants = useQuery(api.covenants.getAll) ?? [];
   const communityPosts = useQuery(api.communityPosts.getAll) ?? [];
   const comments = useQuery(api.communityPosts.getAllComments) ?? [];
-  const emergencyAlerts = useQuery(api.emergencyNotifications.getAll) ?? [];
   
   // Mutations
   const setBlockStatus = useMutation(api.residents.setBlockStatus);
@@ -41,13 +40,10 @@ const AdminScreen = () => {
   const createBoardMember = useMutation(api.boardMembers.create);
   const updateBoardMember = useMutation(api.boardMembers.update);
   const generateUploadUrl = useMutation(api.storage.generateUploadUrl);
-  const createEmergencyAlert = useMutation(api.emergencyNotifications.create);
-  const updateEmergencyAlert = useMutation(api.emergencyNotifications.update);
-  const deleteEmergencyAlert = useMutation(api.emergencyNotifications.remove);
   
   // State
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'residents' | 'board' | 'covenants' | 'posts' | 'comments' | 'emergency'>('residents');
+  const [activeTab, setActiveTab] = useState<'residents' | 'board' | 'covenants' | 'posts' | 'comments'>('residents');
   const [showBlockModal, setShowBlockModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
@@ -65,18 +61,6 @@ const AdminScreen = () => {
     termEnd: '',
   });
   const [boardMemberImage, setBoardMemberImage] = useState<string | null>(null);
-  
-  // Emergency alert modal state
-  const [showEmergencyModal, setShowEmergencyModal] = useState(false);
-  const [isEditingEmergency, setIsEditingEmergency] = useState(false);
-  const [emergencyForm, setEmergencyForm] = useState({
-    title: '',
-    content: '',
-    type: 'Alert' as 'Emergency' | 'Alert' | 'Info',
-    priority: 'Medium' as 'High' | 'Medium' | 'Low',
-    category: 'Other' as 'Security' | 'Maintenance' | 'Event' | 'Lost Pet' | 'Other',
-    isActive: true,
-  });
 
   // Check if current user is a board member
   const isBoardMember = user?.isBoardMember && user?.isActive;
@@ -149,10 +133,6 @@ const AdminScreen = () => {
         case 'comment':
           await deleteComment({ id: selectedItem._id });
           Alert.alert('Success', 'Comment deleted successfully.');
-          break;
-        case 'emergency':
-          await deleteEmergencyAlert({ id: selectedItem._id });
-          Alert.alert('Success', 'Emergency alert deleted successfully.');
           break;
         default:
           Alert.alert('Error', 'Unknown item type.');
@@ -263,80 +243,6 @@ const AdminScreen = () => {
       termEnd: '',
     });
     setBoardMemberImage(null);
-    setSelectedItem(null);
-  };
-
-  // Emergency alert handlers
-  const handleAddEmergencyAlert = () => {
-    setEmergencyForm({
-      title: '',
-      content: '',
-      type: 'Alert',
-      priority: 'Medium',
-      category: 'Other',
-      isActive: true,
-    });
-    setIsEditingEmergency(false);
-    setShowEmergencyModal(true);
-  };
-
-  const handleEditEmergencyAlert = (alert: any) => {
-    setEmergencyForm({
-      title: alert.title || '',
-      content: alert.content || '',
-      type: alert.type || 'Alert',
-      priority: alert.priority || 'Medium',
-      category: alert.category || 'Other',
-      isActive: alert.isActive !== undefined ? alert.isActive : true,
-    });
-    setIsEditingEmergency(true);
-    setSelectedItem(alert);
-    setShowEmergencyModal(true);
-  };
-
-  const handleSaveEmergencyAlert = async () => {
-    if (!emergencyForm.title.trim() || !emergencyForm.content.trim()) {
-      Alert.alert('Error', 'Please fill in all required fields (Title, Content).');
-      return;
-    }
-
-    try {
-      if (isEditingEmergency) {
-        await updateEmergencyAlert({
-          id: selectedItem._id,
-          ...emergencyForm,
-        });
-        Alert.alert('Success', 'Emergency alert updated successfully.');
-      } else {
-        await createEmergencyAlert(emergencyForm);
-        Alert.alert('Success', 'Emergency alert created successfully.');
-      }
-      
-      setShowEmergencyModal(false);
-      setEmergencyForm({
-        title: '',
-        content: '',
-        type: 'Alert',
-        priority: 'Medium',
-        category: 'Other',
-        isActive: true,
-      });
-      setSelectedItem(null);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to save emergency alert. Please try again.');
-    }
-  };
-
-  const handleCancelEmergencyAlert = () => {
-    setShowEmergencyModal(false);
-    setEmergencyForm({
-      title: '',
-      content: '',
-      type: 'Alert',
-      priority: 'Medium',
-      category: 'Other',
-      isActive: true,
-    });
     setSelectedItem(null);
   };
 
@@ -645,78 +551,6 @@ const AdminScreen = () => {
           />
         );
       
-      case 'emergency':
-        return (
-          <View style={styles.tabContent}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Emergency Alerts</Text>
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={handleAddEmergencyAlert}
-              >
-                <Ionicons name="add" size={20} color="#ffffff" />
-                <Text style={styles.addButtonText}>New Alert</Text>
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              data={emergencyAlerts}
-              keyExtractor={(item) => item._id}
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-              }
-              renderItem={({ item }) => (
-                <View style={styles.tableRow}>
-                  <View style={styles.rowContent}>
-                    <View style={styles.alertHeader}>
-                      <Text style={styles.rowTitle}>{item.title}</Text>
-                      <View style={styles.alertBadges}>
-                        <View style={[
-                          styles.badge, 
-                          item.priority === 'High' ? styles.highBadge : 
-                          item.priority === 'Medium' ? styles.mediumBadge : 
-                          styles.lowBadge
-                        ]}>
-                          <Text style={styles.badgeText}>{item.priority}</Text>
-                        </View>
-                        <View style={[
-                          styles.badge,
-                          item.type === 'Emergency' ? styles.emergencyBadge :
-                          item.type === 'Alert' ? styles.alertBadge :
-                          styles.infoBadge
-                        ]}>
-                          <Text style={styles.badgeText}>{item.type}</Text>
-                        </View>
-                        {item.isActive && (
-                          <View style={[styles.badge, styles.activeBadge]}>
-                            <Text style={styles.badgeText}>Active</Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                    <Text style={styles.rowSubtitle}>Category: {item.category}</Text>
-                    <Text style={styles.rowDetail} numberOfLines={3}>{item.content}</Text>
-                    <Text style={styles.rowDate}>{formatDate(item.createdAt)}</Text>
-                  </View>
-                  <View style={styles.rowActions}>
-                    <TouchableOpacity
-                      style={[styles.actionButton, styles.editButton]}
-                      onPress={() => handleEditEmergencyAlert(item)}
-                    >
-                      <Ionicons name="create" size={20} color="#2563eb" />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={() => handleDeleteItem(item, 'emergency')}
-                    >
-                      <Ionicons name="trash" size={20} color="#ef4444" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-            />
-          </View>
-        );
-      
       default:
         return null;
     }
@@ -782,16 +616,6 @@ const AdminScreen = () => {
             <Ionicons name="chatbox" size={20} color={activeTab === 'comments' ? '#2563eb' : '#6b7280'} />
             <Text style={[styles.folderTabText, activeTab === 'comments' && styles.activeFolderTabText]}>
               Comments ({comments.length})
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.folderTab, activeTab === 'emergency' && styles.activeFolderTab]}
-            onPress={() => setActiveTab('emergency')}
-          >
-            <Ionicons name="warning" size={20} color={activeTab === 'emergency' ? '#2563eb' : '#6b7280'} />
-            <Text style={[styles.folderTabText, activeTab === 'emergency' && styles.activeFolderTabText]}>
-              Emergency ({emergencyAlerts.length})
             </Text>
           </TouchableOpacity>
         </View>
@@ -1024,164 +848,6 @@ const AdminScreen = () => {
                 >
                   <Text style={styles.confirmButtonText}>
                     {isEditingBoardMember ? 'Update' : 'Add'} Member
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Emergency Alert Modal */}
-        <Modal
-          visible={showEmergencyModal}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={handleCancelEmergencyAlert}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.emergencyModalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>
-                  {isEditingEmergency ? 'Edit Emergency Alert' : 'Create Emergency Alert'}
-                </Text>
-                <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={handleCancelEmergencyAlert}
-                >
-                  <Ionicons name="close" size={24} color="#6b7280" />
-                </TouchableOpacity>
-              </View>
-              
-              <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Title *</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="Enter alert title"
-                    value={emergencyForm.title}
-                    onChangeText={(text) => setEmergencyForm(prev => ({ ...prev, title: text }))}
-                    autoCapitalize="words"
-                  />
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Content *</Text>
-                  <TextInput
-                    style={[styles.textInput, styles.textArea]}
-                    placeholder="Enter alert content"
-                    value={emergencyForm.content}
-                    onChangeText={(text) => setEmergencyForm(prev => ({ ...prev, content: text }))}
-                    multiline
-                    numberOfLines={4}
-                    textAlignVertical="top"
-                  />
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Type</Text>
-                  <View style={styles.radioGroup}>
-                    {['Emergency', 'Alert', 'Info'].map((type) => (
-                      <TouchableOpacity
-                        key={type}
-                        style={[
-                          styles.radioButton,
-                          emergencyForm.type === type && styles.radioButtonActive
-                        ]}
-                        onPress={() => setEmergencyForm(prev => ({ ...prev, type: type as any }))}
-                      >
-                        <Text style={[
-                          styles.radioButtonText,
-                          emergencyForm.type === type && styles.radioButtonTextActive
-                        ]}>
-                          {type}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Priority</Text>
-                  <View style={styles.radioGroup}>
-                    {['High', 'Medium', 'Low'].map((priority) => (
-                      <TouchableOpacity
-                        key={priority}
-                        style={[
-                          styles.radioButton,
-                          emergencyForm.priority === priority && styles.radioButtonActive
-                        ]}
-                        onPress={() => setEmergencyForm(prev => ({ ...prev, priority: priority as any }))}
-                      >
-                        <Text style={[
-                          styles.radioButtonText,
-                          emergencyForm.priority === priority && styles.radioButtonTextActive
-                        ]}>
-                          {priority}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Category</Text>
-                  <View style={styles.radioGroup}>
-                    {['Security', 'Maintenance', 'Event', 'Lost Pet', 'Other'].map((category) => (
-                      <TouchableOpacity
-                        key={category}
-                        style={[
-                          styles.radioButton,
-                          emergencyForm.category === category && styles.radioButtonActive
-                        ]}
-                        onPress={() => setEmergencyForm(prev => ({ ...prev, category: category as any }))}
-                      >
-                        <Text style={[
-                          styles.radioButtonText,
-                          emergencyForm.category === category && styles.radioButtonTextActive
-                        ]}>
-                          {category}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <TouchableOpacity
-                    style={[
-                      styles.checkboxButton,
-                      emergencyForm.isActive && styles.checkboxButtonActive
-                    ]}
-                    onPress={() => setEmergencyForm(prev => ({ ...prev, isActive: !prev.isActive }))}
-                  >
-                    <Ionicons 
-                      name={emergencyForm.isActive ? "checkmark-circle" : "ellipse-outline"} 
-                      size={20} 
-                      color={emergencyForm.isActive ? "#2563eb" : "#6b7280"} 
-                    />
-                    <Text style={[
-                      styles.checkboxText,
-                      emergencyForm.isActive && styles.checkboxTextActive
-                    ]}>
-                      Active Alert
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </ScrollView>
-
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={handleCancelEmergencyAlert}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.confirmButton}
-                  onPress={handleSaveEmergencyAlert}
-                >
-                  <Text style={styles.confirmButtonText}>
-                    {isEditingEmergency ? 'Update' : 'Create'} Alert
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1616,95 +1282,6 @@ const styles = StyleSheet.create({
   imageButtonText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#2563eb',
-  },
-  // Emergency alert styles
-  emergencyModalContent: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    width: '100%',
-    maxWidth: 500,
-    maxHeight: '90%',
-  },
-  alertHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  alertBadges: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  highBadge: {
-    backgroundColor: '#ef4444',
-  },
-  mediumBadge: {
-    backgroundColor: '#f59e0b',
-  },
-  lowBadge: {
-    backgroundColor: '#10b981',
-  },
-  emergencyBadge: {
-    backgroundColor: '#dc2626',
-  },
-  alertBadge: {
-    backgroundColor: '#f59e0b',
-  },
-  infoBadge: {
-    backgroundColor: '#3b82f6',
-  },
-  activeBadge: {
-    backgroundColor: '#10b981',
-  },
-  // Radio button styles
-  radioGroup: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  radioButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    backgroundColor: '#f9fafb',
-  },
-  radioButtonActive: {
-    backgroundColor: '#2563eb',
-    borderColor: '#2563eb',
-  },
-  radioButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6b7280',
-  },
-  radioButtonTextActive: {
-    color: '#ffffff',
-  },
-  // Checkbox styles
-  checkboxButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    gap: 8,
-  },
-  checkboxButtonActive: {
-    // Add any active state styling if needed
-  },
-  checkboxText: {
-    fontSize: 16,
-    color: '#374151',
-    fontWeight: '500',
-  },
-  checkboxTextActive: {
     color: '#2563eb',
   },
 });

@@ -9,6 +9,7 @@ import {
   Linking,
   ImageBackground,
   Platform,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -73,20 +74,16 @@ const HomeScreen = () => {
       <ScrollView style={styles.container}>
       {/* Header */}
       <LinearGradient
-        colors={['#2563eb', '#1d4ed8']}
+        colors={['#2563eb', '#1d4ed5']}
         style={styles.header}
+
       >
-        <View style={styles.headerTop}>
-          <View>
-            <Text style={styles.welcomeText}>Welcome to</Text>
-            <Text style={styles.hoaName}>{hoaInfo?.name ?? 'HOA'}</Text>
-            <Text style={styles.subtitle}>Your Community Connection</Text>
-          </View>
-          <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-            <Ionicons name="log-out-outline" size={24} color="#ffffff" />
-          </TouchableOpacity>
-        </View>
-        
+
+        <Text style={styles.welcomeText}>Welcome to</Text>
+        <Text style={styles.hoaName}>{hoaInfo?.name ?? 'HOA'}</Text>
+        <Text style={styles.subtitle}>Your Community Connection</Text>
+
+              
         {user && (
           <View style={styles.userInfo}>
             <View style={styles.userNameContainer}>
@@ -158,7 +155,20 @@ const HomeScreen = () => {
         {communityPosts?.slice(0, 2).map((post: any) => (
           <View key={post._id} style={styles.postCard}>
             <View style={styles.postHeader}>
-              <Text style={styles.postAuthor}>{post.author}</Text>
+              <View style={styles.postAuthorInfo}>
+                <View style={styles.postAvatar}>
+                  {post.authorProfileImage ? (
+                    <Image 
+                      source={{ uri: post.authorProfileImage }} 
+                      style={styles.postAvatarImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <Ionicons name="person" size={20} color="#6b7280" />
+                  )}
+                </View>
+                <Text style={styles.postAuthor}>{post.author}</Text>
+              </View>
               <Text style={styles.postCategory}>{post.category}</Text>
             </View>
             <Text style={styles.postTitle}>{post.title}</Text>
@@ -222,7 +232,7 @@ const styles = StyleSheet.create({
   },
   headerImage: {
     borderRadius: 0,
-    resizeMode: "repeat",
+    resizeMode: "stretch",
   },
   headerOverlay: {
     position: 'absolute',
@@ -315,7 +325,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1f2937',
+    color: '#322D2D',
     marginBottom: 15,
   },
   notificationCard: {
@@ -358,6 +368,25 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+  },
+  postAuthorInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  postAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  postAvatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   postAuthor: {
     fontSize: 14,
