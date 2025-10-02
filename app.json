@@ -30,16 +30,10 @@
       "baseUrl": "/hoa-community-app"
     },
     "extra": {
-<<<<<<< HEAD
-      "router":{},
-      "eas":"a30576d8-ca43-4d96-8957-d6080ae9076d",
-      "convexUrl": "${EXPO_PUBLIC_CONVEX_URL}"
-=======
       "convexUrl": "${EXPO_PUBLIC_CONVEX_URL}",
       "eas": {
         "projectId": "a30576d8-ca43-4d96-8957-d6080ae9076d"
       }
->>>>>>> PC/Experiments
     }
   }
 }
