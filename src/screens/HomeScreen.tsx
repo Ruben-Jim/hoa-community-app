@@ -16,16 +16,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-<<<<<<< HEAD
-import { 
-  hoaInfo as hoaInfoData, 
-  emergencyNotifications as emergencyData, 
-  communityPosts as postsData 
-} from '../data/Data';
-
-const HomeScreen = () => {
-  const hoaInfo = useQuery(api.hoaInfo.get) ?? hoaInfoData;
-=======
 import { useAuth } from '../context/AuthContext';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import { webCompatibleAlert } from '../utils/webCompatibleAlert';
@@ -33,7 +23,6 @@ import { webCompatibleAlert } from '../utils/webCompatibleAlert';
 const HomeScreen = () => {
   const { user, signOut } = useAuth();
   const hoaInfo = useQuery(api.hoaInfo.get);
->>>>>>> PC/Experiments
   const emergencyNotifications = useQuery(api.emergencyNotifications.getActive);
   const communityPosts = useQuery(api.communityPosts.getAll);
 
