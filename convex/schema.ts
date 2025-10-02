@@ -123,12 +123,17 @@ export default defineSchema({
   }),
 
   residents: defineTable({
-    name: v.string(),
+    firstName: v.string(),
+    lastName: v.string(),
     email: v.string(),
     phone: v.optional(v.string()),
     address: v.string(),
+    unitNumber: v.optional(v.string()),
+    isResident: v.boolean(),
+    isBoardMember: v.boolean(),
     isActive: v.boolean(),
+    password: v.optional(v.string()), // In production, this should be hashed
     createdAt: v.number(),
     updatedAt: v.number(),
-  }),
+  }).index("by_email", ["email"]),
 }); 

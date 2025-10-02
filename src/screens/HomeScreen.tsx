@@ -8,18 +8,19 @@ import {
   Alert,
   Linking,
   ImageBackground,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { hoaInfo as hoaInfoData } from '../data/sampleData';
 import { useAuth } from '../context/AuthContext';
+import { webCompatibleAlert } from '../utils/webCompatibleAlert';
 
 const HomeScreen = () => {
   const { user, signOut } = useAuth();
-  const hoaInfo = useQuery(api.hoaInfo.get) ?? hoaInfoData;
+  const hoaInfo = useQuery(api.hoaInfo.get);
   const emergencyNotifications = useQuery(api.emergencyNotifications.getActive);
   const communityPosts = useQuery(api.communityPosts.getAll);
 
@@ -32,25 +33,28 @@ const HomeScreen = () => {
   };
 
   const handleEmergency = () => {
-    Alert.alert(
-      'Emergency Contact',
-      `Call: ${hoaInfo?.emergencyContact ?? ''}`,
-      [
+    webCompatibleAlert({
+      title: 'Emergency Contact',
+      message: `Call: ${hoaInfo?.emergencyContact ?? ''}`,
+      buttons: [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Call Now', onPress: () => hoaInfo?.emergencyContact && Linking.openURL(`tel:${hoaInfo.emergencyContact}`) }
+        { 
+          text: 'Call Now', 
+          onPress: () => hoaInfo?.emergencyContact && Linking.openURL(`tel:${hoaInfo.emergencyContact}`) 
+        }
       ]
-    );
+    });
   };
 
   const handleSignOut = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
+    webCompatibleAlert({
+      title: 'Sign Out',
+      message: 'Are you sure you want to sign out?',
+      buttons: [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Sign Out', style: 'destructive', onPress: signOut }
       ]
-    );
+    });
   };
 
   const formatDate = (dateString: string) => {

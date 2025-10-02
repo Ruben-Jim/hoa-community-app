@@ -15,6 +15,9 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useAuth } from '../context/AuthContext';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
+import { simpleAlert } from '../utils/webCompatibleAlert';
+import { useQuery } from 'convex/react';
+import { api } from '../../convex/_generated/api';
 
 type LoginScreenNavigationProp = StackNavigationProp<AuthStackParamList, 'Login'>;
 
@@ -23,9 +26,13 @@ const LoginScreen = () => {
   const { signIn } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
-    password: '', // In a real app, this would be used for authentication
+    password: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Get user by email for authentication
+  const user = useQuery(api.residents.getByEmail, { email: formData.email.toLowerCase() });
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -49,28 +56,34 @@ const LoginScreen = () => {
       return;
     }
 
-    try {
-      // For demo purposes, we'll create a mock user
-      // In a real app, this would validate against a backend
-      const mockUser = {
-        _id: 'demo-user-123',
-        email: formData.email.trim().toLowerCase(),
-        firstName: 'Demo',
-        lastName: 'User',
-        phone: '(555) 123-4567',
-        address: '123 Demo Street',
-        unitNumber: 'A1',
-        isResident: true,
-        isBoardMember: false,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      };
+    setIsLoading(true);
 
-      await signIn(mockUser);
-      Alert.alert('Success', 'Logged in successfully!');
+    try {
+      // Check if user exists and password matches
+      if (!user) {
+        simpleAlert('No account found with this email address.', 'Login Failed');
+        return;
+      }
+
+      // In a real app, you would hash the password and compare
+      // For now, we'll use a simple string comparison
+      if (user.password !== formData.password) {
+        simpleAlert('Invalid password. Please try again.', 'Login Failed');
+        return;
+      }
+
+      if (!user.isActive) {
+        simpleAlert('Your account is inactive. Please contact support.', 'Account Inactive');
+        return;
+      }
+
+      await signIn(user);
+      simpleAlert('Logged in successfully!', 'Success');
     } catch (error) {
-      // Silently handle login errors
-      Alert.alert('Error', 'Failed to login. Please try again.');
+      console.error('Login error:', error);
+      simpleAlert('Failed to login. Please try again.', 'Error');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -125,8 +138,14 @@ const LoginScreen = () => {
             {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
 
             {/* Login Button */}
-            <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-              <Text style={styles.loginButtonText}>Sign In</Text>
+            <TouchableOpacity 
+              style={[styles.loginButton, isLoading && styles.loginButtonDisabled]} 
+              onPress={handleLogin}
+              disabled={isLoading}
+            >
+              <Text style={styles.loginButtonText}>
+                {isLoading ? 'Signing In...' : 'Sign In'}
+              </Text>
             </TouchableOpacity>
 
             {/* Signup Link */}
@@ -137,13 +156,6 @@ const LoginScreen = () => {
               </TouchableOpacity>
             </View>
 
-            {/* Demo Note */}
-            <View style={styles.demoNote}>
-              <Ionicons name="information-circle" size={16} color="#6b7280" />
-              <Text style={styles.demoNoteText}>
-                Demo Mode: Any email/password combination will work
-              </Text>
-            </View>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -217,6 +229,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 20,
   },
+  loginButtonDisabled: {
+    backgroundColor: '#9ca3af',
+    opacity: 0.6,
+  },
   loginButtonText: {
     color: '#ffffff',
     fontSize: 18,
@@ -236,20 +252,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#2563eb',
     fontWeight: '600',
-  },
-  demoNote: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 24,
-    paddingHorizontal: 20,
-  },
-  demoNoteText: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginLeft: 8,
-    textAlign: 'center',
-    lineHeight: 16,
   },
 });
 

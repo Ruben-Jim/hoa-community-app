@@ -10,14 +10,15 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { covenants as covenantsSample } from '../data/sampleData';
+import { useQuery } from 'convex/react';
+import { api } from '../../convex/_generated/api';
 
 const CovenantsScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   const categories = ['Architecture', 'Landscaping', 'Parking', 'Pets', 'General'];
-  const covenants = covenantsSample.map((c: any) => ({ ...c, _id: c.id ?? c._id ?? Math.random().toString() }));
+  const covenants = useQuery(api.covenants.getAll) ?? [];
 
   const filteredCovenants = covenants.filter((covenant: any) => {
     const matchesSearch = covenant.title.toLowerCase().includes(searchQuery.toLowerCase()) ||

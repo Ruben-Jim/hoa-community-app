@@ -83,11 +83,13 @@ export interface User {
   email: string;
   firstName: string;
   lastName: string;
-  phone: string;
+  phone?: string;
   address: string;
   unitNumber?: string;
   isResident: boolean;
   isBoardMember: boolean;
+  isActive: boolean;
+  password?: string;
   createdAt: number;
   updatedAt: number;
 }

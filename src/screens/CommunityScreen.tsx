@@ -13,7 +13,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { communityPosts as postsSample } from '../data/sampleData';
 import { useAuth } from '../context/AuthContext';
 
 const CommunityScreen = () => {
@@ -31,12 +30,7 @@ const CommunityScreen = () => {
   });
 
   // Convex queries
-  const posts = useQuery(api.communityPosts.getAll) ?? postsSample.map((p: any) => ({
-    ...p,
-    _id: p.id ?? p._id ?? Math.random().toString(),
-    createdAt: Date.parse(p.timestamp ?? new Date().toISOString()),
-    comments: (p.comments ?? []).map((c: any) => ({ ...c, _id: c.id ?? c._id ?? Math.random().toString(), createdAt: Date.parse(c.timestamp ?? new Date().toISOString()) })),
-  }));
+  const posts = useQuery(api.communityPosts.getAll) ?? [];
 
   // Convex mutations
   const createPost = useMutation(api.communityPosts.create);

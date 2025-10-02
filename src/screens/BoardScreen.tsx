@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { boardMembers as boardMembersSample } from '../data/sampleData';
+import { useQuery } from 'convex/react';
+import { api } from '../../convex/_generated/api';
 
 const BoardScreen = () => {
   const handleContact = (member: any, type: 'phone' | 'email') => {
@@ -29,7 +30,7 @@ const BoardScreen = () => {
     });
   };
 
-  const members = boardMembersSample.map((m: any) => ({ ...m, _id: m.id ?? m._id ?? Math.random().toString() }));
+  const members = useQuery(api.boardMembers.getAll) ?? [];
 
   return (
     <SafeAreaView style={styles.safeArea}>

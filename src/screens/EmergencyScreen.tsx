@@ -13,8 +13,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
+import { useAuth } from '../context/AuthContext';
 
 const EmergencyScreen = () => {
+  const { user } = useAuth();
   const notifications = useQuery(api.emergencyNotifications.getAll) ?? [];
   const createNotification = useMutation(api.emergencyNotifications.create);
   const deactivateNotification = useMutation(api.emergencyNotifications.deactivate);
@@ -32,6 +34,9 @@ const EmergencyScreen = () => {
   const priorities = ['High', 'Medium', 'Low'];
   const categories = ['Security', 'Maintenance', 'Event', 'Lost Pet', 'Other'];
   const types = ['Emergency', 'Alert', 'Info'];
+
+  // Check if user is a board member
+  const isBoardMember = user?.isBoardMember && user?.isActive;
 
   const filteredNotifications = notifications.filter((notification: any) => {
     const matchesPriority = !selectedPriority || notification.priority === selectedPriority;
@@ -93,10 +98,17 @@ const EmergencyScreen = () => {
   };
 
   const handleCreateAlert = async () => {
+    // Check if user is a board member
+    if (!isBoardMember) {
+      Alert.alert('Access Denied', 'Only board members can create emergency alerts.');
+      return;
+    }
+
     if (!newAlert.title.trim() || !newAlert.content.trim()) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
+    
     await createNotification({
       title: newAlert.title,
       content: newAlert.content,
@@ -116,22 +128,38 @@ const EmergencyScreen = () => {
   };
 
   const handleDeactivate = async (id: string) => {
+    // Check if user is a board member
+    if (!isBoardMember) {
+      Alert.alert('Access Denied', 'Only board members can deactivate emergency alerts.');
+      return;
+    }
+    
     await deactivateNotification({ id: id as any });
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        {/* Header with New Alert Button */}
+        {/* Header with New Alert Button (Board Members Only) */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Emergency Alerts</Text>
-          <TouchableOpacity
-            style={styles.newAlertButton}
-            onPress={() => setShowNewAlertModal(true)}
-          >
-            <Ionicons name="add" size={20} color="#ffffff" />
-            <Text style={styles.newAlertButtonText}>New Alert</Text>
-          </TouchableOpacity>
+          <View style={styles.headerLeft}>
+            <Text style={styles.headerTitle}>Emergency Alerts</Text>
+            {isBoardMember && (
+              <View style={styles.boardMemberBadge}>
+                <Ionicons name="shield" size={12} color="#ffffff" />
+                <Text style={styles.boardMemberText}>Board Member</Text>
+              </View>
+            )}
+          </View>
+          {isBoardMember && (
+            <TouchableOpacity
+              style={styles.newAlertButton}
+              onPress={() => setShowNewAlertModal(true)}
+            >
+              <Ionicons name="add" size={20} color="#ffffff" />
+              <Text style={styles.newAlertButtonText}>New Alert</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Priority Filter */}
@@ -292,7 +320,7 @@ const EmergencyScreen = () => {
                     {formatDate(new Date(notification.createdAt).toISOString())}
                   </Text>
 
-                  {notification.isActive && (
+                  {notification.isActive && isBoardMember && (
                     <TouchableOpacity
                       style={styles.deactivateButton}
                       onPress={() => handleDeactivate(notification._id)}
@@ -443,10 +471,29 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#1f2937',
+  },
+  boardMemberBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#10b981',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  boardMemberText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#ffffff',
   },
   newAlertButton: {
     flexDirection: 'row',

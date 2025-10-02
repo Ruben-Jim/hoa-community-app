@@ -17,6 +17,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { useAuth } from '../context/AuthContext';
 import { User } from '../types';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
+import { simpleAlert } from '../utils/webCompatibleAlert';
 
 type SignupScreenNavigationProp = StackNavigationProp<AuthStackParamList, 'Signup'>;
 
@@ -70,7 +71,7 @@ const SignupScreen = () => {
     }
 
     try {
-      const userData: Omit<User, '_id' | 'createdAt' | 'updatedAt'> = {
+      const userData: Omit<User, '_id' | 'createdAt' | 'updatedAt' | 'isActive' | 'password'> = {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         email: formData.email.trim().toLowerCase(),
@@ -82,10 +83,10 @@ const SignupScreen = () => {
       };
 
       await signUp(userData);
-      Alert.alert('Success', 'Account created successfully!');
+      simpleAlert('Account created successfully!', 'Success');
     } catch (error) {
       // Silently handle signup errors
-      Alert.alert('Error', 'Failed to create account. Please try again.');
+      simpleAlert('Failed to create account. Please try again.', 'Error');
     }
   };
 
