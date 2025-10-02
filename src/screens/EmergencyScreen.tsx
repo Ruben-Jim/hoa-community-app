@@ -141,118 +141,6 @@ const EmergencyScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-<<<<<<< HEAD
-      {/* Header with New Alert Button */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Emergency Alerts</Text>
-        <TouchableOpacity
-          style={styles.newAlertButton}
-          onPress={() => setShowNewAlertModal(true)}
-        >
-          <Ionicons name="add" size={20} color="#ffffff" />
-          <Text style={styles.newAlertButtonText}>New Alert</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Priority Filter */}
-      
-
-      <SafeAreaView style={styles.filterContainer}>
-        <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterContent}
-      >
-        <Text style={styles.filterLabel}>Priority:</Text>
-        <TouchableOpacity
-          style={[
-            styles.filterButton,
-            !selectedPriority && styles.filterButtonActive
-          ]}
-          onPress={() => setSelectedPriority(null)}
-        >
-          <Text style={[
-            styles.filterButtonText,
-            !selectedPriority && styles.filterButtonTextActive
-          ]}>
-            All
-          </Text>
-        </TouchableOpacity>
-        
-        {priorities.map((priority) => (
-          <TouchableOpacity
-            key={priority}
-            style={[
-              styles.filterButton,
-              selectedPriority === priority && styles.filterButtonActive
-            ]}
-            onPress={() => setSelectedPriority(priority)}
-          >
-            <Text style={[
-              styles.filterButtonText,
-              selectedPriority === priority && styles.filterButtonTextActive
-            ]}>
-              {priority}
-            </Text>
-          </TouchableOpacity>
-        ))}
-        </ScrollView>
-       </SafeAreaView>
-
-
-      {/* Category Filter */}
-      <SafeAreaView style={styles.filterContainer}>
-        <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        style={styles.filterContainer}
-        contentContainerStyle={styles.filterContent}
-      >
-        <Text style={styles.filterLabel}>Category:</Text>
-        <TouchableOpacity
-          style={[
-            styles.filterButton,
-            !selectedCategory && styles.filterButtonActive
-          ]}
-          onPress={() => setSelectedCategory(null)}
-        >
-          <Text style={[
-            styles.filterButtonText,
-            !selectedCategory && styles.filterButtonTextActive
-          ]}>
-            All
-          </Text>
-        </TouchableOpacity>
-        
-        {categories.map((category) => (
-          <TouchableOpacity
-            key={category}
-            style={[
-              styles.filterButton,
-              selectedCategory === category && styles.filterButtonActive
-            ]}
-            onPress={() => setSelectedCategory(category)}
-          >
-            <Text style={[
-              styles.filterButtonText,
-              selectedCategory === category && styles.filterButtonTextActive
-            ]}>
-              {category}
-            </Text>
-          </TouchableOpacity>
-        ))}
-        </ScrollView>
-      </SafeAreaView>
-
-
-      {/* Active Alerts Summary */}
-      {activeNotifications.length > 0 && (
-        <View style={styles.summaryCard}>
-          <Ionicons name="warning" size={24} color="#dc2626" />
-          <Text style={styles.summaryText}>
-            {activeNotifications.length} active alert{activeNotifications.length !== 1 ? 's' : ''}
-          </Text>
-=======
         {/* Header with New Alert Button (Board Members Only) */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
@@ -268,7 +156,6 @@ const EmergencyScreen = () => {
               <Text style={styles.newAlertButtonText}>New Alert</Text>
             </TouchableOpacity>
           )}
->>>>>>> PC/Experiments
         </View>
 
         {/* Priority Filter */}

@@ -199,22 +199,9 @@ const CommunityScreen = () => {
       {/* Category Filter */}
       <SafeAreaView style={styles.categoryContainer}>
         <ScrollView 
-<<<<<<< HEAD
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoryContent}
-      >
-        <TouchableOpacity
-          style={[
-            styles.categoryButton,
-            !selectedCategory && styles.categoryButtonActive
-          ]}
-          onPress={() => setSelectedCategory(null)}
-=======
           horizontal 
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categoryContent}
->>>>>>> PC/Experiments
         >
           <TouchableOpacity
             style={[
@@ -230,9 +217,6 @@ const CommunityScreen = () => {
               All
             </Text>
           </TouchableOpacity>
-<<<<<<< HEAD
-        ))}
-=======
           
           {categories.map((category) => (
             <TouchableOpacity
@@ -251,7 +235,6 @@ const CommunityScreen = () => {
               </Text>
             </TouchableOpacity>
           ))}
->>>>>>> PC/Experiments
         </ScrollView>
       </SafeAreaView>
 
@@ -593,12 +576,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     paddingVertical: 10,
     paddingBottom: -20,
-<<<<<<< HEAD
-    paddingTop: -40
-
-=======
     paddingTop: -40, 
->>>>>>> PC/Experiments
   },
   categoryContent: {
     paddingHorizontal: 15,
