@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
+import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import { webCompatibleAlert } from '../utils/webCompatibleAlert';
 
 const HomeScreen = () => {
@@ -88,9 +89,12 @@ const HomeScreen = () => {
         
         {user && (
           <View style={styles.userInfo}>
-            <Text style={styles.userName}>
-              Welcome back, {user.firstName} {user.lastName}
-            </Text>
+            <View style={styles.userNameContainer}>
+              <Text style={styles.userName}>
+                Welcome back, {user.firstName} {user.lastName}
+              </Text>
+              <BoardMemberIndicator />
+            </View>
             <Text style={styles.userRole}>
               {user.isBoardMember ? 'Board Member' : 'Resident'} • {user.address}
             </Text>
@@ -240,11 +244,16 @@ const styles = StyleSheet.create({
   userInfo: {
     marginTop: 10,
   },
+  userNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
   userName: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#ffffff',
-    marginBottom: 4,
   },
   userRole: {
     fontSize: 14,

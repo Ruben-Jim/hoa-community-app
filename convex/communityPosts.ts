@@ -173,4 +173,25 @@ export const removeComment = mutation({
   handler: async (ctx, args) => {
     await ctx.db.delete(args.id);
   },
+});
+
+// Get all comments for admin management
+export const getAllComments = query({
+  args: {},
+  handler: async (ctx) => {
+    const comments = await ctx.db
+      .query("comments")
+      .order("desc")
+      .collect();
+    
+    // Get post information for each comment
+    const commentsWithPosts = await Promise.all(
+      comments.map(async (comment) => {
+        const post = await ctx.db.get(comment.postId);
+        return { ...comment, postTitle: post?.title || 'Deleted Post' };
+      })
+    );
+    
+    return commentsWithPosts;
+  },
 }); 

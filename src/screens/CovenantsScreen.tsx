@@ -12,8 +12,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
+import { useAuth } from '../context/AuthContext';
+import BoardMemberIndicator from '../components/BoardMemberIndicator';
 
 const CovenantsScreen = () => {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
@@ -72,6 +75,17 @@ const CovenantsScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <Text style={styles.headerTitle}>Covenants & Rules</Text>
+          <BoardMemberIndicator />
+        </View>
+        <Text style={styles.headerSubtitle}>
+          Community guidelines and regulations
+        </Text>
+      </View>
+      
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>

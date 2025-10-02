@@ -9,6 +9,7 @@ interface AuthContextType extends AuthState {
   signUp: (userData: Omit<User, '_id' | 'createdAt' | 'updatedAt' | 'isActive'>) => Promise<void>;
   signOut: () => Promise<void>;
   updateUser: (updates: Partial<User>) => Promise<void>;
+  isUserBlocked: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -105,6 +106,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         ...userData,
         _id: residentId,
         isActive: true,
+        isBlocked: false,
+        blockReason: undefined,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
@@ -167,12 +170,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const isUserBlocked = () => {
+    return authState.user?.isBlocked || false;
+  };
+
   const value: AuthContextType = {
     ...authState,
     signIn,
     signUp,
     signOut,
     updateUser,
+    isUserBlocked,
   };
 
   return (

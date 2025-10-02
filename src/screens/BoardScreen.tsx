@@ -12,8 +12,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
+import { useAuth } from '../context/AuthContext';
+import BoardMemberIndicator from '../components/BoardMemberIndicator';
 
 const BoardScreen = () => {
+  const { user } = useAuth();
+  
   const handleContact = (member: any, type: 'phone' | 'email') => {
     if (type === 'phone') {
       Linking.openURL(`tel:${member.phone}`);
@@ -36,7 +40,10 @@ const BoardScreen = () => {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Board of Directors</Text>
+        <View style={styles.headerTop}>
+          <Text style={styles.headerTitle}>Board of Directors</Text>
+          <BoardMemberIndicator />
+        </View>
         <Text style={styles.headerSubtitle}>
           Your elected representatives serving the community
         </Text>
@@ -116,11 +123,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#1f2937',
-    marginBottom: 8,
   },
   headerSubtitle: {
     fontSize: 16,

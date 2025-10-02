@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
+import BoardMemberIndicator from '../components/BoardMemberIndicator';
 
 const CommunityScreen = () => {
   const { user } = useAuth();
@@ -181,7 +182,10 @@ const CommunityScreen = () => {
       <View style={styles.container}>
       {/* Header with New Post Button */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Community Forum</Text>
+        <View style={styles.headerLeft}>
+          <Text style={styles.headerTitle}>Community Forum</Text>
+          <BoardMemberIndicator />
+        </View>
         <TouchableOpacity
           style={styles.newPostButton}
           onPress={() => setShowNewPostModal(true)}
@@ -508,6 +512,11 @@ const styles = StyleSheet.create({
     padding: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   headerTitle: {
     fontSize: 20,

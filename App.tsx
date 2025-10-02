@@ -15,11 +15,13 @@ import CommunityScreen from './src/screens/CommunityScreen';
 import CovenantsScreen from './src/screens/CovenantsScreen';
 import EmergencyScreen from './src/screens/EmergencyScreen';
 import FeesScreen from './src/screens/FeesScreen';
+import BlockedAccountScreen from './src/screens/BlockedAccountScreen';
+import AdminScreen from './src/screens/AdminScreen';
 
 const Tab = createBottomTabNavigator();
 
 const MainApp = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, isUserBlocked, user } = useAuth();
 
   if (isLoading) {
     return (
@@ -32,6 +34,13 @@ const MainApp = () => {
   if (!isAuthenticated) {
     return <AuthNavigator />;
   }
+
+  // Check if user is blocked
+  if (isUserBlocked()) {
+    return <BlockedAccountScreen />;
+  }
+
+  const isBoardMember = user?.isBoardMember && user?.isActive;
 
   return (
     <Tab.Navigator
@@ -48,6 +57,7 @@ const MainApp = () => {
             Covenants: 'document-text',
             Emergency: 'warning',
             Fees: 'card',
+            Admin: 'settings',
           };
           const name = iconMap[route.name] ?? 'ellipse';
           return <Ionicons name={name as any} size={size} color={color} />;
@@ -59,6 +69,15 @@ const MainApp = () => {
       <Tab.Screen name="Covenants" component={CovenantsScreen} />
       <Tab.Screen name="Community" component={CommunityScreen} />
       <Tab.Screen name="Emergency" component={EmergencyScreen} />
+      {isBoardMember && (
+        <Tab.Screen 
+          name="Admin" 
+          component={AdminScreen}
+          options={{
+            tabBarLabel: 'Admin',
+          }}
+        />
+      )}
       {/* <Tab.Screen name="Fees" component={FeesScreen} /> */}
     </Tab.Navigator>
   );

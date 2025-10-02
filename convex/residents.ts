@@ -56,6 +56,8 @@ export const create = mutation({
     const id = await ctx.db.insert("residents", {
       ...args,
       isActive: true,
+      isBlocked: false,
+      blockReason: undefined,
       createdAt: now,
       updatedAt: now,
     });
@@ -150,5 +152,24 @@ export const getActive = query({
       .query("residents")
       .filter((q) => q.eq(q.field("isActive"), true))
       .collect();
+  },
+});
+
+// Block or unblock a resident
+export const setBlockStatus = mutation({
+  args: {
+    id: v.id("residents"),
+    isBlocked: v.boolean(),
+    blockReason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    await ctx.db.patch(args.id, {
+      isBlocked: args.isBlocked,
+      blockReason: args.blockReason,
+      updatedAt: now,
+    });
+    
+    return { success: true };
   },
 });

@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
+import BoardMemberIndicator from '../components/BoardMemberIndicator';
 
 const EmergencyScreen = () => {
   const { user } = useAuth();
@@ -144,12 +145,7 @@ const EmergencyScreen = () => {
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <Text style={styles.headerTitle}>Emergency Alerts</Text>
-            {isBoardMember && (
-              <View style={styles.boardMemberBadge}>
-                <Ionicons name="shield" size={12} color="#ffffff" />
-                <Text style={styles.boardMemberText}>Board Member</Text>
-              </View>
-            )}
+            <BoardMemberIndicator />
           </View>
           {isBoardMember && (
             <TouchableOpacity
@@ -480,20 +476,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#1f2937',
-  },
-  boardMemberBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#10b981',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-  },
-  boardMemberText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#ffffff',
   },
   newAlertButton: {
     flexDirection: 'row',

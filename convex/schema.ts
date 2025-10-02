@@ -132,6 +132,8 @@ export default defineSchema({
     isResident: v.boolean(),
     isBoardMember: v.boolean(),
     isActive: v.boolean(),
+    isBlocked: v.boolean(),
+    blockReason: v.optional(v.string()),
     password: v.optional(v.string()), // In production, this should be hashed
     createdAt: v.number(),
     updatedAt: v.number(),

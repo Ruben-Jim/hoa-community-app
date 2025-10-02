@@ -89,6 +89,8 @@ export interface User {
   isResident: boolean;
   isBoardMember: boolean;
   isActive: boolean;
+  isBlocked: boolean;
+  blockReason?: string;
   password?: string;
   createdAt: number;
   updatedAt: number;
