@@ -151,7 +151,8 @@ const HomeScreen = () => {
       )}
 
       {/* Recent Community Posts */}
-        {communityPosts && communityPosts.length > 0 && (
+<<<<<<< HEAD
+      {communityPosts && communityPosts.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Community Posts</Text>
           {communityPosts.slice(0, 2).map((post: any) => (
