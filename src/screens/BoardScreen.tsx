@@ -13,12 +13,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-<<<<<<< HEAD
 import { boardMembers as boardMembersSample } from '../data/sampleData'; 
-=======
 import { useAuth } from '../context/AuthContext';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
->>>>>>> PC/Experiments
 
 const BoardScreen = () => {
   const { user } = useAuth();

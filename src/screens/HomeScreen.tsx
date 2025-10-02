@@ -150,7 +150,6 @@ const HomeScreen = () => {
       )}
 
       {/* Recent Community Posts */}
-<<<<<<< HEAD
       {communityPosts && communityPosts.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Community Posts</Text>
@@ -172,40 +171,6 @@ const HomeScreen = () => {
                   <Ionicons name="chatbubble" size={16} color="#6b7280" />
                   <Text style={styles.postStatsText}>{post.comments?.length ?? 0}</Text>
                 </View>
-=======
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Recent Community Posts</Text>
-        {communityPosts?.slice(0, 2).map((post: any) => (
-          <View key={post._id} style={styles.postCard}>
-            <View style={styles.postHeader}>
-              <View style={styles.postAuthorInfo}>
-                <View style={styles.postAvatar}>
-                  {post.authorProfileImage ? (
-                    <Image 
-                      source={{ uri: post.authorProfileImage }} 
-                      style={styles.postAvatarImage}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <Ionicons name="person" size={20} color="#6b7280" />
-                  )}
-                </View>
-                <Text style={styles.postAuthor}>{post.author}</Text>
-              </View>
-              <Text style={styles.postCategory}>{post.category}</Text>
-            </View>
-            <Text style={styles.postTitle}>{post.title}</Text>
-            <Text style={styles.postContent} numberOfLines={2}>
-              {post.content}
-            </Text>
-            <View style={styles.postFooter}>
-              <Text style={styles.postTime}>{formatDate(new Date(post.createdAt).toISOString())}</Text>
-              <View style={styles.postStats}>
-                <Ionicons name="heart" size={16} color="#6b7280" />
-                <Text style={styles.postStatsText}>{post.likes}</Text>
-                <Ionicons name="chatbubble" size={16} color="#6b7280" />
-                <Text style={styles.postStatsText}>{post.comments?.length ?? 0}</Text>
->>>>>>> PC/Experiments
               </View>
             </View>
           ))}
