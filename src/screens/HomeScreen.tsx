@@ -76,13 +76,21 @@ const HomeScreen = () => {
       <LinearGradient
         colors={['#2563eb', '#1d4ed5']}
         style={styles.header}
-
       >
-
-        <Text style={styles.welcomeText}>Welcome to</Text>
-        <Text style={styles.hoaName}>{hoaInfo?.name ?? 'HOA'}</Text>
-        <Text style={styles.subtitle}>Your Community Connection</Text>
-
+        <View style={styles.headerTop}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.welcomeText}>Welcome to</Text>
+            <Text style={styles.hoaName}>{hoaInfo?.name ?? 'HOA'}</Text>
+            <Text style={styles.subtitle}>Your Community Connection</Text>
+          </View>
+          
+          <TouchableOpacity
+            style={styles.signOutButton}
+            onPress={handleSignOut}
+          >
+            <Ionicons name="log-out-outline" size={24} color="#ffffff" />
+          </TouchableOpacity>
+        </View>
               
         {user && (
           <View style={styles.userInfo}>
@@ -248,8 +256,14 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 20,
   },
+  headerLeft: {
+    flex: 1,
+  },
   signOutButton: {
     padding: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 8,
+    marginLeft: 12,
   },
   userInfo: {
     marginTop: 10,
