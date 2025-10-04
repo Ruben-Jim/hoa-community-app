@@ -12,7 +12,6 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
@@ -73,10 +72,12 @@ const HomeScreen = () => {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container}>
       {/* Header */}
-      <LinearGradient
-        colors={['#2563eb', '#1d4ed5']}
+      <ImageBackground
+        source={require('../../assets/hoa-4k.jpg')}
         style={styles.header}
+        imageStyle={styles.headerImage}
       >
+        <View style={styles.headerOverlay} />
         <View style={styles.headerTop}>
           <View style={styles.headerLeft}>
             <Text style={styles.welcomeText}>Welcome to</Text>
@@ -105,7 +106,7 @@ const HomeScreen = () => {
             </Text>
           </View>
         )}
-      </LinearGradient>
+      </ImageBackground>
 
       {/* Quick Actions */}
       <View style={styles.quickActions}>
@@ -136,8 +137,11 @@ const HomeScreen = () => {
 
       {/* Active Notifications */}
       {activeNotifications.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Active Alerts</Text>
+        <View style={[styles.section, styles.emergencySection]}>
+          <View style={styles.emergencyHeader}>
+            <Ionicons name="warning" size={24} color="#dc2626" />
+            <Text style={styles.emergencyTitle}>Active Alerts</Text>
+          </View>
           {activeNotifications.slice(0, 2).map((notification: any) => (
             <View key={notification._id} style={styles.notificationCard}>
               <View style={styles.notificationHeader}>
@@ -159,7 +163,10 @@ const HomeScreen = () => {
 
       {/* Recent Community Posts */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Recent Community Posts</Text>
+        <View style={styles.communityHeader}>
+          <Ionicons name="people" size={24} color="#2563eb" />
+          <Text style={styles.sectionTitle}>Recent Community Posts</Text>
+        </View>
         {communityPosts?.slice(0, 2).map((post: any) => (
           <View key={post._id} style={styles.postCard}>
             <View style={styles.postHeader}>
@@ -198,7 +205,10 @@ const HomeScreen = () => {
 
       {/* Office Information */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Office Information</Text>
+        <View style={styles.officeHeader}>
+          <Ionicons name="business" size={24} color="#059669" />
+          <Text style={styles.sectionTitle}>Office Information</Text>
+        </View>
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
             <Ionicons name="location" size={20} color="#6b7280" />
@@ -233,14 +243,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#f3f4f6',
   },
   header: {
+    height: 240,
     padding: 20,
     paddingTop: 40,
-    paddingBottom: 30,
+    paddingBottom: 20,
     position: 'relative',
+    justifyContent: 'space-between',
   },
   headerImage: {
     borderRadius: 0,
-    resizeMode: "stretch",
+    resizeMode: 'stretch',
+    width: '100%',
   },
   headerOverlay: {
     position: 'absolute',
@@ -248,13 +261,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 20,
+    marginBottom: 10,
+    zIndex: 1,
   },
   headerLeft: {
     flex: 1,
@@ -266,7 +280,8 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   userInfo: {
-    marginTop: 10,
+    marginTop: 5,
+    zIndex: 1,
   },
   userNameContainer: {
     flexDirection: 'row',
@@ -275,7 +290,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   userName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#ffffff',
   },
@@ -294,7 +309,7 @@ const styles = StyleSheet.create({
   },
   hoaName: {
     color: '#ffffff',
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     marginTop: 5,
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
@@ -335,6 +350,14 @@ const styles = StyleSheet.create({
   },
   section: {
     margin: 15,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    padding: 20,
   },
   sectionTitle: {
     fontSize: 18,
@@ -342,13 +365,44 @@ const styles = StyleSheet.create({
     color: '#322D2D',
     marginBottom: 15,
   },
-  notificationCard: {
-    backgroundColor: '#ffffff',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
+  emergencySection: {
     borderLeftWidth: 4,
     borderLeftColor: '#dc2626',
+    backgroundColor: '#fef2f2',
+  },
+  emergencyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  emergencyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#dc2626',
+    marginLeft: 8,
+  },
+  communityHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  officeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  notificationCard: {
+    backgroundColor: '#fef2f2',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#dc2626',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   notificationHeader: {
     flexDirection: 'row',
@@ -372,10 +426,17 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   postCard: {
-    backgroundColor: '#ffffff',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
+    backgroundColor: '#f8fafc',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   postHeader: {
     flexDirection: 'row',
@@ -417,14 +478,16 @@ const styles = StyleSheet.create({
   },
   postTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#1f2937',
     marginBottom: 8,
+    lineHeight: 22,
   },
   postContent: {
     fontSize: 14,
-    color: '#6b7280',
-    lineHeight: 20,
+    color: '#374151',
+    lineHeight: 22,
+    marginBottom: 8,
   },
   postFooter: {
     flexDirection: 'row',
