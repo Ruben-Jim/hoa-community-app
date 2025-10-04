@@ -16,6 +16,7 @@ import { api } from '../../convex/_generated/api';
 
 import { useAuth } from '../context/AuthContext';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
+import CustomTabBar from '../components/CustomTabBar';
 
 const BoardScreen = () => {
   const { user } = useAuth();
@@ -41,6 +42,9 @@ const BoardScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container}>
+      {/* Custom Tab Bar */}
+      <CustomTabBar />
+      
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <Text style={styles.headerTitle}>Board of Directors</Text>

@@ -17,6 +17,7 @@ import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
+import CustomTabBar from '../components/CustomTabBar';
 import { webCompatibleAlert } from '../utils/webCompatibleAlert';
 
 const HomeScreen = () => {
@@ -107,6 +108,9 @@ const HomeScreen = () => {
           </View>
         )}
       </ImageBackground>
+
+      {/* Custom Tab Bar */}
+      <CustomTabBar />
 
       {/* Quick Actions */}
       <View style={styles.quickActions}>

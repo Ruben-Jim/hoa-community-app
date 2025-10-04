@@ -19,6 +19,7 @@ import { useQuery, useMutation } from 'convex/react';
 import { useConvex } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
+import CustomTabBar from '../components/CustomTabBar';
 
 const AdminScreen = () => {
   const { user } = useAuth();
@@ -726,6 +727,9 @@ const AdminScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
+        {/* Custom Tab Bar */}
+        <CustomTabBar />
+        
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Admin Dashboard</Text>

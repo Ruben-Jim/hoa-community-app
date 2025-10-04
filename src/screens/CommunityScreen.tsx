@@ -16,6 +16,7 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
+import CustomTabBar from '../components/CustomTabBar';
 
 const CommunityScreen = () => {
   const { user } = useAuth();
@@ -181,6 +182,9 @@ const CommunityScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
+      {/* Custom Tab Bar */}
+      <CustomTabBar />
+      
       {/* Header with New Post Button */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>

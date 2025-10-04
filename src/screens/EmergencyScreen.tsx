@@ -15,6 +15,7 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
+import CustomTabBar from '../components/CustomTabBar';
 
 const EmergencyScreen = () => {
   const { user } = useAuth();
@@ -141,6 +142,9 @@ const EmergencyScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
+        {/* Custom Tab Bar */}
+        <CustomTabBar />
+        
         {/* Header with New Alert Button (Board Members Only) */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>

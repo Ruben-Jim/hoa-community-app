@@ -14,6 +14,7 @@ import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
+import CustomTabBar from '../components/CustomTabBar';
 
 const CovenantsScreen = () => {
   const { user } = useAuth();
@@ -75,6 +76,9 @@ const CovenantsScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container}>
+      {/* Custom Tab Bar */}
+      <CustomTabBar />
+      
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
