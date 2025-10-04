@@ -10,8 +10,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
+    "build:web": "expo export -p web --clear",
     "deploy": "gh-pages --nojekyll -d dist",
-    "predeploy": "expo export -p web"
+    "predeploy": "npm run build:web"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",

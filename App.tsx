@@ -8,6 +8,7 @@ import { ConvexProvider, ConvexReactClient } from 'convex/react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import AuthNavigator from './src/navigation/AuthNavigator';
+import FontLoader from './src/components/FontLoader';
 
 import HomeScreen from './src/screens/HomeScreen';
 import BoardScreen from './src/screens/BoardScreen';
@@ -73,14 +74,16 @@ export default function App() {
   }, [convexUrl]);
 
   const content = (
-    <SafeAreaProvider>
-      <AuthProvider>
-        <NavigationContainer>
-          <MainApp />
-          <StatusBar style="auto" />
-        </NavigationContainer>
-      </AuthProvider>
-    </SafeAreaProvider>
+    <FontLoader>
+      <SafeAreaProvider>
+        <AuthProvider>
+          <NavigationContainer>
+            <MainApp />
+            <StatusBar style="auto" />
+          </NavigationContainer>
+        </AuthProvider>
+      </SafeAreaProvider>
+    </FontLoader>
   );
 
   return convex ? (
