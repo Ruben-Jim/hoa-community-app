@@ -9,10 +9,25 @@ import {
   Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
+
+type RootStackParamList = {
+  NotificationDetail: {
+    notification: {
+      title: string;
+      content: string;
+      priority: string;
+      category: string;
+      timestamp: string;
+      isActive: boolean;
+    };
+  };
+};
+
+type NotificationDetailScreenRouteProp = RouteProp<RootStackParamList, 'NotificationDetail'>;
 
 const NotificationDetailScreen = () => {
-  const route = useRoute();
+  const route = useRoute<NotificationDetailScreenRouteProp>();
   const navigation = useNavigation();
   const notification = route.params?.notification;
 

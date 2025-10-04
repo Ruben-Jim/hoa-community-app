@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "hoa-community-app",
+    "name": "HOA Community",
     "slug": "hoa-community-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,9 +13,13 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourcompany.hoacommunityapp",
+      "buildNumber": "1"
     },
     "android": {
+      "package": "com.yourcompany.hoacommunityapp",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"

@@ -129,8 +129,8 @@ const HomeScreen = () => {
           style={styles.actionButton}
           onPress={handleEmergency}
         >
-          <Ionicons name="warning" size={24} color="#dc2626" />
-          <Text style={[styles.actionText, { color: '#dc2626' }]}>Emergency</Text>
+          <Ionicons name="warning" size={24} color="#2563eb" />
+          <Text style={[styles.actionText, { color: '#2563eb' }]}>Profile</Text>
         </TouchableOpacity>
       </View>
 
