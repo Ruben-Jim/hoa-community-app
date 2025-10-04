@@ -118,7 +118,7 @@ const HomeScreen = () => {
           style={styles.actionButton}
           onPress={() => handleContact('phone')}
         >
-          <Ionicons name="call" size={24} color="#2563eb" />
+          <Ionicons name="call" size={24} color="#64748b" />
           <Text style={styles.actionText}>Call Office</Text>
         </TouchableOpacity>
 
@@ -126,7 +126,7 @@ const HomeScreen = () => {
           style={styles.actionButton}
           onPress={() => handleContact('email')}
         >
-          <Ionicons name="mail" size={24} color="#2563eb" />
+          <Ionicons name="mail" size={24} color="#64748b" />
           <Text style={styles.actionText}>Email</Text>
         </TouchableOpacity>
 
@@ -134,8 +134,8 @@ const HomeScreen = () => {
           style={styles.actionButton}
           onPress={handleEmergency}
         >
-          <Ionicons name="warning" size={24} color="#2563eb" />
-          <Text style={[styles.actionText, { color: '#2563eb' }]}>Profile</Text>
+          <Ionicons name="warning" size={24} color="#64748b" />
+          <Text style={styles.actionText}>Profile</Text>
         </TouchableOpacity>
       </View>
 
@@ -143,7 +143,7 @@ const HomeScreen = () => {
       {activeNotifications.length > 0 && (
         <View style={[styles.section, styles.emergencySection]}>
           <View style={styles.emergencyHeader}>
-            <Ionicons name="warning" size={24} color="#dc2626" />
+            <Ionicons name="warning" size={24} color="#ef4444" />
             <Text style={styles.emergencyTitle}>Active Alerts</Text>
           </View>
           {activeNotifications.slice(0, 2).map((notification: any) => (
@@ -168,7 +168,7 @@ const HomeScreen = () => {
       {/* Recent Community Posts */}
       <View style={styles.section}>
         <View style={styles.communityHeader}>
-          <Ionicons name="people" size={24} color="#2563eb" />
+          <Ionicons name="people" size={24} color="#64748b" />
           <Text style={styles.sectionTitle}>Recent Community Posts</Text>
         </View>
         {communityPosts?.slice(0, 2).map((post: any) => (
@@ -210,7 +210,7 @@ const HomeScreen = () => {
       {/* Office Information */}
       <View style={styles.section}>
         <View style={styles.officeHeader}>
-          <Ionicons name="business" size={24} color="#059669" />
+          <Ionicons name="business" size={24} color="#64748b" />
           <Text style={styles.sectionTitle}>Office Information</Text>
         </View>
         <View style={styles.infoCard}>
@@ -335,12 +335,14 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#ffffff',
     margin: 15,
-    borderRadius: 12,
+    borderRadius: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
   },
   actionButton: {
     alignItems: 'center',
@@ -349,29 +351,31 @@ const styles = StyleSheet.create({
   actionText: {
     marginTop: 8,
     fontSize: 12,
-    fontWeight: '600',
-    color: '#374151',
+    fontWeight: '500',
+    color: '#64748b',
   },
   section: {
     margin: 15,
     backgroundColor: '#ffffff',
-    borderRadius: 12,
+    borderRadius: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
     padding: 20,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#322D2D',
+    fontWeight: '600',
+    color: '#1e293b',
     marginBottom: 15,
   },
   emergencySection: {
     borderLeftWidth: 4,
-    borderLeftColor: '#dc2626',
+    borderLeftColor: '#ef4444',
     backgroundColor: '#fef2f2',
   },
   emergencyHeader: {
@@ -381,14 +385,16 @@ const styles = StyleSheet.create({
   },
   emergencyTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#dc2626',
+    fontWeight: '600',
+    color: '#ef4444',
     marginLeft: 8,
   },
   communityHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 15,
+    
+    
   },
   officeHeader: {
     flexDirection: 'row',
@@ -401,12 +407,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#dc2626',
+    borderLeftColor: '#ef4444',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   notificationHeader: {
     flexDirection: 'row',
@@ -437,10 +443,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   postHeader: {
     flexDirection: 'row',

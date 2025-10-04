@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   Alert,
   Modal,
   Image,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,6 +19,7 @@ import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import CustomTabBar from '../components/CustomTabBar';
+import { AnimationConfig, createFadeIn, createSlideIn, createScaleIn, createBounceIn } from '../utils/animations';
 
 const CommunityScreen = () => {
   const { user } = useAuth();
@@ -32,6 +35,13 @@ const CommunityScreen = () => {
     category: 'General' as any,
   });
 
+  // Animation values
+  const modalOpacity = useRef(new Animated.Value(0)).current;
+  const modalScale = useRef(new Animated.Value(0.8)).current;
+  const modalTranslateY = useRef(new Animated.Value(50)).current;
+  const postCardAnimations = useRef<Animated.Value[]>([]).current;
+  const commentAnimations = useRef<Animated.Value[]>([]).current;
+
   // Convex queries
   const posts = useQuery(api.communityPosts.getAll) ?? [];
 
@@ -42,6 +52,65 @@ const CommunityScreen = () => {
 
   const categories = ['General', 'Event', 'Complaint', 'Suggestion', 'Lost & Found'];
   const COMMENTS_PREVIEW_LIMIT = 2; // Show only 2 comments initially
+
+  // Initialize post card animations
+  useEffect(() => {
+    postCardAnimations.length = posts.length;
+    for (let i = 0; i < posts.length; i++) {
+      if (!postCardAnimations[i]) {
+        postCardAnimations[i] = new Animated.Value(0);
+      }
+    }
+  }, [posts.length]);
+
+  // Animate post cards on load
+  useEffect(() => {
+    const animations = postCardAnimations.map((anim, index) => 
+      createSlideIn(anim, -30, index * 100)
+    );
+    Animated.stagger(100, animations).start();
+  }, [posts.length]);
+
+  // Modal animation functions
+  const openModal = () => {
+    setShowNewPostModal(true);
+    Animated.parallel([
+      createFadeIn(modalOpacity),
+      createScaleIn(modalScale),
+      createSlideIn(modalTranslateY, 0),
+    ]).start();
+  };
+
+  const closeModal = () => {
+    Animated.parallel([
+      Animated.timing(modalOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
+      Animated.timing(modalScale, { toValue: 0.8, duration: 200, useNativeDriver: true }),
+      Animated.timing(modalTranslateY, { toValue: 50, duration: 200, useNativeDriver: true }),
+    ]).start(() => {
+      setShowNewPostModal(false);
+    });
+  };
+
+  const openCommentModal = (post: any) => {
+    setSelectedPostForComment(post);
+    setShowCommentModal(true);
+    Animated.parallel([
+      createFadeIn(modalOpacity),
+      createScaleIn(modalScale),
+      createSlideIn(modalTranslateY, 0),
+    ]).start();
+  };
+
+  const closeCommentModal = () => {
+    Animated.parallel([
+      Animated.timing(modalOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
+      Animated.timing(modalScale, { toValue: 0.8, duration: 200, useNativeDriver: true }),
+      Animated.timing(modalTranslateY, { toValue: 50, duration: 200, useNativeDriver: true }),
+    ]).start(() => {
+      setShowCommentModal(false);
+      setSelectedPostForComment(null);
+    });
+  };
 
   const filteredPosts = posts.filter((post: any) =>
     !selectedCategory || post.category === selectedCategory
@@ -110,12 +179,16 @@ const CommunityScreen = () => {
         content: newComment.trim(),
       });
 
-      // Auto-expand comments for the post that just got a new comment
-      setExpandedComments(prev => new Set(prev).add(selectedPostForComment._id));
-
-      setNewComment('');
-      setShowCommentModal(false);
-      setSelectedPostForComment(null);
+      // Animate success
+      Animated.sequence([
+        createBounceIn(modalScale),
+        Animated.delay(200),
+      ]).start(() => {
+        // Auto-expand comments for the post that just got a new comment
+        setExpandedComments(prev => new Set(prev).add(selectedPostForComment._id));
+        setNewComment('');
+        closeCommentModal();
+      });
     } catch (error) {
       // Silently handle comment errors
       Alert.alert('Error', 'Failed to add comment');
@@ -141,8 +214,14 @@ const CommunityScreen = () => {
         author: `${user.firstName} ${user.lastName}`,
       });
 
-      setNewPost({ title: '', content: '', category: 'General' });
-      setShowNewPostModal(false);
+      // Animate success
+      Animated.sequence([
+        createBounceIn(modalScale),
+        Animated.delay(200),
+      ]).start(() => {
+        setNewPost({ title: '', content: '', category: 'General' });
+        closeModal();
+      });
     } catch (error) {
       // Silently handle post creation errors
       Alert.alert('Error', 'Failed to create post');
@@ -193,7 +272,7 @@ const CommunityScreen = () => {
         </View>
         <TouchableOpacity
           style={styles.newPostButton}
-          onPress={() => setShowNewPostModal(true)}
+          onPress={openModal}
         >
           <Ionicons name="add" size={20} color="#ffffff" />
           <Text style={styles.newPostButtonText}>New Post</Text>
@@ -253,8 +332,24 @@ const CommunityScreen = () => {
             </Text>
           </View>
         ) : (
-          filteredPosts.map((post: any) => (
-            <View key={post._id} style={styles.postCard}>
+          filteredPosts.map((post: any, index: number) => (
+            <Animated.View 
+              key={post._id} 
+              style={[
+                styles.postCard,
+                {
+                  opacity: postCardAnimations[index] || 1,
+                  transform: [
+                    {
+                      translateY: postCardAnimations[index]?.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-30, 0],
+                      }) || 0,
+                    },
+                  ],
+                }
+              ]}
+            >
               <View style={styles.postHeader}>
                 <View style={styles.postAuthor}>
                   <View style={styles.avatar}>
@@ -399,7 +494,7 @@ const CommunityScreen = () => {
                   )}
                 </View>
               )}
-            </View>
+            </Animated.View>
           ))
         )}
       </ScrollView>
@@ -407,13 +502,22 @@ const CommunityScreen = () => {
       {/* New Post Modal */}
       <Modal
         visible={showNewPostModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
+        transparent={true}
+        animationType="none"
       >
-        <View style={styles.modalContainer}>
+        <Animated.View style={[styles.modalOverlay, { opacity: modalOpacity }]}>
+          <Animated.View style={[
+            styles.modalContainer,
+            {
+              transform: [
+                { scale: modalScale },
+                { translateY: modalTranslateY }
+              ]
+            }
+          ]}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Create New Post</Text>
-            <TouchableOpacity onPress={() => setShowNewPostModal(false)}>
+            <TouchableOpacity onPress={closeModal}>
               <Ionicons name="close" size={24} color="#6b7280" />
             </TouchableOpacity>
           </View>
@@ -462,7 +566,7 @@ const CommunityScreen = () => {
           <View style={styles.modalFooter}>
             <TouchableOpacity
               style={styles.cancelButton}
-              onPress={() => setShowNewPostModal(false)}
+              onPress={closeModal}
             >
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
@@ -474,17 +578,26 @@ const CommunityScreen = () => {
               <Text style={styles.createButtonText}>Create Post</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </Animated.View>
+        </Animated.View>
       </Modal>
 
       {/* Comment Modal */}
       <Modal
         visible={showCommentModal}
-        animationType="slide"
         transparent={true}
+        animationType="none"
       >
-        <View style={styles.commentModalOverlay}>
-          <View style={styles.commentModalContainer}>
+        <Animated.View style={[styles.commentModalOverlay, { opacity: modalOpacity }]}>
+          <Animated.View style={[
+            styles.commentModalContainer,
+            {
+              transform: [
+                { scale: modalScale },
+                { translateY: modalTranslateY }
+              ]
+            }
+          ]}>
             <View style={styles.commentModalHeader}>
               <View style={styles.commentModalHeaderContent}>
                 <Text style={styles.modalTitle}>Add Comment</Text>
@@ -494,7 +607,7 @@ const CommunityScreen = () => {
                   </Text>
                 )}
               </View>
-              <TouchableOpacity onPress={() => setShowCommentModal(false)}>
+              <TouchableOpacity onPress={closeCommentModal}>
                 <Ionicons name="close" size={24} color="#6b7280" />
               </TouchableOpacity>
             </View>
@@ -514,7 +627,7 @@ const CommunityScreen = () => {
             <View style={styles.commentModalFooter}>
               <TouchableOpacity
                 style={styles.cancelButton}
-                onPress={() => setShowCommentModal(false)}
+                onPress={closeCommentModal}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
@@ -526,8 +639,8 @@ const CommunityScreen = () => {
                 <Text style={styles.createButtonText}>Add Comment</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </Animated.View>
+        </Animated.View>
       </Modal>
       </View>
     </SafeAreaView>
@@ -804,9 +917,24 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#9ca3af',
   },
-  modalContainer: {
+  modalOverlay: {
     flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
     backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    margin: 20,
+    maxHeight: '80%',
+    width: '90%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
   },
   modalHeader: {
     flexDirection: 'row',

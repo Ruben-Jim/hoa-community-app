@@ -19,12 +19,12 @@ const CustomTabBar = () => {
   const isBoardMember = user?.isBoardMember && user?.isActive;
 
   const tabs: TabItem[] = [
-    { name: 'Home', icon: 'home', label: 'Home', color: '#2563eb' },
-    { name: 'Board', icon: 'people', label: 'Board', color: '#059669' },
-    { name: 'Community', icon: 'chatbubbles', label: 'Community', color: '#7c3aed' },
-    { name: 'Covenants', icon: 'document-text', label: 'Covenants', color: '#dc2626' },
-    { name: 'Emergency', icon: 'warning', label: 'Emergency', color: '#ea580c' },
-    ...(isBoardMember ? [{ name: 'Admin', icon: 'settings', label: 'Admin', color: '#8b5cf6' }] : []),
+    { name: 'Home', icon: 'home', label: 'Home', color: '#6b7280' },
+    { name: 'Board', icon: 'people', label: 'Board', color: '#6b7280' },
+    { name: 'Community', icon: 'chatbubbles', label: 'Community', color: '#6b7280' },
+    { name: 'Covenants', icon: 'document-text', label: 'Covenants', color: '#6b7280' },
+    { name: 'Emergency', icon: 'warning', label: 'Emergency', color: '#6b7280' },
+    ...(isBoardMember ? [{ name: 'Admin', icon: 'settings', label: 'Admin', color: '#6b7280' }] : []),
   ];
 
   const handleTabPress = (tabName: string) => {
@@ -44,7 +44,7 @@ const CustomTabBar = () => {
             <Ionicons
               name={tab.icon as any}
               size={20}
-              color={isActive ? '#ffffff' : tab.color}
+              color={isActive ? '#1e293b' : tab.color}
             />
             <Text style={[styles.tabLabel, isActive && styles.activeTabLabel]}>
               {tab.label}
@@ -62,35 +62,47 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     marginHorizontal: 15,
     marginTop: 10,
-    borderRadius: 12,
-    padding: 8,
+    borderRadius: 16,
+    padding: 6,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
     justifyContent: 'space-around',
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
   },
   tab: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: 12,
     marginHorizontal: 2,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   activeTab: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#f8fbfe',
+    borderColor: '#64748b',
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   tabLabel: {
     fontSize: 10,
-    fontWeight: '600',
-    color: '#6b7280',
+    fontWeight: '500',
+    color: '#64748b',
     marginTop: 4,
     textAlign: 'center',
   },
   activeTabLabel: {
-    color: '#ffffff',
+    color: '#1e293b',
+    fontWeight: '600',
   },
 });
 

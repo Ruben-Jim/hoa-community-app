@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
   RefreshControl,
   FlatList,
   Image,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +22,7 @@ import { useConvex } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
 import CustomTabBar from '../components/CustomTabBar';
+import { createFadeIn, createScaleIn, createSlideIn, createBounceIn } from '../utils/animations';
 
 const AdminScreen = () => {
   const { user } = useAuth();
@@ -80,6 +83,25 @@ const AdminScreen = () => {
     isActive: true,
   });
 
+  // Animation values
+  const blockModalOpacity = useRef(new Animated.Value(0)).current;
+  const blockModalScale = useRef(new Animated.Value(0.8)).current;
+  const blockModalTranslateY = useRef(new Animated.Value(50)).current;
+  
+  const deleteModalOpacity = useRef(new Animated.Value(0)).current;
+  const deleteModalScale = useRef(new Animated.Value(0.8)).current;
+  const deleteModalTranslateY = useRef(new Animated.Value(50)).current;
+  
+  const boardMemberModalOpacity = useRef(new Animated.Value(0)).current;
+  const boardMemberModalScale = useRef(new Animated.Value(0.8)).current;
+  const boardMemberModalTranslateY = useRef(new Animated.Value(50)).current;
+  
+  const emergencyModalOpacity = useRef(new Animated.Value(0)).current;
+  const emergencyModalScale = useRef(new Animated.Value(0.8)).current;
+  const emergencyModalTranslateY = useRef(new Animated.Value(50)).current;
+  
+  const listItemAnimations = useRef<Animated.Value[]>([]).current;
+
   // Check if current user is a board member
   const isBoardMember = user?.isBoardMember && user?.isActive;
 
@@ -88,10 +110,135 @@ const AdminScreen = () => {
     setTimeout(() => setRefreshing(false), 1000);
   };
 
+  // Modal animation functions
+  const openBlockModal = () => {
+    setShowBlockModal(true);
+    Animated.parallel([
+      createFadeIn(blockModalOpacity),
+      createScaleIn(blockModalScale),
+      createSlideIn(blockModalTranslateY, 50),
+    ]).start();
+  };
+
+  const closeBlockModal = () => {
+    Animated.parallel([
+      Animated.timing(blockModalOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(blockModalScale, {
+        toValue: 0.8,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(blockModalTranslateY, {
+        toValue: 50,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowBlockModal(false);
+    });
+  };
+
+  const openDeleteModal = () => {
+    setShowDeleteModal(true);
+    Animated.parallel([
+      createFadeIn(deleteModalOpacity),
+      createScaleIn(deleteModalScale),
+      createSlideIn(deleteModalTranslateY, 50),
+    ]).start();
+  };
+
+  const closeDeleteModal = () => {
+    Animated.parallel([
+      Animated.timing(deleteModalOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(deleteModalScale, {
+        toValue: 0.8,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(deleteModalTranslateY, {
+        toValue: 50,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowDeleteModal(false);
+    });
+  };
+
+  const openBoardMemberModal = () => {
+    setShowBoardMemberModal(true);
+    Animated.parallel([
+      createFadeIn(boardMemberModalOpacity),
+      createScaleIn(boardMemberModalScale),
+      createSlideIn(boardMemberModalTranslateY, 50),
+    ]).start();
+  };
+
+  const closeBoardMemberModal = () => {
+    Animated.parallel([
+      Animated.timing(boardMemberModalOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(boardMemberModalScale, {
+        toValue: 0.8,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(boardMemberModalTranslateY, {
+        toValue: 50,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowBoardMemberModal(false);
+    });
+  };
+
+  const openEmergencyModal = () => {
+    setShowEmergencyModal(true);
+    Animated.parallel([
+      createFadeIn(emergencyModalOpacity),
+      createScaleIn(emergencyModalScale),
+      createSlideIn(emergencyModalTranslateY, 50),
+    ]).start();
+  };
+
+  const closeEmergencyModal = () => {
+    Animated.parallel([
+      Animated.timing(emergencyModalOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(emergencyModalScale, {
+        toValue: 0.8,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(emergencyModalTranslateY, {
+        toValue: 50,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowEmergencyModal(false);
+    });
+  };
+
   const handleBlockResident = (resident: any) => {
     setSelectedItem(resident);
     setBlockReason('');
-    setShowBlockModal(true);
+    openBlockModal();
   };
 
   const handleUnblockResident = async (resident: any) => {
@@ -109,7 +256,7 @@ const AdminScreen = () => {
 
   const handleDeleteItem = (item: any, type: string) => {
     setSelectedItem({ ...item, type });
-    setShowDeleteModal(true);
+    openDeleteModal();
   };
 
   const confirmBlockResident = async () => {
@@ -125,7 +272,7 @@ const AdminScreen = () => {
         blockReason: blockReason.trim(),
       });
       Alert.alert('Success', `${selectedItem.firstName} ${selectedItem.lastName} has been blocked.`);
-      setShowBlockModal(false);
+      closeBlockModal();
       setSelectedItem(null);
       setBlockReason('');
     } catch (error) {
@@ -159,7 +306,7 @@ const AdminScreen = () => {
         default:
           Alert.alert('Error', 'Unknown item type.');
       }
-      setShowDeleteModal(false);
+      closeDeleteModal();
       setSelectedItem(null);
     } catch (error) {
       Alert.alert('Error', 'Failed to delete item. Please try again.');
@@ -188,7 +335,7 @@ const AdminScreen = () => {
     });
     setBoardMemberImage(null);
     setIsEditingBoardMember(false);
-    setShowBoardMemberModal(true);
+    openBoardMemberModal();
   };
 
   const handleEditBoardMember = (member: any) => {
@@ -203,7 +350,7 @@ const AdminScreen = () => {
     setBoardMemberImage(member.image || null);
     setIsEditingBoardMember(true);
     setSelectedItem(member);
-    setShowBoardMemberModal(true);
+    openBoardMemberModal();
   };
 
   const handleSaveBoardMember = async () => {
@@ -238,7 +385,11 @@ const AdminScreen = () => {
         Alert.alert('Success', 'Board member added successfully.');
       }
       
-      setShowBoardMemberModal(false);
+      // Success animation
+      const successAnimation = createBounceIn(new Animated.Value(0));
+      successAnimation.start();
+      
+      closeBoardMemberModal();
       setBoardMemberForm({
         name: '',
         position: '',
@@ -255,7 +406,7 @@ const AdminScreen = () => {
   };
 
   const handleCancelBoardMember = () => {
-    setShowBoardMemberModal(false);
+    closeBoardMemberModal();
     setBoardMemberForm({
       name: '',
       position: '',
@@ -279,7 +430,7 @@ const AdminScreen = () => {
       isActive: true,
     });
     setIsEditingEmergency(false);
-    setShowEmergencyModal(true);
+    openEmergencyModal();
   };
 
   const handleEditEmergencyAlert = (alert: any) => {
@@ -293,7 +444,7 @@ const AdminScreen = () => {
     });
     setIsEditingEmergency(true);
     setSelectedItem(alert);
-    setShowEmergencyModal(true);
+    openEmergencyModal();
   };
 
   const handleSaveEmergencyAlert = async () => {
@@ -314,7 +465,11 @@ const AdminScreen = () => {
         Alert.alert('Success', 'Emergency alert created successfully.');
       }
       
-      setShowEmergencyModal(false);
+      // Success animation
+      const successAnimation = createBounceIn(new Animated.Value(0));
+      successAnimation.start();
+      
+      closeEmergencyModal();
       setEmergencyForm({
         title: '',
         content: '',
@@ -330,7 +485,7 @@ const AdminScreen = () => {
   };
 
   const handleCancelEmergencyAlert = () => {
-    setShowEmergencyModal(false);
+    closeEmergencyModal();
     setEmergencyForm({
       title: '',
       content: '',
@@ -810,11 +965,21 @@ const AdminScreen = () => {
         <Modal
           visible={showBlockModal}
           transparent={true}
-          animationType="slide"
-          onRequestClose={() => setShowBlockModal(false)}
+          animationType="none"
+          onRequestClose={closeBlockModal}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
+          <Animated.View style={[styles.modalOverlay, { opacity: blockModalOpacity }]}>
+            <Animated.View 
+              style={[
+                styles.modalContent,
+                {
+                  transform: [
+                    { scale: blockModalScale },
+                    { translateY: blockModalTranslateY }
+                  ]
+                }
+              ]}
+            >
               <Text style={styles.modalTitle}>Block Resident</Text>
               <Text style={styles.modalSubtitle}>
                 Blocking {selectedItem?.firstName} {selectedItem?.lastName}
@@ -834,7 +999,7 @@ const AdminScreen = () => {
               <View style={styles.modalActions}>
                 <TouchableOpacity
                   style={styles.cancelButton}
-                  onPress={() => setShowBlockModal(false)}
+                  onPress={closeBlockModal}
                 >
                   <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
@@ -846,19 +1011,29 @@ const AdminScreen = () => {
                   <Text style={styles.confirmButtonText}>Block Resident</Text>
                 </TouchableOpacity>
               </View>
-            </View>
-          </View>
+            </Animated.View>
+          </Animated.View>
         </Modal>
 
         {/* Delete Modal */}
         <Modal
           visible={showDeleteModal}
           transparent={true}
-          animationType="slide"
-          onRequestClose={() => setShowDeleteModal(false)}
+          animationType="none"
+          onRequestClose={closeDeleteModal}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
+          <Animated.View style={[styles.modalOverlay, { opacity: deleteModalOpacity }]}>
+            <Animated.View 
+              style={[
+                styles.modalContent,
+                {
+                  transform: [
+                    { scale: deleteModalScale },
+                    { translateY: deleteModalTranslateY }
+                  ]
+                }
+              ]}
+            >
               <Text style={styles.modalTitle}>Delete Item</Text>
               <Text style={styles.modalSubtitle}>
                 Are you sure you want to delete this {selectedItem?.type}?
@@ -871,7 +1046,7 @@ const AdminScreen = () => {
               <View style={styles.modalActions}>
                 <TouchableOpacity
                   style={styles.cancelButton}
-                  onPress={() => setShowDeleteModal(false)}
+                  onPress={closeDeleteModal}
                 >
                   <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
@@ -883,19 +1058,29 @@ const AdminScreen = () => {
                   <Text style={styles.deleteButtonText}>Delete</Text>
                 </TouchableOpacity>
               </View>
-            </View>
-          </View>
+            </Animated.View>
+          </Animated.View>
         </Modal>
 
         {/* Board Member Modal */}
         <Modal
           visible={showBoardMemberModal}
           transparent={true}
-          animationType="slide"
+          animationType="none"
           onRequestClose={handleCancelBoardMember}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.boardMemberModalContent}>
+          <Animated.View style={[styles.modalOverlay, { opacity: boardMemberModalOpacity }]}>
+            <Animated.View 
+              style={[
+                styles.boardMemberModalContent,
+                {
+                  transform: [
+                    { scale: boardMemberModalScale },
+                    { translateY: boardMemberModalTranslateY }
+                  ]
+                }
+              ]}
+            >
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>
                   {isEditingBoardMember ? 'Edit Board Member' : 'Add Board Member'}
@@ -1032,19 +1217,29 @@ const AdminScreen = () => {
                   </Text>
                 </TouchableOpacity>
               </View>
-            </View>
-          </View>
+            </Animated.View>
+          </Animated.View>
         </Modal>
 
         {/* Emergency Alert Modal */}
         <Modal
           visible={showEmergencyModal}
           transparent={true}
-          animationType="slide"
+          animationType="none"
           onRequestClose={handleCancelEmergencyAlert}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.emergencyModalContent}>
+          <Animated.View style={[styles.modalOverlay, { opacity: emergencyModalOpacity }]}>
+            <Animated.View 
+              style={[
+                styles.emergencyModalContent,
+                {
+                  transform: [
+                    { scale: emergencyModalScale },
+                    { translateY: emergencyModalTranslateY }
+                  ]
+                }
+              ]}
+            >
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>
                   {isEditingEmergency ? 'Edit Emergency Alert' : 'Create Emergency Alert'}
@@ -1190,8 +1385,8 @@ const AdminScreen = () => {
                   </Text>
                 </TouchableOpacity>
               </View>
-            </View>
-          </View>
+            </Animated.View>
+          </Animated.View>
         </Modal>
       </View>
     </SafeAreaView>

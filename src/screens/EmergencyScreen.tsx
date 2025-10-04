@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   Alert,
   Modal,
   TextInput,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,6 +18,7 @@ import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import CustomTabBar from '../components/CustomTabBar';
+import { createFadeIn, createScaleIn, createSlideIn, createBounceIn } from '../utils/animations';
 
 const EmergencyScreen = () => {
   const { user } = useAuth();
@@ -33,6 +36,12 @@ const EmergencyScreen = () => {
     category: 'Other' as any,
   });
 
+  // Animation values
+  const modalOpacity = useRef(new Animated.Value(0)).current;
+  const modalScale = useRef(new Animated.Value(0.8)).current;
+  const modalTranslateY = useRef(new Animated.Value(50)).current;
+  const notificationAnimations = useRef<Animated.Value[]>([]).current;
+
   const priorities = ['High', 'Medium', 'Low'];
   const categories = ['Security', 'Maintenance', 'Event', 'Lost Pet', 'Other'];
   const types = ['Emergency', 'Alert', 'Info'];
@@ -47,6 +56,20 @@ const EmergencyScreen = () => {
   });
 
   const activeNotifications = filteredNotifications.filter((n: any) => n.isActive);
+
+  // Initialize notification animations
+  useEffect(() => {
+    const newAnimations = activeNotifications.map(() => new Animated.Value(0));
+    notificationAnimations.splice(0, notificationAnimations.length, ...newAnimations);
+    
+    // Animate notifications in with stagger
+    if (activeNotifications.length > 0) {
+      const animations = notificationAnimations.map((anim, index) => 
+        createSlideIn(anim, -30, index * 100)
+      );
+      Animated.stagger(100, animations).start();
+    }
+  }, [activeNotifications.length]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -99,6 +122,38 @@ const EmergencyScreen = () => {
     }
   };
 
+  // Modal animation functions
+  const openModal = () => {
+    setShowNewAlertModal(true);
+    Animated.parallel([
+      createFadeIn(modalOpacity),
+      createScaleIn(modalScale),
+      createSlideIn(modalTranslateY, 50),
+    ]).start();
+  };
+
+  const closeModal = () => {
+    Animated.parallel([
+      Animated.timing(modalOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(modalScale, {
+        toValue: 0.8,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(modalTranslateY, {
+        toValue: 50,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowNewAlertModal(false);
+    });
+  };
+
   const handleCreateAlert = async () => {
     // Check if user is a board member
     if (!isBoardMember) {
@@ -119,6 +174,11 @@ const EmergencyScreen = () => {
       category: newAlert.category,
       isActive: true,
     });
+    
+    // Success animation
+    const successAnimation = createBounceIn(new Animated.Value(0));
+    successAnimation.start();
+    
     setNewAlert({
       title: '',
       content: '',
@@ -126,7 +186,7 @@ const EmergencyScreen = () => {
       priority: 'Medium',
       category: 'Other',
     });
-    setShowNewAlertModal(false);
+    closeModal();
   };
 
   const handleDeactivate = async (id: string) => {
@@ -154,7 +214,7 @@ const EmergencyScreen = () => {
           {isBoardMember && (
             <TouchableOpacity
               style={styles.newAlertButton}
-              onPress={() => setShowNewAlertModal(true)}
+              onPress={openModal}
             >
               <Ionicons name="add" size={20} color="#ffffff" />
               <Text style={styles.newAlertButtonText}>New Alert</Text>
@@ -274,8 +334,24 @@ const EmergencyScreen = () => {
               </Text>
             </View>
           ) : (
-            filteredNotifications.map((notification: any) => (
-              <View key={notification._id} style={styles.notificationCard}>
+            filteredNotifications.map((notification: any, index: number) => (
+              <Animated.View 
+                key={notification._id} 
+                style={[
+                  styles.notificationCard,
+                  {
+                    opacity: notificationAnimations[index] || 1,
+                    transform: [
+                      {
+                        translateY: notificationAnimations[index]?.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-30, 0],
+                        }) || 0,
+                      },
+                    ],
+                  }
+                ]}
+              >
                 <View style={styles.notificationHeader}>
                   <View style={styles.notificationIcon}>
                     <Ionicons
@@ -329,7 +405,7 @@ const EmergencyScreen = () => {
                     </TouchableOpacity>
                   )}
                 </View>
-              </View>
+              </Animated.View>
             ))
           )}
         </ScrollView>
@@ -337,13 +413,24 @@ const EmergencyScreen = () => {
         {/* New Alert Modal */}
         <Modal
           visible={showNewAlertModal}
-          animationType="slide"
-          presentationStyle="pageSheet"
+          transparent={true}
+          animationType="none"
         >
-          <View style={styles.modalContainer}>
+          <Animated.View style={[styles.modalOverlay, { opacity: modalOpacity }]}>
+            <Animated.View 
+              style={[
+                styles.modalContainer,
+                {
+                  transform: [
+                    { scale: modalScale },
+                    { translateY: modalTranslateY }
+                  ]
+                }
+              ]}
+            >
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Create Emergency Alert</Text>
-              <TouchableOpacity onPress={() => setShowNewAlertModal(false)}>
+              <TouchableOpacity onPress={closeModal}>
                 <Ionicons name="close" size={24} color="#6b7280" />
               </TouchableOpacity>
             </View>
@@ -434,7 +521,7 @@ const EmergencyScreen = () => {
             <View style={styles.modalFooter}>
               <TouchableOpacity
                 style={styles.cancelButton}
-                onPress={() => setShowNewAlertModal(false)}
+                onPress={closeModal}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
@@ -446,7 +533,8 @@ const EmergencyScreen = () => {
                 <Text style={styles.createButtonText}>Create Alert</Text>
               </TouchableOpacity>
             </View>
-          </View>
+            </Animated.View>
+          </Animated.View>
         </Modal>
       </View>
     </SafeAreaView>
@@ -673,9 +761,24 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
   },
-  modalContainer: {
+  modalOverlay: {
     flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
     backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    margin: 20,
+    maxHeight: '80%',
+    width: '90%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
   },
   modalHeader: {
     flexDirection: 'row',
