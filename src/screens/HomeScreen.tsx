@@ -19,6 +19,7 @@ import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import CustomTabBar from '../components/CustomTabBar';
+import MobileTabBar from '../components/MobileTabBar';
 import { webCompatibleAlert } from '../utils/webCompatibleAlert';
 
 const HomeScreen = () => {
@@ -130,6 +131,9 @@ const HomeScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+        {/* Mobile Navigation */}
+        <MobileTabBar />
+        
         <ScrollView style={styles.scrollContainer}>
       {/* Header */}
       <Animated.View style={{

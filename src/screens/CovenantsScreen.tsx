@@ -15,6 +15,7 @@ import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import CustomTabBar from '../components/CustomTabBar';
+import MobileTabBar from '../components/MobileTabBar';
 
 const CovenantsScreen = () => {
   const { user } = useAuth();
@@ -76,6 +77,9 @@ const CovenantsScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container}>
+      {/* Mobile Navigation */}
+      <MobileTabBar />
+      
       {/* Custom Tab Bar */}
       <CustomTabBar />
       

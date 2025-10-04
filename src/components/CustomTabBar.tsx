@@ -1,8 +1,11 @@
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet, Text } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Text, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
+
+const { width: screenWidth } = Dimensions.get('window');
+const isMobile = screenWidth < 768;
 
 interface TabItem {
   name: string;
@@ -17,6 +20,11 @@ const CustomTabBar = () => {
   const { user } = useAuth();
 
   const isBoardMember = user?.isBoardMember && user?.isActive;
+
+  // Hide tab bar on mobile devices
+  if (isMobile) {
+    return null;
+  }
 
   const tabs: TabItem[] = [
     { name: 'Home', icon: 'home', label: 'Home', color: '#6b7280' },

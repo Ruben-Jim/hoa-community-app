@@ -24,6 +24,7 @@ import { useConvex } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
 import CustomTabBar from '../components/CustomTabBar';
+import MobileTabBar from '../components/MobileTabBar';
 
 const AdminScreen = () => {
   const { user } = useAuth();
@@ -858,6 +859,9 @@ const AdminScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+        {/* Mobile Navigation */}
+        <MobileTabBar />
+        
         {/* Custom Tab Bar */}
         <CustomTabBar />
         

@@ -21,6 +21,7 @@ import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import CustomTabBar from '../components/CustomTabBar';
+import MobileTabBar from '../components/MobileTabBar';
 
 const CommunityScreen = () => {
   const { user } = useAuth();
@@ -278,6 +279,9 @@ const CommunityScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+      {/* Mobile Navigation */}
+      <MobileTabBar />
+      
       {/* Custom Tab Bar */}
       <CustomTabBar />
       
