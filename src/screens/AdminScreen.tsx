@@ -13,6 +13,8 @@ import {
   Image,
   Animated,
   Dimensions,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,7 +24,6 @@ import { useConvex } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
 import CustomTabBar from '../components/CustomTabBar';
-import { createFadeIn, createScaleIn, createSlideIn, createBounceIn } from '../utils/animations';
 
 const AdminScreen = () => {
   const { user } = useAuth();
@@ -85,160 +86,116 @@ const AdminScreen = () => {
 
   // Animation values
   const blockModalOpacity = useRef(new Animated.Value(0)).current;
-  const blockModalScale = useRef(new Animated.Value(0.8)).current;
-  const blockModalTranslateY = useRef(new Animated.Value(50)).current;
-  
+  const blockModalTranslateY = useRef(new Animated.Value(300)).current;
   const deleteModalOpacity = useRef(new Animated.Value(0)).current;
-  const deleteModalScale = useRef(new Animated.Value(0.8)).current;
-  const deleteModalTranslateY = useRef(new Animated.Value(50)).current;
-  
+  const deleteModalTranslateY = useRef(new Animated.Value(300)).current;
   const boardMemberModalOpacity = useRef(new Animated.Value(0)).current;
-  const boardMemberModalScale = useRef(new Animated.Value(0.8)).current;
-  const boardMemberModalTranslateY = useRef(new Animated.Value(50)).current;
-  
+  const boardMemberModalTranslateY = useRef(new Animated.Value(300)).current;
   const emergencyModalOpacity = useRef(new Animated.Value(0)).current;
-  const emergencyModalScale = useRef(new Animated.Value(0.8)).current;
-  const emergencyModalTranslateY = useRef(new Animated.Value(50)).current;
-  
-  const listItemAnimations = useRef<Animated.Value[]>([]).current;
+  const emergencyModalTranslateY = useRef(new Animated.Value(300)).current;
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const buttonScale = useRef(new Animated.Value(1)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   // Check if current user is a board member
   const isBoardMember = user?.isBoardMember && user?.isActive;
+
+  // Modern animation functions
+  const animateIn = (modalType: 'block' | 'delete' | 'boardMember' | 'emergency') => {
+    const opacity = modalType === 'block' ? blockModalOpacity : 
+                   modalType === 'delete' ? deleteModalOpacity :
+                   modalType === 'boardMember' ? boardMemberModalOpacity : emergencyModalOpacity;
+    const translateY = modalType === 'block' ? blockModalTranslateY : 
+                      modalType === 'delete' ? deleteModalTranslateY :
+                      modalType === 'boardMember' ? boardMemberModalTranslateY : emergencyModalTranslateY;
+    
+    Animated.parallel([
+      Animated.timing(overlayOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.spring(translateY, {
+        toValue: 0,
+        tension: 100,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const animateOut = (modalType: 'block' | 'delete' | 'boardMember' | 'emergency', callback: () => void) => {
+    const opacity = modalType === 'block' ? blockModalOpacity : 
+                   modalType === 'delete' ? deleteModalOpacity :
+                   modalType === 'boardMember' ? boardMemberModalOpacity : emergencyModalOpacity;
+    const translateY = modalType === 'block' ? blockModalTranslateY : 
+                      modalType === 'delete' ? deleteModalTranslateY :
+                      modalType === 'boardMember' ? boardMemberModalTranslateY : emergencyModalTranslateY;
+    
+    Animated.parallel([
+      Animated.timing(overlayOpacity, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: 300,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      callback();
+    });
+  };
+
+  const animateButtonPress = () => {
+    Animated.sequence([
+      Animated.timing(buttonScale, {
+        toValue: 0.95,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(buttonScale, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const animateFadeIn = () => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  // Initialize animations on component mount
+  useEffect(() => {
+    animateFadeIn();
+  }, []);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     setTimeout(() => setRefreshing(false), 1000);
   };
 
-  // Modal animation functions
-  const openBlockModal = () => {
-    setShowBlockModal(true);
-    Animated.parallel([
-      createFadeIn(blockModalOpacity),
-      createScaleIn(blockModalScale),
-      createSlideIn(blockModalTranslateY, 50),
-    ]).start();
-  };
-
-  const closeBlockModal = () => {
-    Animated.parallel([
-      Animated.timing(blockModalOpacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(blockModalScale, {
-        toValue: 0.8,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(blockModalTranslateY, {
-        toValue: 50,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setShowBlockModal(false);
-    });
-  };
-
-  const openDeleteModal = () => {
-    setShowDeleteModal(true);
-    Animated.parallel([
-      createFadeIn(deleteModalOpacity),
-      createScaleIn(deleteModalScale),
-      createSlideIn(deleteModalTranslateY, 50),
-    ]).start();
-  };
-
-  const closeDeleteModal = () => {
-    Animated.parallel([
-      Animated.timing(deleteModalOpacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(deleteModalScale, {
-        toValue: 0.8,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(deleteModalTranslateY, {
-        toValue: 50,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setShowDeleteModal(false);
-    });
-  };
-
-  const openBoardMemberModal = () => {
-    setShowBoardMemberModal(true);
-    Animated.parallel([
-      createFadeIn(boardMemberModalOpacity),
-      createScaleIn(boardMemberModalScale),
-      createSlideIn(boardMemberModalTranslateY, 50),
-    ]).start();
-  };
-
-  const closeBoardMemberModal = () => {
-    Animated.parallel([
-      Animated.timing(boardMemberModalOpacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(boardMemberModalScale, {
-        toValue: 0.8,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(boardMemberModalTranslateY, {
-        toValue: 50,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setShowBoardMemberModal(false);
-    });
-  };
-
-  const openEmergencyModal = () => {
-    setShowEmergencyModal(true);
-    Animated.parallel([
-      createFadeIn(emergencyModalOpacity),
-      createScaleIn(emergencyModalScale),
-      createSlideIn(emergencyModalTranslateY, 50),
-    ]).start();
-  };
-
-  const closeEmergencyModal = () => {
-    Animated.parallel([
-      Animated.timing(emergencyModalOpacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(emergencyModalScale, {
-        toValue: 0.8,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(emergencyModalTranslateY, {
-        toValue: 50,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setShowEmergencyModal(false);
-    });
-  };
-
   const handleBlockResident = (resident: any) => {
     setSelectedItem(resident);
     setBlockReason('');
-    openBlockModal();
+    setShowBlockModal(true);
+    animateIn('block');
   };
 
   const handleUnblockResident = async (resident: any) => {
@@ -256,7 +213,8 @@ const AdminScreen = () => {
 
   const handleDeleteItem = (item: any, type: string) => {
     setSelectedItem({ ...item, type });
-    openDeleteModal();
+    setShowDeleteModal(true);
+    animateIn('delete');
   };
 
   const confirmBlockResident = async () => {
@@ -272,9 +230,11 @@ const AdminScreen = () => {
         blockReason: blockReason.trim(),
       });
       Alert.alert('Success', `${selectedItem.firstName} ${selectedItem.lastName} has been blocked.`);
-      closeBlockModal();
-      setSelectedItem(null);
-      setBlockReason('');
+      animateOut('block', () => {
+        setShowBlockModal(false);
+        setSelectedItem(null);
+        setBlockReason('');
+      });
     } catch (error) {
       Alert.alert('Error', 'Failed to block resident. Please try again.');
     }
@@ -306,8 +266,10 @@ const AdminScreen = () => {
         default:
           Alert.alert('Error', 'Unknown item type.');
       }
-      closeDeleteModal();
-      setSelectedItem(null);
+      animateOut('delete', () => {
+        setShowDeleteModal(false);
+        setSelectedItem(null);
+      });
     } catch (error) {
       Alert.alert('Error', 'Failed to delete item. Please try again.');
     }
@@ -335,7 +297,8 @@ const AdminScreen = () => {
     });
     setBoardMemberImage(null);
     setIsEditingBoardMember(false);
-    openBoardMemberModal();
+    setShowBoardMemberModal(true);
+    animateIn('boardMember');
   };
 
   const handleEditBoardMember = (member: any) => {
@@ -350,7 +313,8 @@ const AdminScreen = () => {
     setBoardMemberImage(member.image || null);
     setIsEditingBoardMember(true);
     setSelectedItem(member);
-    openBoardMemberModal();
+    setShowBoardMemberModal(true);
+    animateIn('boardMember');
   };
 
   const handleSaveBoardMember = async () => {
@@ -385,11 +349,27 @@ const AdminScreen = () => {
         Alert.alert('Success', 'Board member added successfully.');
       }
       
-      // Success animation
-      const successAnimation = createBounceIn(new Animated.Value(0));
-      successAnimation.start();
-      
-      closeBoardMemberModal();
+      animateOut('boardMember', () => {
+        setShowBoardMemberModal(false);
+        setBoardMemberForm({
+          name: '',
+          position: '',
+          email: '',
+          phone: '',
+          bio: '',
+          termEnd: '',
+        });
+        setBoardMemberImage(null);
+        setSelectedItem(null);
+      });
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save board member. Please try again.');
+    }
+  };
+
+  const handleCancelBoardMember = () => {
+    animateOut('boardMember', () => {
+      setShowBoardMemberModal(false);
       setBoardMemberForm({
         name: '',
         position: '',
@@ -400,23 +380,7 @@ const AdminScreen = () => {
       });
       setBoardMemberImage(null);
       setSelectedItem(null);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to save board member. Please try again.');
-    }
-  };
-
-  const handleCancelBoardMember = () => {
-    closeBoardMemberModal();
-    setBoardMemberForm({
-      name: '',
-      position: '',
-      email: '',
-      phone: '',
-      bio: '',
-      termEnd: '',
     });
-    setBoardMemberImage(null);
-    setSelectedItem(null);
   };
 
   // Emergency alert handlers
@@ -430,7 +394,8 @@ const AdminScreen = () => {
       isActive: true,
     });
     setIsEditingEmergency(false);
-    openEmergencyModal();
+    setShowEmergencyModal(true);
+    animateIn('emergency');
   };
 
   const handleEditEmergencyAlert = (alert: any) => {
@@ -444,7 +409,8 @@ const AdminScreen = () => {
     });
     setIsEditingEmergency(true);
     setSelectedItem(alert);
-    openEmergencyModal();
+    setShowEmergencyModal(true);
+    animateIn('emergency');
   };
 
   const handleSaveEmergencyAlert = async () => {
@@ -465,11 +431,26 @@ const AdminScreen = () => {
         Alert.alert('Success', 'Emergency alert created successfully.');
       }
       
-      // Success animation
-      const successAnimation = createBounceIn(new Animated.Value(0));
-      successAnimation.start();
-      
-      closeEmergencyModal();
+      animateOut('emergency', () => {
+        setShowEmergencyModal(false);
+        setEmergencyForm({
+          title: '',
+          content: '',
+          type: 'Alert',
+          priority: 'Medium',
+          category: 'Other',
+          isActive: true,
+        });
+        setSelectedItem(null);
+      });
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save emergency alert. Please try again.');
+    }
+  };
+
+  const handleCancelEmergencyAlert = () => {
+    animateOut('emergency', () => {
+      setShowEmergencyModal(false);
       setEmergencyForm({
         title: '',
         content: '',
@@ -479,22 +460,7 @@ const AdminScreen = () => {
         isActive: true,
       });
       setSelectedItem(null);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to save emergency alert. Please try again.');
-    }
-  };
-
-  const handleCancelEmergencyAlert = () => {
-    closeEmergencyModal();
-    setEmergencyForm({
-      title: '',
-      content: '',
-      type: 'Alert',
-      priority: 'Medium',
-      category: 'Other',
-      isActive: true,
     });
-    setSelectedItem(null);
   };
 
   // Image upload functions
@@ -653,13 +619,18 @@ const AdminScreen = () => {
           <View style={styles.tabContent}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Board Members</Text>
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={handleAddBoardMember}
-              >
-                <Ionicons name="add" size={20} color="#ffffff" />
-                <Text style={styles.addButtonText}>Add Member</Text>
-              </TouchableOpacity>
+              <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+                <TouchableOpacity
+                  style={styles.addButton}
+                  onPress={() => {
+                    animateButtonPress();
+                    handleAddBoardMember();
+                  }}
+                >
+                  <Ionicons name="add" size={20} color="#ffffff" />
+                  <Text style={styles.addButtonText}>Add Member</Text>
+                </TouchableOpacity>
+              </Animated.View>
             </View>
             <FlatList
               data={boardMembers}
@@ -807,13 +778,18 @@ const AdminScreen = () => {
           <View style={styles.tabContent}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Emergency Alerts</Text>
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={handleAddEmergencyAlert}
-              >
-                <Ionicons name="add" size={20} color="#ffffff" />
-                <Text style={styles.addButtonText}>New Alert</Text>
-              </TouchableOpacity>
+              <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+                <TouchableOpacity
+                  style={styles.addButton}
+                  onPress={() => {
+                    animateButtonPress();
+                    handleAddEmergencyAlert();
+                  }}
+                >
+                  <Ionicons name="add" size={20} color="#ffffff" />
+                  <Text style={styles.addButtonText}>New Alert</Text>
+                </TouchableOpacity>
+              </Animated.View>
             </View>
             <FlatList
               data={emergencyAlerts}
@@ -881,7 +857,7 @@ const AdminScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
+      <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
         {/* Custom Tab Bar */}
         <CustomTabBar />
         
@@ -966,20 +942,16 @@ const AdminScreen = () => {
           visible={showBlockModal}
           transparent={true}
           animationType="none"
-          onRequestClose={closeBlockModal}
+          onRequestClose={() => animateOut('block', () => setShowBlockModal(false))}
         >
-          <Animated.View style={[styles.modalOverlay, { opacity: blockModalOpacity }]}>
-            <Animated.View 
-              style={[
-                styles.modalContent,
-                {
-                  transform: [
-                    { scale: blockModalScale },
-                    { translateY: blockModalTranslateY }
-                  ]
-                }
-              ]}
-            >
+          <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
+            <Animated.View style={[
+              styles.modalContent,
+              {
+                opacity: blockModalOpacity,
+                transform: [{ translateY: blockModalTranslateY }],
+              }
+            ]}>
               <Text style={styles.modalTitle}>Block Resident</Text>
               <Text style={styles.modalSubtitle}>
                 Blocking {selectedItem?.firstName} {selectedItem?.lastName}
@@ -999,7 +971,7 @@ const AdminScreen = () => {
               <View style={styles.modalActions}>
                 <TouchableOpacity
                   style={styles.cancelButton}
-                  onPress={closeBlockModal}
+                  onPress={() => animateOut('block', () => setShowBlockModal(false))}
                 >
                   <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
@@ -1020,20 +992,16 @@ const AdminScreen = () => {
           visible={showDeleteModal}
           transparent={true}
           animationType="none"
-          onRequestClose={closeDeleteModal}
+          onRequestClose={() => animateOut('delete', () => setShowDeleteModal(false))}
         >
-          <Animated.View style={[styles.modalOverlay, { opacity: deleteModalOpacity }]}>
-            <Animated.View 
-              style={[
-                styles.modalContent,
-                {
-                  transform: [
-                    { scale: deleteModalScale },
-                    { translateY: deleteModalTranslateY }
-                  ]
-                }
-              ]}
-            >
+          <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
+            <Animated.View style={[
+              styles.modalContent,
+              {
+                opacity: deleteModalOpacity,
+                transform: [{ translateY: deleteModalTranslateY }],
+              }
+            ]}>
               <Text style={styles.modalTitle}>Delete Item</Text>
               <Text style={styles.modalSubtitle}>
                 Are you sure you want to delete this {selectedItem?.type}?
@@ -1046,7 +1014,7 @@ const AdminScreen = () => {
               <View style={styles.modalActions}>
                 <TouchableOpacity
                   style={styles.cancelButton}
-                  onPress={closeDeleteModal}
+                  onPress={() => animateOut('delete', () => setShowDeleteModal(false))}
                 >
                   <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
@@ -1069,18 +1037,14 @@ const AdminScreen = () => {
           animationType="none"
           onRequestClose={handleCancelBoardMember}
         >
-          <Animated.View style={[styles.modalOverlay, { opacity: boardMemberModalOpacity }]}>
-            <Animated.View 
-              style={[
-                styles.boardMemberModalContent,
-                {
-                  transform: [
-                    { scale: boardMemberModalScale },
-                    { translateY: boardMemberModalTranslateY }
-                  ]
-                }
-              ]}
-            >
+          <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
+            <Animated.View style={[
+              styles.boardMemberModalContent,
+              {
+                opacity: boardMemberModalOpacity,
+                transform: [{ translateY: boardMemberModalTranslateY }],
+              }
+            ]}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>
                   {isEditingBoardMember ? 'Edit Board Member' : 'Add Board Member'}
@@ -1228,18 +1192,14 @@ const AdminScreen = () => {
           animationType="none"
           onRequestClose={handleCancelEmergencyAlert}
         >
-          <Animated.View style={[styles.modalOverlay, { opacity: emergencyModalOpacity }]}>
-            <Animated.View 
-              style={[
-                styles.emergencyModalContent,
-                {
-                  transform: [
-                    { scale: emergencyModalScale },
-                    { translateY: emergencyModalTranslateY }
-                  ]
-                }
-              ]}
-            >
+          <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
+            <Animated.View style={[
+              styles.emergencyModalContent,
+              {
+                opacity: emergencyModalOpacity,
+                transform: [{ translateY: emergencyModalTranslateY }],
+              }
+            ]}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>
                   {isEditingEmergency ? 'Edit Emergency Alert' : 'Create Emergency Alert'}
@@ -1388,7 +1348,7 @@ const AdminScreen = () => {
             </Animated.View>
           </Animated.View>
         </Modal>
-      </View>
+      </Animated.View>
     </SafeAreaView>
   );
 };
@@ -1574,14 +1534,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   modalContent: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
+    borderRadius: 20,
     padding: 20,
-    width: '100%',
-    maxWidth: 400,
+    width: '90%',
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
   },
   modalTitle: {
     fontSize: 20,
@@ -1658,10 +1622,14 @@ const styles = StyleSheet.create({
   // Board member modal styles
   boardMemberModalContent: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    width: '100%',
-    maxWidth: 500,
-    maxHeight: '90%',
+    borderRadius: 20,
+    width: '90%',
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1821,10 +1789,14 @@ const styles = StyleSheet.create({
   // Emergency alert styles
   emergencyModalContent: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    width: '100%',
-    maxWidth: 500,
-    maxHeight: '90%',
+    borderRadius: 20,
+    width: '90%',
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
   },
   alertHeader: {
     flexDirection: 'row',

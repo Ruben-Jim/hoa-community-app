@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   ImageBackground,
   Platform,
   Image,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,6 +26,63 @@ const HomeScreen = () => {
   const hoaInfo = useQuery(api.hoaInfo.get);
   const emergencyNotifications = useQuery(api.emergencyNotifications.getActive);
   const communityPosts = useQuery(api.communityPosts.getAll);
+
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const quickActionsAnim = useRef(new Animated.Value(0)).current;
+  const notificationsAnim = useRef(new Animated.Value(0)).current;
+  const postsAnim = useRef(new Animated.Value(0)).current;
+  const officeAnim = useRef(new Animated.Value(0)).current;
+
+  // Animation functions
+  const animateFadeIn = () => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const animateSlideUp = () => {
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const animateStaggeredContent = () => {
+    Animated.stagger(200, [
+      Animated.timing(quickActionsAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(notificationsAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(postsAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(officeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  // Initialize animations on component mount
+  useEffect(() => {
+    animateFadeIn();
+    animateSlideUp();
+    animateStaggeredContent();
+  }, []);
 
   const handleContact = (type: 'phone' | 'email') => {
     if (type === 'phone') {
@@ -71,13 +129,18 @@ const HomeScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container}>
+      <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+        <ScrollView style={styles.scrollContainer}>
       {/* Header */}
-      <ImageBackground
-        source={require('../../assets/hoa-4k.jpg')}
-        style={styles.header}
-        imageStyle={styles.headerImage}
-      >
+      <Animated.View style={{
+        transform: [{ translateY: slideAnim }],
+        opacity: fadeAnim,
+      }}>
+        <ImageBackground
+          source={require('../../assets/hoa-4k.jpg')}
+          style={styles.header}
+          imageStyle={styles.headerImage}
+        >
         <View style={styles.headerOverlay} />
         <View style={styles.headerTop}>
           <View style={styles.headerLeft}>
@@ -107,13 +170,31 @@ const HomeScreen = () => {
             </Text>
           </View>
         )}
-      </ImageBackground>
+        </ImageBackground>
+      </Animated.View>
 
       {/* Custom Tab Bar */}
-      <CustomTabBar />
+      <Animated.View style={{
+        opacity: fadeAnim,
+        transform: [{ translateY: slideAnim }],
+      }}>
+        <CustomTabBar />
+      </Animated.View>
 
       {/* Quick Actions */}
-      <View style={styles.quickActions}>
+      <Animated.View style={[
+        styles.quickActions,
+        {
+          opacity: quickActionsAnim,
+          transform: [{
+            translateY: quickActionsAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [50, 0],
+            })
+          }]
+        }
+      ]}>
+      {/* <View style={styles.quickActions}>
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => handleContact('phone')}
@@ -137,11 +218,24 @@ const HomeScreen = () => {
           <Ionicons name="warning" size={24} color="#64748b" />
           <Text style={styles.actionText}>Profile</Text>
         </TouchableOpacity>
-      </View>
+      </View> */}
+      </Animated.View>
 
       {/* Active Notifications */}
       {activeNotifications.length > 0 && (
-        <View style={[styles.section, styles.emergencySection]}>
+        <Animated.View style={[
+          styles.section, 
+          styles.emergencySection,
+          {
+            opacity: notificationsAnim,
+            transform: [{
+              translateY: notificationsAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [50, 0],
+              })
+            }]
+          }
+        ]}>
           <View style={styles.emergencyHeader}>
             <Ionicons name="warning" size={24} color="#ef4444" />
             <Text style={styles.emergencyTitle}>Active Alerts</Text>
@@ -162,17 +256,42 @@ const HomeScreen = () => {
               </Text>
             </View>
           ))}
-        </View>
+        </Animated.View>
       )}
 
       {/* Recent Community Posts */}
-      <View style={styles.section}>
+      <Animated.View style={[
+        styles.section,
+        {
+          opacity: postsAnim,
+          transform: [{
+            translateY: postsAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [50, 0],
+            })
+          }]
+        }
+      ]}>
         <View style={styles.communityHeader}>
           <Ionicons name="people" size={24} color="#64748b" />
           <Text style={styles.sectionTitle}>Recent Community Posts</Text>
         </View>
-        {communityPosts?.slice(0, 2).map((post: any) => (
-          <View key={post._id} style={styles.postCard}>
+        {communityPosts?.slice(0, 2).map((post: any, index: number) => (
+          <Animated.View 
+            key={post._id} 
+            style={[
+              styles.postCard,
+              {
+                opacity: postsAnim,
+                transform: [{
+                  translateY: postsAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [30 + (index * 20), 0],
+                  })
+                }]
+              }
+            ]}
+          >
             <View style={styles.postHeader}>
               <View style={styles.postAuthorInfo}>
                 <View style={styles.postAvatar}>
@@ -203,12 +322,23 @@ const HomeScreen = () => {
                 <Text style={styles.postStatsText}>{post.comments?.length ?? 0}</Text>
               </View>
             </View>
-          </View>
+          </Animated.View>
         ))}
-      </View>
+      </Animated.View>
 
       {/* Office Information */}
-      <View style={styles.section}>
+      <Animated.View style={[
+        styles.section,
+        {
+          opacity: officeAnim,
+          transform: [{
+            translateY: officeAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [50, 0],
+            })
+          }]
+        }
+      ]}>
         <View style={styles.officeHeader}>
           <Ionicons name="business" size={24} color="#64748b" />
           <Text style={styles.sectionTitle}>Office Information</Text>
@@ -231,8 +361,9 @@ const HomeScreen = () => {
             <Text style={styles.infoText}>{hoaInfo?.email ?? ''}</Text>
           </View>
         </View>
-      </View>
+      </Animated.View>
       </ScrollView>
+      </Animated.View>
     </SafeAreaView>
   );
 };
@@ -241,6 +372,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f3f4f6',
+  },
+  scrollContainer: {
+    flex: 1,
   },
   safeArea: {
     flex: 1,
