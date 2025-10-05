@@ -15,6 +15,7 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Platform,
+  ImageBackground,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,6 +30,10 @@ import MobileTabBar from '../components/MobileTabBar';
 const AdminScreen = () => {
   const { user } = useAuth();
   const convex = useConvex();
+  
+  // Check if device is mobile based on screen width
+  const screenWidth = Dimensions.get('window').width;
+  const isMobile = screenWidth < 768;
   
   // Data queries
   const residents = useQuery(api.residents.getAll) ?? [];
@@ -54,6 +59,7 @@ const AdminScreen = () => {
   // State
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'residents' | 'board' | 'covenants' | 'posts' | 'comments' | 'emergency'>('residents');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const [showBlockModal, setShowBlockModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -942,19 +948,46 @@ const AdminScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        {/* Mobile Navigation */}
-        <MobileTabBar />
+        {/* Mobile Navigation - Only for Mobile */}
+        {isMobile && (
+          <MobileTabBar 
+            isMenuOpen={isMenuOpen}
+            onMenuClose={() => setIsMenuOpen(false)}
+          />
+        )}
         
-        {/* Custom Tab Bar */}
-        <CustomTabBar />
-        
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Admin Dashboard</Text>
-          <Text style={styles.headerSubtitle}>
-            Manage community content and residents
-          </Text>
-        </View>
+        <ScrollView style={styles.scrollContainer}>
+          {/* Header with ImageBackground */}
+          <ImageBackground
+            source={require('../../assets/hoa-4k.jpg')}
+            style={styles.header}
+            imageStyle={styles.headerImage}
+          >
+            <View style={styles.headerOverlay} />
+            <View style={styles.headerTop}>
+              {/* Hamburger Menu - Only when mobile nav is shown */}
+              {isMobile && (
+                <TouchableOpacity 
+                  style={styles.menuButton}
+                  onPress={() => setIsMenuOpen(true)}
+                >
+                  <Ionicons name="menu" size={24} color="#ffffff" />
+                </TouchableOpacity>
+              )}
+              
+              <View style={styles.headerLeft}>
+                <Text style={styles.headerTitle}>Admin Dashboard</Text>
+                <Text style={styles.headerSubtitle}>
+                  Manage community content and residents
+                </Text>
+              </View>
+            </View>
+          </ImageBackground>
+
+          {/* Custom Tab Bar - Only for Desktop */}
+          {!isMobile && (
+            <CustomTabBar />
+          )}
 
         {/* Folder Tabs */}
         <ScrollView 
@@ -1440,6 +1473,7 @@ const AdminScreen = () => {
             </Animated.View>
           </Animated.View>
         </Modal>
+        </ScrollView>
       </View>
     </SafeAreaView>
   );
@@ -1451,6 +1485,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#f3f4f6',
   },
   container: {
+    flex: 1,
+  },
+  scrollContainer: {
     flex: 1,
   },
   accessDeniedContainer: {
@@ -1473,20 +1510,62 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   header: {
-    backgroundColor: '#ffffff',
+    height: 240,
     padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    paddingTop: 40,
+    paddingBottom: 20,
+    position: 'relative',
+    justifyContent: 'space-between',
+  },
+  headerImage: {
+    borderRadius: 0,
+    resizeMode: 'stretch',
+    width: '100%',
+  },
+  headerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  menuButton: {
+    padding: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  headerLeft: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 10,
   },
   headerTitle: {
+    color: '#ffffff',
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1f2937',
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+    textAlign: 'center',
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginTop: 4,
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '400',
+    opacity: 0.9,
+    marginTop: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+    textAlign: 'center',
   },
   folderTabs: {
     backgroundColor: '#ffffff',

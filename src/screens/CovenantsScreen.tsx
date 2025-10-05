@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  ImageBackground,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,6 +23,11 @@ const CovenantsScreen = () => {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  // Check if device is mobile based on screen width
+  const screenWidth = Dimensions.get('window').width;
+  const isMobile = screenWidth < 768;
 
   const categories = ['Architecture', 'Landscaping', 'Parking', 'Pets', 'General'];
   const covenants = useQuery(api.covenants.getAll) ?? [];
@@ -76,23 +83,48 @@ const CovenantsScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container}>
-      {/* Mobile Navigation */}
-      <MobileTabBar />
+      <View style={styles.container}>
+      {/* Mobile Navigation - Only for Mobile */}
+      {isMobile && (
+        <MobileTabBar 
+          isMenuOpen={isMenuOpen}
+          onMenuClose={() => setIsMenuOpen(false)}
+        />
+      )}
       
-      {/* Custom Tab Bar */}
-      <CustomTabBar />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <Text style={styles.headerTitle}>Covenants & Rules</Text>
-          <BoardMemberIndicator />
-        </View>
-        <Text style={styles.headerSubtitle}>
-          Community guidelines and regulations
-        </Text>
-      </View>
+      <ScrollView style={styles.scrollContainer}>
+        {/* Header with ImageBackground */}
+        <ImageBackground
+          source={require('../../assets/hoa-4k.jpg')}
+          style={styles.header}
+          imageStyle={styles.headerImage}
+        >
+          <View style={styles.headerOverlay} />
+          <View style={styles.headerTop}>
+            {/* Hamburger Menu - Only when mobile nav is shown */}
+            {isMobile && (
+              <TouchableOpacity 
+                style={styles.menuButton}
+                onPress={() => setIsMenuOpen(true)}
+              >
+                <Ionicons name="menu" size={24} color="#ffffff" />
+              </TouchableOpacity>
+            )}
+            
+            <View style={styles.headerLeft}>
+              <Text style={styles.headerTitle}>Covenants & Rules</Text>
+              <Text style={styles.headerSubtitle}>
+                Community guidelines and regulations
+              </Text>
+            </View>
+            <BoardMemberIndicator />
+          </View>
+        </ImageBackground>
+
+        {/* Custom Tab Bar - Only for Desktop */}
+        {!isMobile && (
+          <CustomTabBar />
+        )}
       
       {/* Search Bar */}
       <View style={styles.searchContainer}>
@@ -219,6 +251,7 @@ const CovenantsScreen = () => {
         </Text>
       </View>
       </ScrollView>
+      </View>
     </SafeAreaView>
   );
 };
@@ -232,26 +265,66 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f3f4f6',
   },
+  scrollContainer: {
+    flex: 1,
+  },
   header: {
-    backgroundColor: '#ffffff',
+    height: 240,
     padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    paddingTop: 40,
+    paddingBottom: 20,
+    position: 'relative',
+    justifyContent: 'space-between',
+  },
+  headerImage: {
+    borderRadius: 0,
+    resizeMode: 'stretch',
+    width: '100%',
+  },
+  headerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   headerTop: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
+    zIndex: 1,
+  },
+  menuButton: {
+    padding: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  headerLeft: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 10,
   },
   headerTitle: {
+    color: '#ffffff',
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1f2937',
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+    textAlign: 'center',
   },
   headerSubtitle: {
+    color: '#ffffff',
     fontSize: 16,
-    color: '#6b7280',
+    fontWeight: '400',
+    opacity: 0.9,
+    marginTop: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+    textAlign: 'center',
   },
   searchContainer: {
     backgroundColor: '#ffffff',

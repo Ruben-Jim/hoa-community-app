@@ -9,6 +9,7 @@ import {
   Alert,
   Modal,
   Image,
+  ImageBackground,
   Animated,
   Dimensions,
   KeyboardAvoidingView,
@@ -31,6 +32,7 @@ const CommunityScreen = () => {
   const [selectedPostForComment, setSelectedPostForComment] = useState<any>(null);
   const [newComment, setNewComment] = useState('');
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [newPost, setNewPost] = useState({
     title: '',
     content: '',
@@ -288,75 +290,106 @@ const CommunityScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-      {/* Mobile Navigation */}
-      <MobileTabBar />
-      
-      {/* Custom Tab Bar */}
-      <CustomTabBar />
+      {/* Mobile Navigation - Only for Mobile */}
+      {isMobile && (
+        <MobileTabBar 
+          isMenuOpen={isMenuOpen}
+          onMenuClose={() => setIsMenuOpen(false)}
+        />
+      )}
       
       {/* Header with New Post Button */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>Community Forum</Text>
-          <BoardMemberIndicator />
-        </View>
-        {!isMobile && (
-          <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-            <TouchableOpacity
-              style={styles.newPostButton}
-              onPress={() => {
-                animateButtonPress();
-                setShowNewPostModal(true);
-                animateIn('post');
-              }}
-            >
-              <Ionicons name="add" size={20} color="#ffffff" />
-              <Text style={styles.newPostButtonText}>New Post</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        )}
-      </View>
+      <ImageBackground
+        source={require('../../assets/hoa-4k.jpg')}
+        style={styles.header}
+        imageStyle={styles.headerImage}
+      >
+          <View style={styles.headerOverlay} />
+          <View style={styles.headerTop}>
+            {/* Hamburger Menu - Only when mobile nav is shown */}
+            {isMobile && (
+              <TouchableOpacity 
+                style={styles.menuButton}
+                onPress={() => setIsMenuOpen(true)}
+              >
+                <Ionicons name="menu" size={24} color="#ffffff" />
+              </TouchableOpacity>
+            )}
+            
+            <View style={styles.headerLeft}>
+              <Text style={styles.headerTitle}>Community Forum</Text>
+              <Text style={styles.headerSubtitle}>
+                Connect with your neighbors and stay informed
+              </Text>
+            </View>
+          </View>
+        </ImageBackground>
 
-      {/* Category Filter */}
+      {/* Custom Tab Bar - Only for Desktop */}
+      {!isMobile && (
+        <CustomTabBar />
+      )}
+
+      {/* Category Filter with New Post Button */}
       <SafeAreaView style={styles.categoryContainer}>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoryContent}
-        >
-          <TouchableOpacity
-            style={[
-              styles.categoryButton,
-              !selectedCategory && styles.categoryButtonActive
-            ]}
-            onPress={() => setSelectedCategory(null)}
+        <View style={styles.filterRow}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryContent}
+            style={styles.categoryScrollView}
           >
-            <Text style={[
-              styles.categoryButtonText,
-              !selectedCategory && styles.categoryButtonTextActive
-            ]}>
-              All
-            </Text>
-          </TouchableOpacity>
-          
-          {categories.map((category) => (
             <TouchableOpacity
-              key={category}
               style={[
                 styles.categoryButton,
-                selectedCategory === category && styles.categoryButtonActive
+                !selectedCategory && styles.categoryButtonActive
               ]}
-              onPress={() => setSelectedCategory(category)}
+              onPress={() => setSelectedCategory(null)}
             >
               <Text style={[
                 styles.categoryButtonText,
-                selectedCategory === category && styles.categoryButtonTextActive
+                !selectedCategory && styles.categoryButtonTextActive
               ]}>
-                {category}
+                All
               </Text>
             </TouchableOpacity>
-          ))}
-        </ScrollView>
+            
+            {categories.map((category) => (
+              <TouchableOpacity
+                key={category}
+                style={[
+                  styles.categoryButton,
+                  selectedCategory === category && styles.categoryButtonActive
+                ]}
+                onPress={() => setSelectedCategory(category)}
+              >
+                <Text style={[
+                  styles.categoryButtonText,
+                  selectedCategory === category && styles.categoryButtonTextActive
+                ]}>
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          
+          {/* New Post Button - Desktop Only */}
+          {!isMobile && (
+            <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+              <TouchableOpacity
+                style={styles.newPostButton}
+                onPress={() => {
+                  animateButtonPress();
+                  setShowNewPostModal(true);
+                  animateIn('post');
+                }}
+              >
+                <Ionicons name="add" size={20} color="#ffffff" />
+                <Text style={styles.newPostButtonText}>New Post</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          )}
+        </View>
       </SafeAreaView>
 
       {/* Posts List */}
@@ -703,23 +736,62 @@ const styles = StyleSheet.create({
     backgroundColor: '#f3f4f6',
   },
   header: {
+    height: 240,
+    padding: 20,
+    paddingTop: 40,
+    paddingBottom: 20,
+    position: 'relative',
+    justifyContent: 'space-between',
+  },
+  headerImage: {
+    borderRadius: 0,
+    resizeMode: 'stretch',
+    width: '100%',
+  },
+  headerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    zIndex: 1,
+  },
+  menuButton: {
+    padding: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 8,
+    marginRight: 12,
   },
   headerLeft: {
-    flexDirection: 'row',
+    flex: 1,
     alignItems: 'center',
-    gap: 8,
+    paddingHorizontal: 10,
   },
   headerTitle: {
-    fontSize: 20,
+    color: '#ffffff',
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#1f2937',
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+    textAlign: 'center',
+  },
+  headerSubtitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '400',
+    opacity: 0.9,
+    marginTop: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+    textAlign: 'center',
   },
   newPostButton: {
     flexDirection: 'row',
@@ -758,8 +830,17 @@ const styles = StyleSheet.create({
     paddingBottom: -20,
     paddingTop: -40, 
   },
-  categoryContent: {
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 15,
+  },
+  categoryScrollView: {
+    flex: 1,
+  },
+  categoryContent: {
+    paddingHorizontal: 0,
   },
   categoryButton: {
     paddingHorizontal: 16,

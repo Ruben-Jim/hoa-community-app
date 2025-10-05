@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   Alert,
   Image,
   ImageBackground,
+  Dimensions,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,6 +25,18 @@ import MobileTabBar from '../components/MobileTabBar';
 const BoardScreen = () => {
   const { user } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  
+  // State for dynamic responsive behavior
+  const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
+  
+  // Dynamic responsive check - show mobile nav when screen is too narrow for desktop nav
+  const showMobileNav = screenWidth < 1024; // Show mobile nav when screen is narrower than 1024px
+  const showDesktopNav = screenWidth >= 1024; // Show desktop nav when screen is 1024px or wider
+
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(1)).current; // Start at 1 to avoid white flash
+  const membersAnim = useRef(new Animated.Value(0)).current;
+  const infoAnim = useRef(new Animated.Value(0)).current;
   
   const handleContact = (member: any, type: 'phone' | 'email') => {
     if (type === 'phone') {
@@ -42,45 +56,95 @@ const BoardScreen = () => {
 
   const members = useQuery(api.boardMembers.getAll) ?? [];
 
+  // Animation functions
+  const animateStaggeredContent = () => {
+    Animated.stagger(200, [
+      Animated.timing(membersAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(infoAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+
+  // Initialize animations on component mount
+  useEffect(() => {
+    animateStaggeredContent();
+  }, []);
+
+  // Listen for window size changes
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setScreenWidth(window.width);
+    });
+
+    return () => subscription?.remove();
+  }, []);
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Mobile Navigation */}
-      <MobileTabBar 
-        isMenuOpen={isMenuOpen}
-        onMenuClose={() => setIsMenuOpen(false)}
-      />
-      
-      {/* Custom Tab Bar */}
-      <CustomTabBar />
+      {/* Mobile Navigation - Only when screen is narrow */}
+      {showMobileNav && (
+        <MobileTabBar 
+          isMenuOpen={isMenuOpen}
+          onMenuClose={() => setIsMenuOpen(false)}
+        />
+      )}
       
       <ScrollView style={styles.container}>
-        <ImageBackground
-          source={require('../../assets/hoa-4k.jpg')}
-          style={styles.header}
-          imageStyle={styles.headerImage}
-        >
-          <View style={styles.headerOverlay} />
-          <View style={styles.headerTop}>
-            <TouchableOpacity 
-              style={styles.menuButton}
-              onPress={() => setIsMenuOpen(true)}
-            >
-              <Ionicons name="menu" size={24} color="#ffffff" />
-            </TouchableOpacity>
-            
-            <View style={styles.headerLeft}>
-              <Text style={styles.headerTitle}>Board of Directors</Text>
-              <Text style={styles.headerSubtitle}>
-                Your elected representatives serving the community
-              </Text>
+        {/* Header */}
+        <Animated.View style={{
+          opacity: fadeAnim,
+        }}>
+          <ImageBackground
+            source={require('../../assets/hoa-4k.jpg')}
+            style={styles.header}
+            imageStyle={styles.headerImage}
+          >
+            <View style={styles.headerOverlay} />
+            <View style={styles.headerTop}>
+              {/* Hamburger Menu - Only when mobile nav is shown */}
+              {showMobileNav && (
+                <TouchableOpacity 
+                  style={styles.menuButton}
+                  onPress={() => setIsMenuOpen(true)}
+                >
+                  <Ionicons name="menu" size={24} color="#ffffff" />
+                </TouchableOpacity>
+              )}
+              
+              <View style={styles.headerLeft}>
+                <Text style={styles.headerTitle}>Board of Directors</Text>
+                <Text style={styles.headerSubtitle}>
+                  Your elected representatives serving the community
+                </Text>
+              </View>
+              
+              <BoardMemberIndicator />
             </View>
-            
-            <BoardMemberIndicator />
-          </View>
-        </ImageBackground>
+          </ImageBackground>
+        </Animated.View>
 
-      {members.map((member: any) => (
-        <View key={member._id} style={styles.memberCard}>
+        {/* Custom Tab Bar - Only when screen is wide enough */}
+        {showDesktopNav && (
+          <Animated.View style={{
+            opacity: fadeAnim,
+          }}>
+            <CustomTabBar />
+          </Animated.View>
+        )}
+
+      <Animated.View style={{
+        opacity: membersAnim,
+      }}>
+        {members.map((member: any) => (
+          <View key={member._id} style={styles.memberCard}>
           <View style={styles.memberHeader}>
             <View style={styles.avatar}>
               {member.image ? (
@@ -129,9 +193,13 @@ const BoardScreen = () => {
             </TouchableOpacity>
           </View>
         </View>
-      ))}
+        ))}
+      </Animated.View>
 
-      <View style={styles.infoSection}>
+      <Animated.View style={{
+        opacity: infoAnim,
+      }}>
+        <View style={styles.infoSection}>
         <Text style={styles.infoTitle}>Board Meetings</Text>
         <Text style={styles.infoText}>
           Board meetings are held on the second Tuesday of each month at 7:00 PM in the community center.
@@ -141,15 +209,16 @@ const BoardScreen = () => {
         </Text>
       </View>
 
-      <View style={styles.infoSection}>
-        <Text style={styles.infoTitle}>Contact the Board</Text>
-        <Text style={styles.infoText}>
-          For general inquiries, please contact the board secretary or use the contact information above.
-        </Text>
-        <Text style={styles.infoText}>
-          For urgent matters, please contact the HOA office directly.
-        </Text>
-      </View>
+        <View style={styles.infoSection}>
+          <Text style={styles.infoTitle}>Contact the Board</Text>
+          <Text style={styles.infoText}>
+            For general inquiries, please contact the board secretary or use the contact information above.
+          </Text>
+          <Text style={styles.infoText}>
+            For urgent matters, please contact the HOA office directly.
+          </Text>
+        </View>
+      </Animated.View>
       </ScrollView>
     </SafeAreaView>
   );

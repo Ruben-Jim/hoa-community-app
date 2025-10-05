@@ -12,6 +12,7 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Platform,
+  ImageBackground,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -30,6 +31,7 @@ const EmergencyScreen = () => {
   const [selectedPriority, setSelectedPriority] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showNewAlertModal, setShowNewAlertModal] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [newAlert, setNewAlert] = useState({
     title: '',
     content: '',
@@ -37,6 +39,10 @@ const EmergencyScreen = () => {
     priority: 'Medium' as any,
     category: 'Other' as any,
   });
+
+  // Check if device is mobile based on screen width
+  const screenWidth = Dimensions.get('window').width;
+  const isMobile = screenWidth < 768;
 
   // Animation values
   const alertModalOpacity = useRef(new Animated.Value(0)).current;
@@ -233,123 +239,155 @@ const EmergencyScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        {/* Mobile Navigation */}
-        <MobileTabBar />
+        {/* Mobile Navigation - Only for Mobile */}
+        {isMobile && (
+          <MobileTabBar 
+            isMenuOpen={isMenuOpen}
+            onMenuClose={() => setIsMenuOpen(false)}
+          />
+        )}
         
-        {/* Custom Tab Bar */}
-        <CustomTabBar />
-        
-        {/* Header with New Alert Button (Board Members Only) */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.headerTitle}>Emergency Alerts</Text>
-            <BoardMemberIndicator />
-          </View>
-          {isBoardMember && (
-            <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-              <TouchableOpacity
-                style={styles.newAlertButton}
-                onPress={() => {
-                  animateButtonPress();
-                  setShowNewAlertModal(true);
-                  animateIn();
-                }}
-              >
-                <Ionicons name="add" size={20} color="#ffffff" />
-                <Text style={styles.newAlertButtonText}>New Alert</Text>
-              </TouchableOpacity>
-            </Animated.View>
+        <ScrollView style={styles.scrollContainer}>
+          {/* Header with ImageBackground */}
+          <ImageBackground
+            source={require('../../assets/hoa-4k.jpg')}
+            style={styles.header}
+            imageStyle={styles.headerImage}
+          >
+            <View style={styles.headerOverlay} />
+            <View style={styles.headerTop}>
+              {/* Hamburger Menu - Only when mobile nav is shown */}
+              {isMobile && (
+                <TouchableOpacity 
+                  style={styles.menuButton}
+                  onPress={() => setIsMenuOpen(true)}
+                >
+                  <Ionicons name="menu" size={24} color="#ffffff" />
+                </TouchableOpacity>
+              )}
+              
+              <View style={styles.headerLeft}>
+                <Text style={styles.headerTitle}>Emergency Alerts</Text>
+                <Text style={styles.headerSubtitle}>
+                  Stay informed about community emergencies and important updates
+                </Text>
+              </View>
+            </View>
+          </ImageBackground>
+
+          {/* Custom Tab Bar - Only for Desktop */}
+          {!isMobile && (
+            <CustomTabBar />
           )}
-        </View>
 
         {/* Priority Filter */}
-
-
         <SafeAreaView style={styles.filterContainer}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterContent}
-          >
-            <Text style={styles.filterLabel}>Priority:</Text>
-            <TouchableOpacity
-              style={[
-                styles.filterButton,
-                !selectedPriority && styles.filterButtonActive
-              ]}
-              onPress={() => setSelectedPriority(null)}
+          <View style={styles.filterRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterContent}
+              style={styles.filterScrollView}
             >
-              <Text style={[
-                styles.filterButtonText,
-                !selectedPriority && styles.filterButtonTextActive
-              ]}>
-                All
-              </Text>
-            </TouchableOpacity>
-
-            {priorities.map((priority) => (
+              <Text style={styles.filterLabel}>Priority:</Text>
               <TouchableOpacity
-                key={priority}
                 style={[
                   styles.filterButton,
-                  selectedPriority === priority && styles.filterButtonActive
+                  !selectedPriority && styles.filterButtonActive
                 ]}
-                onPress={() => setSelectedPriority(priority)}
+                onPress={() => setSelectedPriority(null)}
               >
                 <Text style={[
                   styles.filterButtonText,
-                  selectedPriority === priority && styles.filterButtonTextActive
+                  !selectedPriority && styles.filterButtonTextActive
                 ]}>
-                  {priority}
+                  All
                 </Text>
               </TouchableOpacity>
-            ))}
-          </ScrollView>
+
+              {priorities.map((priority) => (
+                <TouchableOpacity
+                  key={priority}
+                  style={[
+                    styles.filterButton,
+                    selectedPriority === priority && styles.filterButtonActive
+                  ]}
+                  onPress={() => setSelectedPriority(priority)}
+                >
+                  <Text style={[
+                    styles.filterButtonText,
+                    selectedPriority === priority && styles.filterButtonTextActive
+                  ]}>
+                    {priority}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
         </SafeAreaView>
 
 
-        {/* Category Filter */}
+        {/* Category Filter with New Alert Button */}
         <SafeAreaView style={styles.filterContainer}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.filterContainer}
-            contentContainerStyle={styles.filterContent}
-          >
-            <Text style={styles.filterLabel}>Category:</Text>
-            <TouchableOpacity
-              style={[
-                styles.filterButton,
-                !selectedCategory && styles.filterButtonActive
-              ]}
-              onPress={() => setSelectedCategory(null)}
+          <View style={styles.filterRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterContent}
+              style={styles.filterScrollView}
             >
-              <Text style={[
-                styles.filterButtonText,
-                !selectedCategory && styles.filterButtonTextActive
-              ]}>
-                All
-              </Text>
-            </TouchableOpacity>
-
-            {categories.map((category) => (
+              <Text style={styles.filterLabel}>Category:</Text>
               <TouchableOpacity
-                key={category}
                 style={[
                   styles.filterButton,
-                  selectedCategory === category && styles.filterButtonActive
+                  !selectedCategory && styles.filterButtonActive
                 ]}
-                onPress={() => setSelectedCategory(category)}
+                onPress={() => setSelectedCategory(null)}
               >
                 <Text style={[
                   styles.filterButtonText,
-                  selectedCategory === category && styles.filterButtonTextActive
+                  !selectedCategory && styles.filterButtonTextActive
                 ]}>
-                  {category}
+                  All
                 </Text>
               </TouchableOpacity>
-            ))}
-          </ScrollView>
+
+              {categories.map((category) => (
+                <TouchableOpacity
+                  key={category}
+                  style={[
+                    styles.filterButton,
+                    selectedCategory === category && styles.filterButtonActive
+                  ]}
+                  onPress={() => setSelectedCategory(category)}
+                >
+                  <Text style={[
+                    styles.filterButtonText,
+                    selectedCategory === category && styles.filterButtonTextActive
+                  ]}>
+                    {category}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            
+            {/* New Alert Button - Desktop Only (Board Members Only) */}
+            {!isMobile && isBoardMember && (
+              <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+                <TouchableOpacity
+                  style={styles.newAlertButton}
+                  onPress={() => {
+                    animateButtonPress();
+                    setShowNewAlertModal(true);
+                    animateIn();
+                  }}
+                >
+                  <Ionicons name="add" size={20} color="#ffffff" />
+                  <Text style={styles.newAlertButtonText}>New Alert</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            )}
+          </View>
         </SafeAreaView>
 
 
@@ -448,6 +486,20 @@ const EmergencyScreen = () => {
           )}
         </ScrollView>
 
+        {/* Floating Action Button for Mobile (Board Members Only) */}
+        {isMobile && isBoardMember && (
+          <TouchableOpacity
+            style={styles.floatingActionButton}
+            onPress={() => {
+              animateButtonPress();
+              setShowNewAlertModal(true);
+              animateIn();
+            }}
+          >
+            <Ionicons name="add" size={28} color="#ffffff" />
+          </TouchableOpacity>
+        )}
+
         {/* New Alert Modal */}
         <Modal
           visible={showNewAlertModal}
@@ -469,7 +521,7 @@ const EmergencyScreen = () => {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.modalContent}>
+            <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
               <Text style={styles.inputLabel}>Alert Type</Text>
               <View style={styles.selectorContainer}>
                 {types.map((type) => (
@@ -550,7 +602,7 @@ const EmergencyScreen = () => {
                 multiline
                 textAlignVertical="top"
               />
-            </View>
+            </ScrollView>
 
             <View style={styles.modalFooter}>
               <TouchableOpacity
@@ -570,6 +622,7 @@ const EmergencyScreen = () => {
             </Animated.View>
           </Animated.View>
         </Modal>
+        </ScrollView>
       </View>
     </SafeAreaView>
   );
@@ -584,24 +637,66 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f3f4f6',
   },
+  scrollContainer: {
+    flex: 1,
+  },
   header: {
+    height: 240,
+    padding: 20,
+    paddingTop: 40,
+    paddingBottom: 20,
+    position: 'relative',
+    justifyContent: 'space-between',
+  },
+  headerImage: {
+    borderRadius: 0,
+    resizeMode: 'stretch',
+    width: '100%',
+  },
+  headerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    zIndex: 1,
+  },
+  menuButton: {
+    padding: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 8,
+    marginRight: 12,
   },
   headerLeft: {
-    flexDirection: 'row',
+    flex: 1,
     alignItems: 'center',
-    gap: 10,
+    paddingHorizontal: 10,
   },
   headerTitle: {
-    fontSize: 20,
+    color: '#ffffff',
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#1f2937',
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+    textAlign: 'center',
+  },
+  headerSubtitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '400',
+    opacity: 0.9,
+    marginTop: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+    textAlign: 'center',
   },
   newAlertButton: {
     flexDirection: 'row',
@@ -617,14 +712,40 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 4,
   },
+  floatingActionButton: {
+    position: 'absolute',
+    bottom: 100,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#dc2626',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    zIndex: 1000,
+  },
   filterContainer: {
     backgroundColor: '#ffffff',
     paddingVertical: 10,
-    paddingTop: -35,
+    paddingTop: -40,
     paddingBottom: -20,
   },
-  filterContent: {
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 15,
+  },
+  filterScrollView: {
+    flex: 1,
+  },
+  filterContent: {
+    paddingHorizontal: 0,
     alignItems: 'center',
   },
   filterLabel: {
@@ -797,44 +918,59 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContainer: {
     backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    padding: 0,
     width: '90%',
-    maxHeight: '80%',
+    maxHeight: '90%',
+    minHeight: '70%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.3,
     shadowRadius: 20,
-    elevation: 10,
+    elevation: 15,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    paddingTop: 24,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
+    backgroundColor: '#f8fafc',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#1f2937',
+    flex: 1,
+    textAlign: 'center',
+    marginRight: 24,
   },
   modalContent: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    paddingBottom: 20,
   },
   inputLabel: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: '#374151',
-    marginBottom: 8,
+    marginBottom: 12,
+    marginTop: 16,
   },
   selectorContainer: {
     flexDirection: 'row',
@@ -861,31 +997,49 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   textInput: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    padding: 12,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 16,
     color: '#374151',
     marginBottom: 20,
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   contentInput: {
-    height: 100,
+    height: 140,
   },
   modalFooter: {
     flexDirection: 'row',
-    padding: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    paddingBottom: 32,
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
+    backgroundColor: '#f8fafc',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    gap: 12,
   },
   cancelButton: {
     flex: 1,
-    paddingVertical: 12,
-    marginRight: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
+    paddingVertical: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#ffffff',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   cancelButtonText: {
     fontSize: 16,
@@ -894,11 +1048,15 @@ const styles = StyleSheet.create({
   },
   createButton: {
     flex: 1,
-    paddingVertical: 12,
-    marginLeft: 8,
-    borderRadius: 8,
+    paddingVertical: 16,
+    borderRadius: 12,
     backgroundColor: '#dc2626',
     alignItems: 'center',
+    shadowColor: '#dc2626',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   createButtonText: {
     fontSize: 16,

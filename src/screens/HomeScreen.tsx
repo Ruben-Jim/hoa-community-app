@@ -11,6 +11,7 @@ import {
   Platform,
   Image,
   Animated,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -28,23 +29,22 @@ const HomeScreen = () => {
   const emergencyNotifications = useQuery(api.emergencyNotifications.getActive);
   const communityPosts = useQuery(api.communityPosts.getAll);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  
+  // State for dynamic responsive behavior
+  const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
+  
+  // Dynamic responsive check - show mobile nav when screen is too narrow for desktop nav
+  const showMobileNav = screenWidth < 1024; // Show mobile nav when screen is narrower than 1024px
+  const showDesktopNav = screenWidth >= 1024; // Show desktop nav when screen is 1024px or wider
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(1)).current; // Start at 1 to avoid white flash
-  const slideAnim = useRef(new Animated.Value(50)).current;
   const quickActionsAnim = useRef(new Animated.Value(0)).current;
   const notificationsAnim = useRef(new Animated.Value(0)).current;
   const postsAnim = useRef(new Animated.Value(0)).current;
   const officeAnim = useRef(new Animated.Value(0)).current;
 
   // Animation functions
-  const animateSlideUp = () => {
-    Animated.timing(slideAnim, {
-      toValue: 0,
-      duration: 600,
-      useNativeDriver: true,
-    }).start();
-  };
 
   const animateStaggeredContent = () => {
     Animated.stagger(200, [
@@ -73,8 +73,16 @@ const HomeScreen = () => {
 
   // Initialize animations on component mount
   useEffect(() => {
-    animateSlideUp();
     animateStaggeredContent();
+  }, []);
+
+  // Listen for window size changes
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setScreenWidth(window.width);
+    });
+
+    return () => subscription?.remove();
   }, []);
 
   const handleContact = (type: 'phone' | 'email') => {
@@ -123,16 +131,17 @@ const HomeScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        {/* Mobile Navigation */}
-        <MobileTabBar 
-          isMenuOpen={isMenuOpen}
-          onMenuClose={() => setIsMenuOpen(false)}
-        />
+        {/* Mobile Navigation - Only when screen is narrow */}
+        {showMobileNav && (
+          <MobileTabBar 
+            isMenuOpen={isMenuOpen}
+            onMenuClose={() => setIsMenuOpen(false)}
+          />
+        )}
         
         <ScrollView style={styles.scrollContainer}>
       {/* Header */}
       <Animated.View style={{
-        transform: [{ translateY: slideAnim }],
         opacity: fadeAnim,
       }}>
         <ImageBackground
@@ -142,12 +151,15 @@ const HomeScreen = () => {
         >
         <View style={styles.headerOverlay} />
         <View style={styles.headerTop}>
-          <TouchableOpacity
-            style={styles.menuButton}
-            onPress={() => setIsMenuOpen(true)}
-          >
-            <Ionicons name="menu" size={24} color="#ffffff" />
-          </TouchableOpacity>
+          {/* Hamburger Menu - Only when mobile nav is shown */}
+          {showMobileNav && (
+            <TouchableOpacity
+              style={styles.menuButton}
+              onPress={() => setIsMenuOpen(true)}
+            >
+              <Ionicons name="menu" size={24} color="#ffffff" />
+            </TouchableOpacity>
+          )}
           
           <View style={styles.headerLeft}>
             <Text style={styles.welcomeText}>Welcome to</Text>
@@ -179,13 +191,14 @@ const HomeScreen = () => {
         </ImageBackground>
       </Animated.View>
 
-      {/* Custom Tab Bar */}
-      <Animated.View style={{
-        opacity: fadeAnim,
-        transform: [{ translateY: slideAnim }],
-      }}>
-        <CustomTabBar />
-      </Animated.View>
+      {/* Custom Tab Bar - Only when screen is wide enough */}
+      {showDesktopNav && (
+        <Animated.View style={{
+          opacity: fadeAnim,
+        }}>
+          <CustomTabBar />
+        </Animated.View>
+      )}
 
       {/* Quick Actions */}
       {/* <Animated.View style={[
@@ -396,6 +409,7 @@ const styles = StyleSheet.create({
   },
   headerImage: {
     borderRadius: 0,
+    resizeMode: 'stretch',
     width: '100%',
   },
   headerOverlay: {
