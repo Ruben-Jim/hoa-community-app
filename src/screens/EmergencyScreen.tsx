@@ -43,7 +43,7 @@ const EmergencyScreen = () => {
   const alertModalTranslateY = useRef(new Animated.Value(300)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current; // Start at 0 for individual notification animations
 
   const priorities = ['High', 'Medium', 'Low'];
   const categories = ['Security', 'Maintenance', 'Event', 'Lost Pet', 'Other'];
@@ -118,7 +118,12 @@ const EmergencyScreen = () => {
 
   // Initialize animations on component mount
   useEffect(() => {
-    animateFadeIn();
+    // Animate individual notifications
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
   }, []);
 
   // Check if user is a board member
@@ -227,7 +232,7 @@ const EmergencyScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+      <View style={styles.container}>
         {/* Mobile Navigation */}
         <MobileTabBar />
         
@@ -565,7 +570,7 @@ const EmergencyScreen = () => {
             </Animated.View>
           </Animated.View>
         </Modal>
-      </Animated.View>
+      </View>
     </SafeAreaView>
   );
 };

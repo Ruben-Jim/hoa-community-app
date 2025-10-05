@@ -96,7 +96,7 @@ const AdminScreen = () => {
   const emergencyModalTranslateY = useRef(new Animated.Value(300)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current; // Start at 0 for individual item animations
 
   // Check if current user is a board member
   const isBoardMember = user?.isBoardMember && user?.isActive;
@@ -184,7 +184,12 @@ const AdminScreen = () => {
 
   // Initialize animations on component mount
   useEffect(() => {
-    animateFadeIn();
+    // Animate individual items
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
   }, []);
 
   const handleRefresh = async () => {
@@ -563,7 +568,20 @@ const AdminScreen = () => {
               <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
             }
             renderItem={({ item }) => (
-              <View style={styles.tableRow}>
+              <Animated.View 
+                style={[
+                  styles.tableRow,
+                  {
+                    opacity: fadeAnim,
+                    transform: [{
+                      translateY: fadeAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [50, 0],
+                      })
+                    }]
+                  }
+                ]}
+              >
                 <View style={styles.rowContent}>
                   <View style={styles.residentHeader}>
                     <View style={styles.profileImageContainer}>
@@ -610,7 +628,7 @@ const AdminScreen = () => {
                     </TouchableOpacity>
                   )}
                 </View>
-              </View>
+              </Animated.View>
             )}
           />
         );
@@ -640,7 +658,20 @@ const AdminScreen = () => {
                 <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
               }
               renderItem={({ item }) => (
-                <View style={styles.tableRow}>
+                <Animated.View 
+                  style={[
+                    styles.tableRow,
+                    {
+                      opacity: fadeAnim,
+                      transform: [{
+                        translateY: fadeAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [50, 0],
+                        })
+                      }]
+                    }
+                  ]}
+                >
                   <View style={styles.rowContent}>
                     <View style={styles.memberHeader}>
                       <View style={styles.memberAvatar}>
@@ -682,7 +713,7 @@ const AdminScreen = () => {
                       <Ionicons name="trash" size={20} color="#ef4444" />
                     </TouchableOpacity>
                   </View>
-                </View>
+                </Animated.View>
               )}
             />
           </View>
@@ -697,7 +728,20 @@ const AdminScreen = () => {
               <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
             }
             renderItem={({ item }) => (
-              <View style={styles.tableRow}>
+              <Animated.View 
+                style={[
+                  styles.tableRow,
+                  {
+                    opacity: fadeAnim,
+                    transform: [{
+                      translateY: fadeAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [50, 0],
+                      })
+                    }]
+                  }
+                ]}
+              >
                 <View style={styles.rowContent}>
                   <Text style={styles.rowTitle}>{item.title}</Text>
                   <Text style={styles.rowSubtitle}>{item.category}</Text>
@@ -711,7 +755,7 @@ const AdminScreen = () => {
                     <Ionicons name="trash" size={20} color="#ef4444" />
                   </TouchableOpacity>
                 </View>
-              </View>
+              </Animated.View>
             )}
           />
         );
@@ -725,7 +769,20 @@ const AdminScreen = () => {
               <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
             }
             renderItem={({ item }) => (
-              <View style={styles.tableRow}>
+              <Animated.View 
+                style={[
+                  styles.tableRow,
+                  {
+                    opacity: fadeAnim,
+                    transform: [{
+                      translateY: fadeAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [50, 0],
+                      })
+                    }]
+                  }
+                ]}
+              >
                 <View style={styles.rowContent}>
                   <Text style={styles.rowTitle}>{item.title}</Text>
                   <Text style={styles.rowSubtitle}>By: {item.author}</Text>
@@ -740,7 +797,7 @@ const AdminScreen = () => {
                     <Ionicons name="trash" size={20} color="#ef4444" />
                   </TouchableOpacity>
                 </View>
-              </View>
+              </Animated.View>
             )}
           />
         );
@@ -754,7 +811,20 @@ const AdminScreen = () => {
               <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
             }
             renderItem={({ item }) => (
-              <View style={styles.tableRow}>
+              <Animated.View 
+                style={[
+                  styles.tableRow,
+                  {
+                    opacity: fadeAnim,
+                    transform: [{
+                      translateY: fadeAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [50, 0],
+                      })
+                    }]
+                  }
+                ]}
+              >
                 <View style={styles.rowContent}>
                   <Text style={styles.rowTitle}>Comment by: {item.author}</Text>
                   <Text style={styles.rowSubtitle}>On: {item.postTitle}</Text>
@@ -769,7 +839,7 @@ const AdminScreen = () => {
                     <Ionicons name="trash" size={20} color="#ef4444" />
                   </TouchableOpacity>
                 </View>
-              </View>
+              </Animated.View>
             )}
           />
         );
@@ -799,7 +869,20 @@ const AdminScreen = () => {
                 <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
               }
               renderItem={({ item }) => (
-                <View style={styles.tableRow}>
+                <Animated.View 
+                  style={[
+                    styles.tableRow,
+                    {
+                      opacity: fadeAnim,
+                      transform: [{
+                        translateY: fadeAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [50, 0],
+                        })
+                      }]
+                    }
+                  ]}
+                >
                   <View style={styles.rowContent}>
                     <View style={styles.alertHeader}>
                       <Text style={styles.rowTitle}>{item.title}</Text>
@@ -845,7 +928,7 @@ const AdminScreen = () => {
                       <Ionicons name="trash" size={20} color="#ef4444" />
                     </TouchableOpacity>
                   </View>
-                </View>
+                </Animated.View>
               )}
             />
           </View>
@@ -858,7 +941,7 @@ const AdminScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+      <View style={styles.container}>
         {/* Mobile Navigation */}
         <MobileTabBar />
         
@@ -874,7 +957,12 @@ const AdminScreen = () => {
         </View>
 
         {/* Folder Tabs */}
-        <View style={styles.folderTabs}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          style={styles.folderTabs}
+          contentContainerStyle={styles.folderTabsContent}
+        >
           <TouchableOpacity
             style={[styles.folderTab, activeTab === 'residents' && styles.activeFolderTab]}
             onPress={() => setActiveTab('residents')}
@@ -934,7 +1022,7 @@ const AdminScreen = () => {
               Emergency ({emergencyAlerts.length})
             </Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
 
         {/* Content Area */}
         <View style={styles.contentArea}>
@@ -1352,7 +1440,7 @@ const AdminScreen = () => {
             </Animated.View>
           </Animated.View>
         </Modal>
-      </Animated.View>
+      </View>
     </SafeAreaView>
   );
 };
@@ -1401,33 +1489,41 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   folderTabs: {
-    flexDirection: 'row',
     backgroundColor: '#ffffff',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
+    maxHeight: 60, // Limit height to match original design
+  },
+  folderTabsContent: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingRight: 40, // Extra padding to ensure last tab is fully visible
+    alignItems: 'center',
+    minHeight: 60, // Ensure consistent height
   },
   folderTab: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     marginRight: 8,
-    borderRadius: 8,
+    borderRadius: 6,
     backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    minWidth: 100, // Reduced minimum width for better fit
+    flexShrink: 0, // Prevent tabs from shrinking
   },
   activeFolderTab: {
     backgroundColor: '#eff6ff',
     borderColor: '#2563eb',
   },
   folderTabText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
     color: '#6b7280',
-    marginLeft: 8,
+    marginLeft: 6,
   },
   activeFolderTabText: {
     color: '#2563eb',

@@ -10,6 +10,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import CustomTabBar from '../components/CustomTabBar';
+import MobileTabBar from '../components/MobileTabBar';
 
 type RootStackParamList = {
   NotificationDetail: {
@@ -117,8 +120,15 @@ const NotificationDetailScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      {/* Header */}
+    <SafeAreaView style={styles.safeArea}>
+      {/* Mobile Navigation */}
+      <MobileTabBar />
+      
+      {/* Custom Tab Bar */}
+      <CustomTabBar />
+      
+      <ScrollView style={styles.container}>
+        {/* Header */}
       <View style={styles.header}>
         <View style={styles.priorityIndicator}>
           <Ionicons 
@@ -244,11 +254,16 @@ const NotificationDetailScreen = () => {
           </Text>
         </View>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f3f4f6',
+  },
   container: {
     flex: 1,
     backgroundColor: '#f3f4f6',

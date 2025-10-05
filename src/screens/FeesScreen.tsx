@@ -11,6 +11,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
+import CustomTabBar from '../components/CustomTabBar';
+import MobileTabBar from '../components/MobileTabBar';
 
 const FeesScreen = () => {
   const [activeTab, setActiveTab] = useState<'fees' | 'fines'>('fees');
@@ -75,6 +77,12 @@ const FeesScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      {/* Mobile Navigation */}
+      <MobileTabBar />
+      
+      {/* Custom Tab Bar */}
+      <CustomTabBar />
+      
       <ScrollView style={styles.container}>
       {/* Summary Cards */}
       <View style={styles.summaryContainer}>

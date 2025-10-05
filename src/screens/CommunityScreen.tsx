@@ -44,7 +44,7 @@ const CommunityScreen = () => {
   const commentModalTranslateY = useRef(new Animated.Value(400)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current; // Start at 0 for individual post animations
 
   // Convex queries
   const posts = useQuery(api.communityPosts.getAll) ?? [];
@@ -132,7 +132,12 @@ const CommunityScreen = () => {
 
   // Initialize animations on component mount
   useEffect(() => {
-    animateFadeIn();
+    // Animate individual posts
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
   }, []);
 
   const filteredPosts = posts.filter((post: any) =>
@@ -278,7 +283,7 @@ const CommunityScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+      <View style={styles.container}>
       {/* Mobile Navigation */}
       <MobileTabBar />
       
@@ -663,7 +668,7 @@ const CommunityScreen = () => {
           </Animated.View>
         </Animated.View>
       </Modal>
-      </Animated.View>
+      </View>
     </SafeAreaView>
   );
 };

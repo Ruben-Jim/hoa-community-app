@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -27,9 +27,10 @@ const HomeScreen = () => {
   const hoaInfo = useQuery(api.hoaInfo.get);
   const emergencyNotifications = useQuery(api.emergencyNotifications.getActive);
   const communityPosts = useQuery(api.communityPosts.getAll);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Animation values
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(1)).current; // Start at 1 to avoid white flash
   const slideAnim = useRef(new Animated.Value(50)).current;
   const quickActionsAnim = useRef(new Animated.Value(0)).current;
   const notificationsAnim = useRef(new Animated.Value(0)).current;
@@ -37,14 +38,6 @@ const HomeScreen = () => {
   const officeAnim = useRef(new Animated.Value(0)).current;
 
   // Animation functions
-  const animateFadeIn = () => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 600,
-      useNativeDriver: true,
-    }).start();
-  };
-
   const animateSlideUp = () => {
     Animated.timing(slideAnim, {
       toValue: 0,
@@ -80,7 +73,6 @@ const HomeScreen = () => {
 
   // Initialize animations on component mount
   useEffect(() => {
-    animateFadeIn();
     animateSlideUp();
     animateStaggeredContent();
   }, []);
@@ -130,9 +122,12 @@ const HomeScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+      <View style={styles.container}>
         {/* Mobile Navigation */}
-        <MobileTabBar />
+        <MobileTabBar 
+          isMenuOpen={isMenuOpen}
+          onMenuClose={() => setIsMenuOpen(false)}
+        />
         
         <ScrollView style={styles.scrollContainer}>
       {/* Header */}
@@ -147,6 +142,13 @@ const HomeScreen = () => {
         >
         <View style={styles.headerOverlay} />
         <View style={styles.headerTop}>
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() => setIsMenuOpen(true)}
+          >
+            <Ionicons name="menu" size={24} color="#ffffff" />
+          </TouchableOpacity>
+          
           <View style={styles.headerLeft}>
             <Text style={styles.welcomeText}>Welcome to</Text>
             <Text style={styles.hoaName}>{hoaInfo?.name ?? 'HOA'}</Text>
@@ -186,7 +188,7 @@ const HomeScreen = () => {
       </Animated.View>
 
       {/* Quick Actions */}
-      <Animated.View style={[
+      {/* <Animated.View style={[
         styles.quickActions,
         {
           opacity: quickActionsAnim,
@@ -197,7 +199,7 @@ const HomeScreen = () => {
             })
           }]
         }
-      ]}>
+      ]}> */}
       {/* <View style={styles.quickActions}>
         <TouchableOpacity
           style={styles.actionButton}
@@ -223,7 +225,7 @@ const HomeScreen = () => {
           <Text style={styles.actionText}>Profile</Text>
         </TouchableOpacity>
       </View> */}
-      </Animated.View>
+      {/* </Animated.View> */}
 
       {/* Active Notifications */}
       {activeNotifications.length > 0 && (
@@ -278,7 +280,7 @@ const HomeScreen = () => {
       ]}>
         <View style={styles.communityHeader}>
           <Ionicons name="people" size={24} color="#64748b" />
-          <Text style={styles.sectionTitle}>Recent Community Posts</Text>
+          <Text style={[styles.sectionTitle, { marginLeft: 8, marginBottom: 0 }]}>Recent Community Posts</Text>
         </View>
         {communityPosts?.slice(0, 2).map((post: any, index: number) => (
           <Animated.View 
@@ -345,7 +347,7 @@ const HomeScreen = () => {
       ]}>
         <View style={styles.officeHeader}>
           <Ionicons name="business" size={24} color="#64748b" />
-          <Text style={styles.sectionTitle}>Office Information</Text>
+          <Text style={[styles.sectionTitle, { marginLeft: 8, marginBottom: 0 }]}>Office Information</Text>
         </View>
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
@@ -367,7 +369,7 @@ const HomeScreen = () => {
         </View>
       </Animated.View>
       </ScrollView>
-      </Animated.View>
+      </View>
     </SafeAreaView>
   );
 };
@@ -394,7 +396,6 @@ const styles = StyleSheet.create({
   },
   headerImage: {
     borderRadius: 0,
-    resizeMode: 'stretch',
     width: '100%',
   },
   headerOverlay: {
@@ -408,12 +409,20 @@ const styles = StyleSheet.create({
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 10,
     zIndex: 1,
   },
+  menuButton: {
+    padding: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 8,
+    marginRight: 12,
+  },
   headerLeft: {
     flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 10,
   },
   signOutButton: {
     padding: 8,
@@ -443,29 +452,34 @@ const styles = StyleSheet.create({
   },
   welcomeText: {
     color: '#ffffff',
-    fontSize: 16,
-    opacity: 0.9,
-    textShadowColor: 'rgba(0, 0, 0, 0.8)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
+    fontSize: 18,
+    fontWeight: '500',
+    opacity: 0.95,
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+    textAlign: 'center',
   },
   hoaName: {
     color: '#ffffff',
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    marginTop: 5,
-    textShadowColor: 'rgba(0, 0, 0, 0.8)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
+    marginTop: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+    textAlign: 'center',
   },
   subtitle: {
     color: '#ffffff',
-    fontSize: 14,
-    opacity: 0.8,
-    marginTop: 5,
-    textShadowColor: 'rgba(0, 0, 0, 0.8)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
+    fontSize: 16,
+    fontWeight: '400',
+    opacity: 0.9,
+    marginTop: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+    textAlign: 'center',
   },
   quickActions: {
     flexDirection: 'row',
@@ -531,8 +545,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 15,
-    
-    
   },
   officeHeader: {
     flexDirection: 'row',

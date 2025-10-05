@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Linking,
   Alert,
   Image,
+  ImageBackground,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,6 +22,7 @@ import MobileTabBar from '../components/MobileTabBar';
 
 const BoardScreen = () => {
   const { user } = useAuth();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   const handleContact = (member: any, type: 'phone' | 'email') => {
     if (type === 'phone') {
@@ -42,22 +44,40 @@ const BoardScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container}>
       {/* Mobile Navigation */}
-      <MobileTabBar />
+      <MobileTabBar 
+        isMenuOpen={isMenuOpen}
+        onMenuClose={() => setIsMenuOpen(false)}
+      />
       
       {/* Custom Tab Bar */}
       <CustomTabBar />
       
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <Text style={styles.headerTitle}>Board of Directors</Text>
-          <BoardMemberIndicator />
-        </View>
-        <Text style={styles.headerSubtitle}>
-          Your elected representatives serving the community
-        </Text>
-      </View>
+      <ScrollView style={styles.container}>
+        <ImageBackground
+          source={require('../../assets/hoa-4k.jpg')}
+          style={styles.header}
+          imageStyle={styles.headerImage}
+        >
+          <View style={styles.headerOverlay} />
+          <View style={styles.headerTop}>
+            <TouchableOpacity 
+              style={styles.menuButton}
+              onPress={() => setIsMenuOpen(true)}
+            >
+              <Ionicons name="menu" size={24} color="#ffffff" />
+            </TouchableOpacity>
+            
+            <View style={styles.headerLeft}>
+              <Text style={styles.headerTitle}>Board of Directors</Text>
+              <Text style={styles.headerSubtitle}>
+                Your elected representatives serving the community
+              </Text>
+            </View>
+            
+            <BoardMemberIndicator />
+          </View>
+        </ImageBackground>
 
       {members.map((member: any) => (
         <View key={member._id} style={styles.memberCard}>
@@ -145,26 +165,62 @@ const styles = StyleSheet.create({
     backgroundColor: '#f3f4f6',
   },
   header: {
-    backgroundColor: '#ffffff',
+    height: 240,
     padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    paddingTop: 40,
+    paddingBottom: 20,
+    position: 'relative',
+    justifyContent: 'space-between',
+  },
+  headerImage: {
+    borderRadius: 0,
+    resizeMode: 'stretch',
+    width: '100%',
+  },
+  headerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   headerTop: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
+    zIndex: 1,
+  },
+  menuButton: {
+    padding: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  headerLeft: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 10,
   },
   headerTitle: {
+    color: '#ffffff',
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1f2937',
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+    textAlign: 'center',
   },
   headerSubtitle: {
+    color: '#ffffff',
     fontSize: 16,
-    color: '#6b7280',
-    lineHeight: 22,
+    fontWeight: '400',
+    opacity: 0.9,
+    marginTop: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+    textAlign: 'center',
   },
   memberCard: {
     backgroundColor: '#ffffff',

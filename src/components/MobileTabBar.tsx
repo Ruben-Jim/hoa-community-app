@@ -20,16 +20,34 @@ interface TabItem {
   color: string;
 }
 
-const MobileTabBar = () => {
+interface MobileTabBarProps {
+  isMenuOpen?: boolean;
+  onMenuClose?: () => void;
+}
+
+const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTabBarProps) => {
   const navigation = useNavigation();
   const route = useRoute();
   const { user } = useAuth();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [internalMenuOpen, setInternalMenuOpen] = useState(false);
+  
+  const isMenuOpen = externalIsMenuOpen !== undefined ? externalIsMenuOpen : internalMenuOpen;
   
   const slideAnim = useRef(new Animated.Value(-300)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
 
   const isBoardMember = user?.isBoardMember && user?.isActive;
+
+  // Handle external menu state changes
+  useEffect(() => {
+    if (externalIsMenuOpen !== undefined) {
+      if (externalIsMenuOpen) {
+        openMenu();
+      } else {
+        closeMenu();
+      }
+    }
+  }, [externalIsMenuOpen]);
 
   const tabs: TabItem[] = [
     { name: 'Home', icon: 'home', label: 'Home', color: '#2563eb' },
@@ -46,7 +64,9 @@ const MobileTabBar = () => {
   };
 
   const openMenu = () => {
-    setIsMenuOpen(true);
+    if (externalIsMenuOpen === undefined) {
+      setInternalMenuOpen(true);
+    }
     Animated.parallel([
       Animated.timing(slideAnim, {
         toValue: 0,
@@ -74,20 +94,16 @@ const MobileTabBar = () => {
         useNativeDriver: true,
       }),
     ]).start(() => {
-      setIsMenuOpen(false);
+      if (externalIsMenuOpen === undefined) {
+        setInternalMenuOpen(false);
+      } else if (onMenuClose) {
+        onMenuClose();
+      }
     });
   };
 
   return (
     <>
-      {/* Hamburger Menu Button */}
-      <TouchableOpacity
-        style={styles.menuButton}
-        onPress={openMenu}
-      >
-        <Ionicons name="menu" size={24} color="#374151" />
-      </TouchableOpacity>
-
       {/* Mobile Navigation Modal */}
       <Modal
         visible={isMenuOpen}
@@ -164,20 +180,6 @@ const MobileTabBar = () => {
 };
 
 const styles = StyleSheet.create({
-  menuButton: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : 20,
-    left: 20,
-    zIndex: 1000,
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
