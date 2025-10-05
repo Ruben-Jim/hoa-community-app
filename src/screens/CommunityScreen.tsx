@@ -37,6 +37,10 @@ const CommunityScreen = () => {
     category: 'General' as any,
   });
 
+  // Check if device is mobile based on screen width
+  const screenWidth = Dimensions.get('window').width;
+  const isMobile = screenWidth < 768;
+
   // Animation values
   const postModalOpacity = useRef(new Animated.Value(0)).current;
   const postModalTranslateY = useRef(new Animated.Value(300)).current;
@@ -296,19 +300,21 @@ const CommunityScreen = () => {
           <Text style={styles.headerTitle}>Community Forum</Text>
           <BoardMemberIndicator />
         </View>
-        <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-          <TouchableOpacity
-            style={styles.newPostButton}
-            onPress={() => {
-              animateButtonPress();
-              setShowNewPostModal(true);
-              animateIn('post');
-            }}
-          >
-            <Ionicons name="add" size={20} color="#ffffff" />
-            <Text style={styles.newPostButtonText}>New Post</Text>
-          </TouchableOpacity>
-        </Animated.View>
+        {!isMobile && (
+          <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+            <TouchableOpacity
+              style={styles.newPostButton}
+              onPress={() => {
+                animateButtonPress();
+                setShowNewPostModal(true);
+                animateIn('post');
+              }}
+            >
+              <Ionicons name="add" size={20} color="#ffffff" />
+              <Text style={styles.newPostButtonText}>New Post</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
       </View>
 
       {/* Category Filter */}
@@ -529,6 +535,20 @@ const CommunityScreen = () => {
         )}
       </ScrollView>
 
+      {/* Floating Action Button for Mobile */}
+      {isMobile && (
+        <TouchableOpacity
+          style={styles.floatingActionButton}
+          onPress={() => {
+            animateButtonPress();
+            setShowNewPostModal(true);
+            animateIn('post');
+          }}
+        >
+          <Ionicons name="add" size={28} color="#ffffff" />
+        </TouchableOpacity>
+      )}
+
       {/* New Post Modal */}
       <Modal
         visible={showNewPostModal}
@@ -550,7 +570,7 @@ const CommunityScreen = () => {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.modalContent}>
+          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
             <Text style={styles.inputLabel}>Category</Text>
             <View style={styles.categorySelector}>
               {categories.map((category) => (
@@ -589,7 +609,7 @@ const CommunityScreen = () => {
               multiline
               textAlignVertical="top"
             />
-          </View>
+          </ScrollView>
 
           <View style={styles.modalFooter}>
             <TouchableOpacity
@@ -714,6 +734,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginLeft: 4,
+  },
+  floatingActionButton: {
+    position: 'absolute',
+    bottom: 100,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#2563eb',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    zIndex: 1000,
   },
   categoryContainer: {
     backgroundColor: '#ffffff',
@@ -945,44 +982,59 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContainer: {
     backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    padding: 0,
     width: '90%',
-    maxHeight: '80%',
+    maxHeight: '90%',
+    minHeight: '70%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.3,
     shadowRadius: 20,
-    elevation: 10,
+    elevation: 15,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    paddingTop: 24,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
+    backgroundColor: '#f8fafc',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#1f2937',
+    flex: 1,
+    textAlign: 'center',
+    marginRight: 24, // Account for close button width
   },
   modalContent: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    paddingBottom: 20,
   },
   inputLabel: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: '#374151',
-    marginBottom: 8,
+    marginBottom: 12,
+    marginTop: 16,
   },
   categorySelector: {
     flexDirection: 'row',
@@ -1009,31 +1061,50 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   textInput: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    padding: 12,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 16,
     color: '#374151',
     marginBottom: 20,
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   contentInput: {
-    height: 120,
+    height: 140,
+    textAlignVertical: 'top',
   },
   modalFooter: {
     flexDirection: 'row',
-    padding: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    paddingBottom: 32,
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
+    backgroundColor: '#f8fafc',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    gap: 12,
   },
   cancelButton: {
     flex: 1,
-    paddingVertical: 12,
-    marginRight: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
+    paddingVertical: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#ffffff',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   cancelButtonText: {
     fontSize: 16,
@@ -1042,11 +1113,15 @@ const styles = StyleSheet.create({
   },
   createButton: {
     flex: 1,
-    paddingVertical: 12,
-    marginLeft: 8,
-    borderRadius: 8,
+    paddingVertical: 16,
+    borderRadius: 12,
     backgroundColor: '#2563eb',
     alignItems: 'center',
+    shadowColor: '#2563eb',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   createButtonText: {
     fontSize: 16,
