@@ -11,7 +11,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "deploy": "gh-pages --nojekyll -d dist",
-    "predeploy": "expo export -p web && cp web/ionicons-fallback.js dist/ionicons-fallback.js && node web/inject-ionicons.js"
+    "predeploy": "expo export -p web"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
