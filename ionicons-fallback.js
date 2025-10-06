@@ -2,21 +2,21 @@
 // This ensures Ionicons are available even if the CDN fails
 
 (function() {
-  // Check if Ionicons are already loaded
-  if (typeof window !== 'undefined' && window.Ionicons) {
-    return;
-  }
-
+  console.log('🚀 Ionicons fallback script loaded');
+  
   // Function to ensure Expo Vector Icons work with Ionicons
   function ensureExpoVectorIconsWork() {
+    console.log('🔧 Setting up Expo Vector Icons compatibility');
+    
     // Wait for React to be ready
     const checkReact = setInterval(() => {
       if (window.React && window.React.createElement) {
         clearInterval(checkReact);
+        console.log('✅ React detected, setting up Ionicons');
         
         // Ensure Ionicons are available globally
         if (window.Ionicons) {
-          console.log('Ionicons CDN loaded successfully for all screens');
+          console.log('✅ Ionicons CDN loaded successfully for all screens');
           
           // Add a global check for icon availability
           window.checkIoniconsAvailable = function(iconName) {
@@ -24,42 +24,57 @@
           };
           
           // Log available icons for debugging
-          console.log('Available Ionicons:', Object.keys(window.Ionicons.icons || {}));
+          console.log('📋 Available Ionicons:', Object.keys(window.Ionicons.icons || {}));
+        } else {
+          console.warn('⚠️ Ionicons not available, trying to load...');
         }
       }
     }, 100);
     
-    // Clear interval after 5 seconds
-    setTimeout(() => clearInterval(checkReact), 5000);
+    // Clear interval after 10 seconds
+    setTimeout(() => {
+      clearInterval(checkReact);
+      console.log('⏰ React check timeout');
+    }, 10000);
   }
 
-  // Fallback: Load Ionicons from alternative CDN if primary fails
-  function loadIoniconsFallback() {
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/ionicons@7.1.0/dist/ionicons/ionicons.js';
-    script.async = true;
-    script.onload = function() {
-      console.log('Ionicons loaded from fallback CDN');
+  // Function to load Ionicons from CDN
+  function loadIoniconsFromCDN(url, name) {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = url;
+      script.async = true;
+      script.onload = function() {
+        console.log(`✅ ${name} loaded successfully`);
+        resolve();
+      };
+      script.onerror = function() {
+        console.warn(`❌ Failed to load ${name}`);
+        reject();
+      };
+      document.head.appendChild(script);
+    });
+  }
+
+  // Try to load Ionicons from multiple sources
+  async function loadIonicons() {
+    try {
+      // Try primary CDN first
+      await loadIoniconsFromCDN('https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js', 'Primary CDN');
       ensureExpoVectorIconsWork();
-    };
-    script.onerror = function() {
-      console.warn('Failed to load Ionicons from fallback CDN');
-    };
-    document.head.appendChild(script);
+    } catch (error) {
+      try {
+        // Try fallback CDN
+        await loadIoniconsFromCDN('https://cdn.jsdelivr.net/npm/ionicons@7.1.0/dist/ionicons/ionicons.js', 'Fallback CDN');
+        ensureExpoVectorIconsWork();
+      } catch (fallbackError) {
+        console.error('❌ All Ionicons CDN sources failed');
+        console.error('Primary error:', error);
+        console.error('Fallback error:', fallbackError);
+      }
+    }
   }
 
-  // Try to load from primary CDN first
-  const primaryScript = document.createElement('script');
-  primaryScript.src = 'https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js';
-  primaryScript.async = true;
-  primaryScript.onload = function() {
-    console.log('Ionicons loaded from primary CDN');
-    ensureExpoVectorIconsWork();
-  };
-  primaryScript.onerror = function() {
-    console.warn('Primary Ionicons CDN failed, trying fallback');
-    loadIoniconsFallback();
-  };
-  
-  document.head.appendChild(primaryScript);
+  // Start loading Ionicons
+  loadIonicons();
 })();

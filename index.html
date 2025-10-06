@@ -23,9 +23,12 @@
         flex: 1;
       }
     </style>
-  <link rel="icon" href="/favicon.ico" />
+  <link rel="icon" href="/hoa-community-app/favicon.ico" />
     <!-- Ionicons CSS fallback for GitHub Pages -->
     <style>
+      /* Import Ionicons font from CDN */
+      @import url('https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.css');
+      
       /* Fallback styles for Ionicons to ensure they display even if fonts fail to load */
       .ionicon, [class*="ion-"] {
         font-family: "Ionicons", "ionicons", sans-serif;
@@ -36,11 +39,25 @@
         line-height: 1;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
+        display: inline-block;
       }
       
       /* Ensure Expo Vector Icons fallback works */
       [class*="expo-vector-icons"] {
         font-family: "Ionicons", "ionicons", sans-serif;
+        display: inline-block;
+      }
+      
+      /* Additional fallback for React Navigation icons */
+      [data-testid*="icon"], [aria-label*="icon"] {
+        font-family: "Ionicons", "ionicons", sans-serif;
+        display: inline-block;
+      }
+      
+      /* Ensure proper rendering of icon components */
+      .expo-vector-icons {
+        font-family: "Ionicons", "ionicons", sans-serif;
+        display: inline-block;
       }
     </style>
   </head>
@@ -60,7 +77,12 @@
     <!-- Preload Ionicons for better performance -->
     <link rel="preload" href="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js" as="script">
     <link rel="preload" href="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js" as="script">
+    <!-- Preload Ionicons fonts -->
+    <link rel="preload" href="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.woff" as="font" type="font/woff" crossorigin>
+    <!-- Font loading utility for Ionicons -->
+    <script src="/load-ionicons.js"></script>
     <!-- Fallback script for Ionicons -->
-    <script src="/hoa-community-app/ionicons-fallback.js"></script>
+    <script src="/ionicons-fallback.js"></script>
   </body>
 </html>
