@@ -22,7 +22,18 @@
         height: 100%;
         flex: 1;
       }
+    
+      /* Ionicons font face declaration */
+      @font-face {
+        font-family: 'Ionicons';
+        src: url('./Ionicons.ttf') format('truetype');
+        font-weight: normal;
+        font-style: normal;
+        font-display: swap;
+      }
     </style>
+    <!-- Preload Ionicons font for better performance -->
+    <link rel="preload" href="./Ionicons.ttf" as="font" type="font/ttf" crossorigin="anonymous">
   <link rel="icon" href="/hoa-community-app/favicon.ico" /></head>
 
   <body>
