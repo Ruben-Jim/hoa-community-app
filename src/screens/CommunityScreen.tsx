@@ -39,15 +39,31 @@ const CommunityScreen = () => {
     category: 'General' as any,
   });
 
-  // Check if device is mobile based on screen width
-  const screenWidth = Dimensions.get('window').width;
-  const isMobile = screenWidth < 768;
+  // State for dynamic responsive behavior (only for web/desktop)
+  const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
+  
+  // Dynamic responsive check - show mobile nav when screen is too narrow for desktop nav
+  // On mobile, always show mobile nav regardless of screen size
+  const isMobileDevice = Platform.OS === 'ios' || Platform.OS === 'android';
+  const showMobileNav = isMobileDevice || screenWidth < 1024; // Always mobile on mobile devices, responsive on web
+  const showDesktopNav = !isMobileDevice && screenWidth >= 1024; // Only desktop nav on web when wide enough
 
   // Animation values
   const postModalOpacity = useRef(new Animated.Value(0)).current;
   const postModalTranslateY = useRef(new Animated.Value(300)).current;
   const commentModalOpacity = useRef(new Animated.Value(0)).current;
   const commentModalTranslateY = useRef(new Animated.Value(400)).current;
+
+  // Listen for window size changes (only on web/desktop)
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const subscription = Dimensions.addEventListener('change', ({ window }) => {
+        setScreenWidth(window.width);
+      });
+
+      return () => subscription?.remove();
+    }
+  }, []);
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current; // Start at 0 for individual post animations
@@ -290,8 +306,8 @@ const CommunityScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-      {/* Mobile Navigation - Only for Mobile */}
-      {isMobile && (
+      {/* Mobile Navigation - Only when screen is narrow */}
+      {showMobileNav && (
         <MobileTabBar 
           isMenuOpen={isMenuOpen}
           onMenuClose={() => setIsMenuOpen(false)}
@@ -307,7 +323,7 @@ const CommunityScreen = () => {
           <View style={styles.headerOverlay} />
           <View style={styles.headerTop}>
             {/* Hamburger Menu - Only when mobile nav is shown */}
-            {isMobile && (
+            {showMobileNav && (
               <TouchableOpacity 
                 style={styles.menuButton}
                 onPress={() => setIsMenuOpen(true)}
@@ -325,8 +341,8 @@ const CommunityScreen = () => {
           </View>
         </ImageBackground>
 
-      {/* Custom Tab Bar - Only for Desktop */}
-      {!isMobile && (
+      {/* Custom Tab Bar - Only when screen is wide enough */}
+      {showDesktopNav && (
         <CustomTabBar />
       )}
 
@@ -374,7 +390,7 @@ const CommunityScreen = () => {
           </ScrollView>
           
           {/* New Post Button - Desktop Only */}
-          {!isMobile && (
+          {showDesktopNav && (
             <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
               <TouchableOpacity
                 style={styles.newPostButton}
@@ -393,7 +409,14 @@ const CommunityScreen = () => {
       </SafeAreaView>
 
       {/* Posts List */}
-      <ScrollView style={styles.postsContainer}>
+      <ScrollView 
+        style={styles.postsContainer}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={true}
+        bounces={true}
+        scrollEnabled={true}
+      >
         {filteredPosts.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="chatbubbles-outline" size={48} color="#9ca3af" />
@@ -569,7 +592,7 @@ const CommunityScreen = () => {
       </ScrollView>
 
       {/* Floating Action Button for Mobile */}
-      {isMobile && (
+      {showMobileNav && (
         <TouchableOpacity
           style={styles.floatingActionButton}
           onPress={() => {

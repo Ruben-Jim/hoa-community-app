@@ -30,12 +30,14 @@ const HomeScreen = () => {
   const communityPosts = useQuery(api.communityPosts.getAll);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
-  // State for dynamic responsive behavior
+  // State for dynamic responsive behavior (only for web/desktop)
   const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
   
   // Dynamic responsive check - show mobile nav when screen is too narrow for desktop nav
-  const showMobileNav = screenWidth < 1024; // Show mobile nav when screen is narrower than 1024px
-  const showDesktopNav = screenWidth >= 1024; // Show desktop nav when screen is 1024px or wider
+  // On mobile, always show mobile nav regardless of screen size
+  const isMobileDevice = Platform.OS === 'ios' || Platform.OS === 'android';
+  const showMobileNav = isMobileDevice || screenWidth < 1024; // Always mobile on mobile devices, responsive on web
+  const showDesktopNav = !isMobileDevice && screenWidth >= 1024; // Only desktop nav on web when wide enough
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(1)).current; // Start at 1 to avoid white flash
@@ -76,13 +78,15 @@ const HomeScreen = () => {
     animateStaggeredContent();
   }, []);
 
-  // Listen for window size changes
+  // Listen for window size changes (only on web/desktop)
   useEffect(() => {
-    const subscription = Dimensions.addEventListener('change', ({ window }) => {
-      setScreenWidth(window.width);
-    });
+    if (Platform.OS === 'web') {
+      const subscription = Dimensions.addEventListener('change', ({ window }) => {
+        setScreenWidth(window.width);
+      });
 
-    return () => subscription?.remove();
+      return () => subscription?.remove();
+    }
   }, []);
 
   const handleContact = (type: 'phone' | 'email') => {

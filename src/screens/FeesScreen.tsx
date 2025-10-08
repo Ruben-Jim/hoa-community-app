@@ -83,7 +83,14 @@ const FeesScreen = () => {
       {/* Custom Tab Bar */}
       <CustomTabBar />
       
-      <ScrollView style={styles.container}>
+      <ScrollView 
+        style={styles.container}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={true}
+        bounces={true}
+        scrollEnabled={true}
+      >
       {/* Summary Cards */}
       <View style={styles.summaryContainer}>
         <View style={styles.summaryCard}>

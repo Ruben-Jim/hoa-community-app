@@ -9,6 +9,7 @@ import {
   Alert,
   ImageBackground,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,9 +26,25 @@ const CovenantsScreen = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  // Check if device is mobile based on screen width
-  const screenWidth = Dimensions.get('window').width;
-  const isMobile = screenWidth < 768;
+  // State for dynamic responsive behavior (only for web/desktop)
+  const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
+  
+  // Dynamic responsive check - show mobile nav when screen is too narrow for desktop nav
+  // On mobile, always show mobile nav regardless of screen size
+  const isMobileDevice = Platform.OS === 'ios' || Platform.OS === 'android';
+  const showMobileNav = isMobileDevice || screenWidth < 1024; // Always mobile on mobile devices, responsive on web
+  const showDesktopNav = !isMobileDevice && screenWidth >= 1024; // Only desktop nav on web when wide enough
+
+  // Listen for window size changes (only on web/desktop)
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const subscription = Dimensions.addEventListener('change', ({ window }) => {
+        setScreenWidth(window.width);
+      });
+
+      return () => subscription?.remove();
+    }
+  }, []);
 
   const categories = ['Architecture', 'Landscaping', 'Parking', 'Pets', 'General'];
   const covenants = useQuery(api.covenants.getAll) ?? [];
@@ -84,15 +101,22 @@ const CovenantsScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-      {/* Mobile Navigation - Only for Mobile */}
-      {isMobile && (
+      {/* Mobile Navigation - Only when screen is narrow */}
+      {showMobileNav && (
         <MobileTabBar 
           isMenuOpen={isMenuOpen}
           onMenuClose={() => setIsMenuOpen(false)}
         />
       )}
       
-      <ScrollView style={styles.scrollContainer}>
+      <ScrollView 
+        style={styles.scrollContainer}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={true}
+        bounces={true}
+        scrollEnabled={true}
+      >
         {/* Header with ImageBackground */}
         <ImageBackground
           source={require('../../assets/hoa-4k.jpg')}
@@ -102,7 +126,7 @@ const CovenantsScreen = () => {
           <View style={styles.headerOverlay} />
           <View style={styles.headerTop}>
             {/* Hamburger Menu - Only when mobile nav is shown */}
-            {isMobile && (
+            {showMobileNav && (
               <TouchableOpacity 
                 style={styles.menuButton}
                 onPress={() => setIsMenuOpen(true)}
@@ -121,8 +145,8 @@ const CovenantsScreen = () => {
           </View>
         </ImageBackground>
 
-        {/* Custom Tab Bar - Only for Desktop */}
-        {!isMobile && (
+        {/* Custom Tab Bar - Only when screen is wide enough */}
+        {showDesktopNav && (
           <CustomTabBar />
         )}
       

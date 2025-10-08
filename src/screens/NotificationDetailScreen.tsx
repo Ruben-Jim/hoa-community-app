@@ -127,7 +127,14 @@ const NotificationDetailScreen = () => {
       {/* Custom Tab Bar */}
       <CustomTabBar />
       
-      <ScrollView style={styles.container}>
+      <ScrollView 
+        style={styles.container}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={true}
+        bounces={true}
+        scrollEnabled={true}
+      >
         {/* Header */}
       <View style={styles.header}>
         <View style={styles.priorityIndicator}>

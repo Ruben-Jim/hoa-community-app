@@ -214,9 +214,9 @@ const SignupScreen = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={true}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         bounces={true}
         scrollEnabled={true}
-        keyboardDismissMode="on-drag"
         decelerationRate="normal"
       >
           {/* Header */}
