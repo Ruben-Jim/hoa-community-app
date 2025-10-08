@@ -215,78 +215,151 @@ const BoardScreen = () => {
       }}>
         {members.map((member: any) => (
           <View key={member._id} style={styles.memberCard}>
-          <View style={styles.memberHeader}>
-            <View style={styles.avatar}>
-              {member.image ? (
-                <Image 
-                  source={{ uri: member.image }} 
-                  style={styles.avatarImage}
-                  resizeMode="cover"
-                />
-              ) : (
-                <Ionicons name="person" size={32} color="#6b7280" />
-              )}
+            {/* Member Header with Avatar and Basic Info */}
+            <View style={styles.memberHeader}>
+              <View style={styles.avatarContainer}>
+                <View style={styles.avatar}>
+                  {member.image ? (
+                    <Image 
+                      source={{ uri: member.image }} 
+                      style={styles.avatarImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <Ionicons name="person" size={32} color="#6b7280" />
+                  )}
+                </View>
+              </View>
+              <View style={styles.memberInfo}>
+                <Text style={styles.memberName}>{member.name}</Text>
+                <Text style={styles.memberPosition}>{member.position}</Text>
+                {member.termEnd && (
+                  <View style={styles.memberTermContainer}>
+                    <Ionicons name="calendar" size={16} color="#6b7280" />
+                    <Text style={styles.memberTerm}>
+                      Term ends: {formatDate(member.termEnd)}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </View>
-            <View style={styles.memberInfo}>
-              <Text style={styles.memberName}>{member.name}</Text>
-              <Text style={styles.memberPosition}>{member.position}</Text>
-              {member.termEnd && (
-                <Text style={styles.memberTerm}>
-                  Term ends: {formatDate(member.termEnd)}
-                </Text>
-              )}
-              {member.bio && (
-                <Text style={styles.memberBio} numberOfLines={3}>
-                  {member.bio}
-                </Text>
-              )}
-            </View>
-          </View>
 
-          <View style={styles.contactSection}>
-            {member.phone && (
-              <TouchableOpacity
-                style={styles.contactButton}
-                onPress={() => handleContact(member, 'phone')}
-              >
-                <Ionicons name="call" size={20} color="#2563eb" />
-                <Text style={styles.contactText}>{member.phone}</Text>
-              </TouchableOpacity>
+            {/* Member Bio Section */}
+            {member.bio && (
+              <Text style={styles.memberBio} numberOfLines={10}>
+                {member.bio}
+              </Text>
             )}
 
-            <TouchableOpacity
-              style={styles.contactButton}
-              onPress={() => handleContact(member, 'email')}
-            >
-              <Ionicons name="mail" size={20} color="#2563eb" />
-              <Text style={styles.contactText}>{member.email}</Text>
-            </TouchableOpacity>
+            {/* Contact Section */}
+            <View style={styles.contactSection}>
+              <View style={styles.contactHeader}>
+                <Ionicons name="call" size={16} color="#6b7280" />
+                <Text style={styles.contactLabel}>Contact Information</Text>
+              </View>
+              <View style={styles.contactButtons}>
+                {member.phone && (
+                  <TouchableOpacity
+                    style={styles.contactButton}
+                    onPress={() => handleContact(member, 'phone')}
+                  >
+                    <Ionicons name="call" size={20} color="#2563eb" />
+                    <Text style={styles.contactText}>{member.phone}</Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  style={styles.contactButton}
+                  onPress={() => handleContact(member, 'email')}
+                >
+                  <Ionicons name="mail" size={20} color="#2563eb" />
+                  <Text style={styles.contactText}>{member.email}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
-        </View>
         ))}
       </Animated.View>
 
       <Animated.View style={{
         opacity: infoAnim,
       }}>
+        {/* Board Meetings Section */}
         <View style={styles.infoSection}>
-        <Text style={styles.infoTitle}>Board Meetings</Text>
-        <Text style={styles.infoText}>
-          Board meetings are held on the second Tuesday of each month at 7:00 PM in the community center.
-        </Text>
-        <Text style={styles.infoText}>
-          Residents are welcome to attend and may request to speak during the open forum period.
-        </Text>
-      </View>
+          <View style={styles.infoHeader}>
+            <View style={styles.infoIconContainer}>
+              <Ionicons name="calendar" size={24} color="#2563eb" />
+            </View>
+            <Text style={styles.infoTitle}>Board Meetings</Text>
+          </View>
+          <View style={styles.infoContent}>
+            <View style={styles.infoItem}>
+              <Ionicons name="time" size={16} color="#6b7280" />
+              <Text style={styles.infoText}>
+                Second Tuesday of each month at 7:00 PM
+              </Text>
+            </View>
+            <View style={styles.infoItem}>
+              <Ionicons name="location" size={16} color="#6b7280" />
+              <Text style={styles.infoText}>
+                Community Center
+              </Text>
+            </View>
+            <View style={styles.infoItem}>
+              <Ionicons name="people" size={16} color="#6b7280" />
+              <Text style={styles.infoText}>
+                Open to residents - speak during open forum
+              </Text>
+            </View>
+          </View>
+        </View>
 
+        {/* Contact Information Section */}
         <View style={styles.infoSection}>
-          <Text style={styles.infoTitle}>Contact the Board</Text>
-          <Text style={styles.infoText}>
-            For general inquiries, please contact the board secretary or use the contact information above.
-          </Text>
-          <Text style={styles.infoText}>
-            For urgent matters, please contact the HOA office directly.
-          </Text>
+          <View style={styles.infoHeader}>
+            <View style={styles.infoIconContainer}>
+              <Ionicons name="mail" size={24} color="#2563eb" />
+            </View>
+            <Text style={styles.infoTitle}>Contact the Board</Text>
+          </View>
+          <View style={styles.infoContent}>
+            <View style={styles.infoItem}>
+              <Ionicons name="information-circle" size={16} color="#6b7280" />
+              <Text style={styles.infoText}>
+                General inquiries: Contact board secretary or use contact info above
+              </Text>
+            </View>
+            <View style={styles.infoItem}>
+              <Ionicons name="alert-circle" size={16} color="#ef4444" />
+              <Text style={styles.infoText}>
+                Urgent matters: Contact HOA office directly
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Additional Resources Section */}
+        <View style={styles.infoSection}>
+          <View style={styles.infoHeader}>
+            <View style={styles.infoIconContainer}>
+              <Ionicons name="document-text" size={24} color="#2563eb" />
+            </View>
+            <Text style={styles.infoTitle}>Resources</Text>
+          </View>
+          <View style={styles.infoContent}>
+            <View style={styles.infoItem}>
+              <Ionicons name="document" size={16} color="#6b7280" />
+              <Text style={styles.infoText}>
+                Meeting minutes and agendas available upon request
+              </Text>
+            </View>
+            <View style={styles.infoItem}>
+              <Ionicons name="shield-checkmark" size={16} color="#6b7280" />
+              <Text style={styles.infoText}>
+                Board decisions are made in accordance with HOA bylaws
+              </Text>
+            </View>
+          </View>
         </View>
       </Animated.View>
       
@@ -399,98 +472,165 @@ const styles = StyleSheet.create({
   memberCard: {
     backgroundColor: '#ffffff',
     margin: 15,
-    borderRadius: 12,
-    padding: 20,
+    borderRadius: 16,
+    padding: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+    borderLeftWidth: 4,
+    borderLeftColor: '#2563eb',
   },
   memberHeader: {
     flexDirection: 'row',
     marginBottom: 20,
+    alignItems: 'flex-start',
+  },
+  avatarContainer: {
+    marginRight: 16,
   },
   avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#f3f4f6',
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: '#f8fafc',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    overflow: 'hidden',
   },
   avatarImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
   },
   memberInfo: {
     flex: 1,
     justifyContent: 'center',
   },
   memberName: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '700',
     color: '#1f2937',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   memberPosition: {
-    fontSize: 16,
+    fontSize: 18,
     color: '#2563eb',
     fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: 8,
+  },
+  memberTermContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   memberTerm: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#6b7280',
+    fontWeight: '500',
   },
   memberBio: {
-    fontSize: 14,
-    color: '#6b7280',
+    fontSize: 15,
+    color: '#4b5563',
     fontStyle: 'italic',
-    marginTop: 8,
-    lineHeight: 20,
+    marginTop: 12,
+    marginBottom: 16,
+    lineHeight: 22,
+    fontWeight: '400',
+    paddingHorizontal: 4,
   },
   contactSection: {
+    paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
-    paddingTop: 15,
+  },
+  contactHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  contactLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  contactButtons: {
+    gap: 12,
   },
   contactButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    marginBottom: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   contactText: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#374151',
-    marginLeft: 10,
+    marginLeft: 12,
     flex: 1,
+    fontWeight: '500',
   },
   infoSection: {
     backgroundColor: '#ffffff',
     margin: 15,
-    borderRadius: 12,
-    padding: 20,
+    borderRadius: 16,
+    padding: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+    borderLeftWidth: 4,
+    borderLeftColor: '#2563eb',
+  },
+  infoHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  infoIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#eff6ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    marginTop: 0,
   },
   infoTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '700',
     color: '#1f2937',
-    marginBottom: 12,
+    flex: 1,
+    marginTop: 8,
+    lineHeight: 24,
+  },
+  infoContent: {
+    gap: 12,
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   infoText: {
-    fontSize: 14,
-    color: '#6b7280',
-    lineHeight: 20,
-    marginBottom: 8,
+    fontSize: 15,
+    color: '#4b5563',
+    lineHeight: 22,
+    flex: 1,
+    fontWeight: '500',
   },
 });
 

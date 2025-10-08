@@ -234,7 +234,7 @@ const HomeScreen = () => {
           
           <View style={styles.headerLeft}>
             <Text style={styles.welcomeText}>Welcome to</Text>
-            <Text style={styles.hoaName}>{hoaInfo?.name ?? 'HOA'}</Text>
+            <Text style={styles.hoaName}>{hoaInfo?.name ?? 'Shelton Springs'}</Text>
             <Text style={styles.subtitle}>Your Community Connection</Text>
           </View>
           
@@ -772,17 +772,15 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   postCard: {
-    backgroundColor: '#f8fafc',
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    padding: 24,
+    borderRadius: 16,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
   },
   postHeader: {
     flexDirection: 'row',

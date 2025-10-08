@@ -66,6 +66,9 @@ const EmergencyScreen = () => {
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current; // Start at 0 for individual notification animations
+  
+  // ScrollView ref for better control
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const priorities = ['High', 'Medium', 'Low'];
   const categories = ['Security', 'Maintenance', 'Event', 'Lost Pet', 'Other'];
@@ -147,6 +150,32 @@ const EmergencyScreen = () => {
       useNativeDriver: true,
     }).start();
   }, []);
+
+  // Set initial cursor and cleanup on unmount (web only)
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      // Set initial cursor
+      document.body.style.cursor = 'grab';
+      
+      // Ensure scroll view is properly initialized
+      setTimeout(() => {
+        if (scrollViewRef.current) {
+          // Force a layout update
+          scrollViewRef.current.scrollTo({ y: 0, animated: false });
+          
+          // Debug: Log scroll view properties
+          console.log('EmergencyScreen ScrollView initialized for web');
+          console.log('Screen width:', screenWidth);
+          console.log('Show mobile nav:', showMobileNav);
+          console.log('Show desktop nav:', showDesktopNav);
+        }
+      }, 100);
+      
+      return () => {
+        document.body.style.cursor = 'default';
+      };
+    }
+  }, [screenWidth, showMobileNav, showDesktopNav]);
 
   // Check if user is a board member
   const isBoardMember = user?.isBoardMember && user?.isActive;
@@ -263,14 +292,42 @@ const EmergencyScreen = () => {
           />
         )}
         
-        <ScrollView 
-          style={styles.scrollContainer}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          showsVerticalScrollIndicator={true}
-          bounces={true}
-          scrollEnabled={true}
-        >
+         <ScrollView 
+           ref={scrollViewRef}
+           style={[styles.scrollContainer, Platform.OS === 'web' && styles.webScrollContainer]}
+           contentContainerStyle={[styles.scrollContent, Platform.OS === 'web' && styles.webScrollContent]}
+           keyboardShouldPersistTaps="handled"
+           keyboardDismissMode="on-drag"
+           showsVerticalScrollIndicator={true}
+           bounces={true}
+           scrollEnabled={true}
+           alwaysBounceVertical={false}
+           nestedScrollEnabled={true}
+           removeClippedSubviews={false}
+           scrollEventThrottle={16}
+           // Enhanced desktop scrolling
+           decelerationRate="normal"
+           directionalLockEnabled={true}
+           canCancelContentTouches={true}
+           // Web-specific enhancements
+           {...(Platform.OS === 'web' && {
+             onScrollBeginDrag: () => {
+               if (Platform.OS === 'web') {
+                 document.body.style.cursor = 'grabbing';
+                 document.body.style.userSelect = 'none';
+               }
+             },
+             onScrollEndDrag: () => {
+               if (Platform.OS === 'web') {
+                 document.body.style.cursor = 'grab';
+                 document.body.style.userSelect = 'auto';
+               }
+             },
+             onScroll: () => {
+               // Ensure scrolling is working
+             },
+           })}
+         >
           {/* Header with ImageBackground */}
           <ImageBackground
             source={require('../../assets/hoa-4k.jpg')}
@@ -440,22 +497,49 @@ const EmergencyScreen = () => {
               </Text>
             </View>
           ) : (
-            filteredNotifications.map((notification: any, index: number) => (
-              <Animated.View 
-                key={notification._id} 
-                style={[
-                  styles.notificationCard,
-                  {
-                    opacity: fadeAnim,
-                    transform: [{
-                      translateY: fadeAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [50, 0],
-                      })
-                    }]
-                  }
-                ]}
-              >
+            filteredNotifications.map((notification: any, index: number) => {
+              const getPriorityCardStyle = (priority: string) => {
+                switch (priority) {
+                  case 'High':
+                    return {
+                      backgroundColor: '#fef2f2',
+                      borderLeftColor: '#dc2626',
+                    };
+                  case 'Medium':
+                    return {
+                      backgroundColor: '#fffbeb',
+                      borderLeftColor: '#f59e0b',
+                    };
+                  case 'Low':
+                    return {
+                      backgroundColor: '#f0fdf4',
+                      borderLeftColor: '#10b981',
+                    };
+                  default:
+                    return {
+                      backgroundColor: '#ffffff',
+                      borderLeftColor: '#2563eb',
+                    };
+                }
+              };
+
+              return (
+                <Animated.View 
+                  key={notification._id} 
+                  style={[
+                    styles.notificationCard,
+                    getPriorityCardStyle(notification.priority),
+                    {
+                      opacity: fadeAnim,
+                      transform: [{
+                        translateY: fadeAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [50, 0],
+                        })
+                      }]
+                    }
+                  ]}
+                >
                 <View style={styles.notificationHeader}>
                   <View style={styles.notificationIcon}>
                     <Ionicons
@@ -510,8 +594,12 @@ const EmergencyScreen = () => {
                   )}
                 </View>
               </Animated.View>
-            ))
+              );
+            })
           )}
+
+          {/* Additional content to ensure scrollable content */}
+          <View style={styles.spacer} />
         </ScrollView>
 
         {/* Floating Action Button for Mobile (Board Members Only) */}
@@ -669,6 +757,32 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flex: 1,
+  },
+  webScrollContainer: {
+    ...(Platform.OS === 'web' && {
+      cursor: 'grab' as any,
+      userSelect: 'none' as any,
+      WebkitUserSelect: 'none' as any,
+      MozUserSelect: 'none' as any,
+      msUserSelect: 'none' as any,
+      overflow: 'auto' as any,
+      height: '100vh' as any,
+      maxHeight: '100vh' as any,
+      position: 'relative' as any,
+    }),
+  },
+  scrollContent: {
+    paddingBottom: 20,
+  },
+  webScrollContent: {
+    ...(Platform.OS === 'web' && {
+      minHeight: '100vh' as any,
+      flexGrow: 1,
+      paddingBottom: 100 as any,
+    }),
+  },
+  spacer: {
+    height: Platform.OS === 'web' ? 200 : 100,
   },
   header: {
     height: 240,
@@ -846,14 +960,16 @@ const styles = StyleSheet.create({
   },
   notificationCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 24,
     marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+    borderLeftWidth: 4,
+    borderLeftColor: '#2563eb',
   },
   notificationHeader: {
     flexDirection: 'row',
