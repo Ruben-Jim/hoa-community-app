@@ -310,7 +310,9 @@ const EmergencyScreen = () => {
                   key={priority}
                   style={[
                     styles.filterButton,
-                    selectedPriority === priority && styles.filterButtonActive
+                    selectedPriority === priority && {
+                      backgroundColor: getPriorityColor(priority)
+                    }
                   ]}
                   onPress={() => setSelectedPriority(priority)}
                 >
@@ -550,7 +552,9 @@ const EmergencyScreen = () => {
                     key={priority}
                     style={[
                       styles.selectorOption,
-                      newAlert.priority === priority && styles.selectorOptionActive
+                      newAlert.priority === priority && {
+                        backgroundColor: getPriorityColor(priority)
+                      }
                     ]}
                     onPress={() => setNewAlert(prev => ({ ...prev, priority }))}
                   >

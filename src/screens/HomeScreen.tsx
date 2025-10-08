@@ -139,7 +139,14 @@ const HomeScreen = () => {
           />
         )}
         
-        <ScrollView style={styles.scrollContainer}>
+        <ScrollView 
+          style={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={true}
+          bounces={true}
+          scrollEnabled={true}
+        >
       {/* Header */}
       <Animated.View style={{
         opacity: fadeAnim,
