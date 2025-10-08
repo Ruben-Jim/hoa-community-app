@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   TouchableOpacity,
   Alert,
   Image,
+  Platform,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -46,6 +48,32 @@ const SignupScreen = () => {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { alertState, showAlert, hideAlert } = useCustomAlert();
+  
+  // ScrollView ref for better control
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  // Set initial cursor and cleanup on unmount (web only)
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      // Set initial cursor
+      document.body.style.cursor = 'grab';
+      
+      // Ensure scroll view is properly initialized
+      setTimeout(() => {
+        if (scrollViewRef.current) {
+          // Force a layout update
+          scrollViewRef.current.scrollTo({ y: 0, animated: false });
+          
+          // Debug: Log scroll view properties
+          console.log('SignupScreen ScrollView initialized for web');
+        }
+      }, 100);
+      
+      return () => {
+        document.body.style.cursor = 'default';
+      };
+    }
+  }, []);
 
   const pickImage = async () => {
     try {
@@ -223,14 +251,39 @@ const SignupScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        ref={scrollViewRef}
+        style={[styles.scrollView, Platform.OS === 'web' && styles.webScrollContainer]}
+        contentContainerStyle={[styles.scrollContent, Platform.OS === 'web' && styles.webScrollContent]}
         showsVerticalScrollIndicator={true}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         bounces={true}
         scrollEnabled={true}
+        alwaysBounceVertical={false}
+        nestedScrollEnabled={true}
+        removeClippedSubviews={false}
+        scrollEventThrottle={16}
         decelerationRate="normal"
+        directionalLockEnabled={true}
+        canCancelContentTouches={true}
+        // Web-specific enhancements
+        {...(Platform.OS === 'web' && {
+          onScrollBeginDrag: () => {
+            if (Platform.OS === 'web') {
+              document.body.style.cursor = 'grabbing';
+              document.body.style.userSelect = 'none';
+            }
+          },
+          onScrollEndDrag: () => {
+            if (Platform.OS === 'web') {
+              document.body.style.cursor = 'grab';
+              document.body.style.userSelect = 'auto';
+            }
+          },
+          onScroll: () => {
+            // Ensure scrolling is working
+          },
+        })}
       >
           {/* Header */}
           <View style={styles.header}>
@@ -438,6 +491,9 @@ const SignupScreen = () => {
               By creating an account, you agree to our Terms of Service and Privacy Policy
             </Text>
           </View>
+          
+          {/* Additional content to ensure scrollable content */}
+          <View style={styles.spacer} />
       </ScrollView>
       
       {/* Custom Alert */}
@@ -461,8 +517,25 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  webScrollContainer: {
+    ...(Platform.OS === 'web' && {
+      cursor: 'grab' as any,
+      userSelect: 'none' as any,
+      WebkitUserSelect: 'none' as any,
+      MozUserSelect: 'none' as any,
+      msUserSelect: 'none' as any,
+    }),
+  },
   scrollContent: {
     paddingBottom: 30,
+  },
+  webScrollContent: {
+    ...(Platform.OS === 'web' && {
+      paddingBottom: 100 as any,
+    }),
+  },
+  spacer: {
+    height: Platform.OS === 'web' ? 120 : 80,
   },
   header: {
     alignItems: 'center',
