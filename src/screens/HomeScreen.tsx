@@ -22,6 +22,8 @@ import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import CustomTabBar from '../components/CustomTabBar';
 import MobileTabBar from '../components/MobileTabBar';
 import { webCompatibleAlert } from '../utils/webCompatibleAlert';
+import CustomAlert from '../components/CustomAlert';
+import { useCustomAlert } from '../hooks/useCustomAlert';
 
 const HomeScreen = () => {
   const { user, signOut } = useAuth();
@@ -29,6 +31,7 @@ const HomeScreen = () => {
   const emergencyNotifications = useQuery(api.emergencyNotifications.getActive);
   const communityPosts = useQuery(api.communityPosts.getAll);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { alertState, showAlert, hideAlert } = useCustomAlert();
   
   // State for dynamic responsive behavior (only for web/desktop)
   const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
@@ -112,7 +115,7 @@ const HomeScreen = () => {
   };
 
   const handleSignOut = () => {
-    webCompatibleAlert({
+    showAlert({
       title: 'Sign Out',
       message: 'Are you sure you want to sign out?',
       buttons: [
@@ -394,6 +397,15 @@ const HomeScreen = () => {
       </Animated.View>
       </ScrollView>
       </View>
+      
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertState.visible}
+        title={alertState.title}
+        message={alertState.message}
+        buttons={alertState.buttons}
+        onClose={hideAlert}
+      />
     </SafeAreaView>
   );
 };
