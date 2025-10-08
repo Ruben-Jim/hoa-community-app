@@ -290,7 +290,10 @@ const EmergencyScreen = () => {
               )}
               
               <View style={styles.headerLeft}>
-                <Text style={styles.headerTitle}>Emergency Alerts</Text>
+                <View style={styles.titleContainer}>
+                  <Text style={styles.headerTitle}>Emergency Alerts</Text>
+                  <BoardMemberIndicator />
+                </View>
                 <Text style={styles.headerSubtitle}>
                   Stay informed about community emergencies and important updates
                 </Text>
@@ -704,6 +707,12 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingHorizontal: 10,
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
   },
   headerTitle: {
     color: '#ffffff',

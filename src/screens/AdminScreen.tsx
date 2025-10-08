@@ -24,6 +24,7 @@ import { useQuery, useMutation } from 'convex/react';
 import { useConvex } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
+import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import CustomTabBar from '../components/CustomTabBar';
 import MobileTabBar from '../components/MobileTabBar';
 
@@ -999,7 +1000,10 @@ const AdminScreen = () => {
               )}
               
               <View style={styles.headerLeft}>
-                <Text style={styles.headerTitle}>Admin Dashboard</Text>
+                <View style={styles.titleContainer}>
+                  <Text style={styles.headerTitle}>Admin Dashboard</Text>
+                  <BoardMemberIndicator />
+                </View>
                 <Text style={styles.headerSubtitle}>
                   Manage community content and residents
                 </Text>
@@ -1569,6 +1573,12 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingHorizontal: 10,
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
   },
   headerTitle: {
     color: '#ffffff',
