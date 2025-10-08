@@ -41,6 +41,9 @@ const BoardScreen = () => {
   const membersAnim = useRef(new Animated.Value(0)).current;
   const infoAnim = useRef(new Animated.Value(0)).current;
   
+  // ScrollView ref for better control
+  const scrollViewRef = useRef<ScrollView>(null);
+  
   const handleContact = (member: any, type: 'phone' | 'email') => {
     if (type === 'phone') {
       Linking.openURL(`tel:${member.phone}`);
@@ -92,6 +95,32 @@ const BoardScreen = () => {
     }
   }, []);
 
+  // Set initial cursor and cleanup on unmount (web only)
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      // Set initial cursor
+      document.body.style.cursor = 'grab';
+      
+      // Ensure scroll view is properly initialized
+      setTimeout(() => {
+        if (scrollViewRef.current) {
+          // Force a layout update
+          scrollViewRef.current.scrollTo({ y: 0, animated: false });
+          
+          // Debug: Log scroll view properties
+          console.log('BoardScreen ScrollView initialized for web');
+          console.log('Screen width:', screenWidth);
+          console.log('Show mobile nav:', showMobileNav);
+          console.log('Show desktop nav:', showDesktopNav);
+        }
+      }, 100);
+      
+      return () => {
+        document.body.style.cursor = 'default';
+      };
+    }
+  }, [screenWidth, showMobileNav, showDesktopNav]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       {/* Mobile Navigation - Only when screen is narrow */}
@@ -103,12 +132,40 @@ const BoardScreen = () => {
       )}
       
       <ScrollView 
-        style={styles.container}
+        ref={scrollViewRef}
+        style={[styles.container, Platform.OS === 'web' && styles.webScrollContainer]}
+        contentContainerStyle={[styles.scrollContent, Platform.OS === 'web' && styles.webScrollContent]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={true}
         bounces={true}
         scrollEnabled={true}
+        alwaysBounceVertical={false}
+        nestedScrollEnabled={true}
+        removeClippedSubviews={false}
+        scrollEventThrottle={16}
+        // Enhanced desktop scrolling
+        decelerationRate="normal"
+        directionalLockEnabled={true}
+        canCancelContentTouches={true}
+        // Web-specific enhancements
+        {...(Platform.OS === 'web' && {
+          onScrollBeginDrag: () => {
+            if (Platform.OS === 'web') {
+              document.body.style.cursor = 'grabbing';
+              document.body.style.userSelect = 'none';
+            }
+          },
+          onScrollEndDrag: () => {
+            if (Platform.OS === 'web') {
+              document.body.style.cursor = 'grab';
+              document.body.style.userSelect = 'auto';
+            }
+          },
+          onScroll: () => {
+            // Ensure scrolling is working
+          },
+        })}
       >
         {/* Header */}
         <Animated.View style={{
@@ -231,6 +288,9 @@ const BoardScreen = () => {
           </Text>
         </View>
       </Animated.View>
+      
+      {/* Additional content to ensure scrollable content */}
+      <View style={styles.spacer} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -240,6 +300,32 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f3f4f6',
+  },
+  webScrollContainer: {
+    ...(Platform.OS === 'web' && {
+      cursor: 'grab' as any,
+      userSelect: 'none' as any,
+      WebkitUserSelect: 'none' as any,
+      MozUserSelect: 'none' as any,
+      msUserSelect: 'none' as any,
+      overflow: 'auto' as any,
+      height: '100vh' as any,
+      maxHeight: '100vh' as any,
+      position: 'relative' as any,
+    }),
+  },
+  scrollContent: {
+    paddingBottom: 20,
+  },
+  webScrollContent: {
+    ...(Platform.OS === 'web' && {
+      minHeight: '100vh' as any,
+      flexGrow: 1,
+      paddingBottom: 100 as any,
+    }),
+  },
+  spacer: {
+    height: Platform.OS === 'web' ? 200 : 100,
   },
   safeArea: {
     flex: 1,

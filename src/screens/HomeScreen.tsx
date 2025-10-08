@@ -48,6 +48,9 @@ const HomeScreen = () => {
   const notificationsAnim = useRef(new Animated.Value(0)).current;
   const postsAnim = useRef(new Animated.Value(0)).current;
   const officeAnim = useRef(new Animated.Value(0)).current;
+  
+  // ScrollView ref for better control
+  const scrollViewRef = useRef<ScrollView>(null);
 
   // Animation functions
 
@@ -91,6 +94,32 @@ const HomeScreen = () => {
       return () => subscription?.remove();
     }
   }, []);
+
+  // Set initial cursor and cleanup on unmount (web only)
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      // Set initial cursor
+      document.body.style.cursor = 'grab';
+      
+      // Ensure scroll view is properly initialized
+      setTimeout(() => {
+        if (scrollViewRef.current) {
+          // Force a layout update
+          scrollViewRef.current.scrollTo({ y: 0, animated: false });
+          
+          // Debug: Log scroll view properties
+          console.log('ScrollView initialized for web');
+          console.log('Screen width:', screenWidth);
+          console.log('Show mobile nav:', showMobileNav);
+          console.log('Show desktop nav:', showDesktopNav);
+        }
+      }, 100);
+      
+      return () => {
+        document.body.style.cursor = 'default';
+      };
+    }
+  }, [screenWidth, showMobileNav, showDesktopNav]);
 
   const handleContact = (type: 'phone' | 'email') => {
     if (type === 'phone') {
@@ -147,8 +176,9 @@ const HomeScreen = () => {
         )}
         
         <ScrollView 
-          style={styles.scrollContainer}
-          contentContainerStyle={styles.scrollContent}
+          ref={scrollViewRef}
+          style={[styles.scrollContainer, Platform.OS === 'web' && styles.webScrollContainer]}
+          contentContainerStyle={[styles.scrollContent, Platform.OS === 'web' && styles.webScrollContent]}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={true}
@@ -158,6 +188,28 @@ const HomeScreen = () => {
           nestedScrollEnabled={true}
           removeClippedSubviews={false}
           scrollEventThrottle={16}
+          // Enhanced desktop scrolling
+          decelerationRate="normal"
+          directionalLockEnabled={true}
+          canCancelContentTouches={true}
+          // Web-specific enhancements
+          {...(Platform.OS === 'web' && {
+            onScrollBeginDrag: () => {
+              if (Platform.OS === 'web') {
+                document.body.style.cursor = 'grabbing';
+                document.body.style.userSelect = 'none';
+              }
+            },
+            onScrollEndDrag: () => {
+              if (Platform.OS === 'web') {
+                document.body.style.cursor = 'grab';
+                document.body.style.userSelect = 'auto';
+              }
+            },
+            onScroll: () => {
+              // Ensure scrolling is working
+            },
+          })}
         >
       {/* Header */}
       <Animated.View style={{
@@ -231,33 +283,33 @@ const HomeScreen = () => {
             })
           }]
         }
-      ]}> */}
-      {/* <View style={styles.quickActions}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => handleContact('phone')}
-        >
-          <Ionicons name="call" size={24} color="#64748b" />
-          <Text style={styles.actionText}>Call Office</Text>
-        </TouchableOpacity>
+      ]}>
+        <View style={styles.quickActions}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => handleContact('phone')}
+          >
+            <Ionicons name="call" size={24} color="#64748b" />
+            <Text style={styles.actionText}>Call Office</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => handleContact('email')}
-        >
-          <Ionicons name="mail" size={24} color="#64748b" />
-          <Text style={styles.actionText}>Email</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => handleContact('email')}
+          >
+            <Ionicons name="mail" size={24} color="#64748b" />
+            <Text style={styles.actionText}>Email</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={handleEmergency}
-        >
-          <Ionicons name="warning" size={24} color="#64748b" />
-          <Text style={styles.actionText}>Profile</Text>
-        </TouchableOpacity>
-      </View> */}
-      {/* </Animated.View> */}
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={handleEmergency}
+          >
+            <Ionicons name="warning" size={24} color="#64748b" />
+            <Text style={styles.actionText}>Emergency</Text>
+          </TouchableOpacity>
+        </View>
+      </Animated.View> */}
 
       {/* Active Notifications */}
       {activeNotifications.length > 0 && (
@@ -401,7 +453,69 @@ const HomeScreen = () => {
         </View>
       </Animated.View>
       
-      {/* Additional spacing to ensure scrollable content */}
+      {/* Additional sections for more content */}
+      <Animated.View style={[
+        styles.section,
+        {
+          opacity: officeAnim,
+          transform: [{
+            translateY: officeAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [50, 0],
+            })
+          }]
+        }
+      ]}>
+        <View style={styles.officeHeader}>
+          <Ionicons name="information-circle" size={24} color="#64748b" />
+          <Text style={[styles.sectionTitle, { marginLeft: 8, marginBottom: 0 }]}>Community Guidelines</Text>
+        </View>
+        <View style={styles.infoCard}>
+          <Text style={styles.guidelineText}>
+            • Please keep noise levels down during quiet hours (10 PM - 7 AM)
+          </Text>
+          <Text style={styles.guidelineText}>
+            • Maintain your property and common areas clean
+          </Text>
+          <Text style={styles.guidelineText}>
+            • Follow parking regulations and assigned spaces
+          </Text>
+          <Text style={styles.guidelineText}>
+            • Report maintenance issues promptly
+          </Text>
+        </View>
+      </Animated.View>
+      
+      <Animated.View style={[
+        styles.section,
+        {
+          opacity: officeAnim,
+          transform: [{
+            translateY: officeAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [50, 0],
+            })
+          }]
+        }
+      ]}>
+        <View style={styles.officeHeader}>
+          <Ionicons name="calendar" size={24} color="#64748b" />
+          <Text style={[styles.sectionTitle, { marginLeft: 8, marginBottom: 0 }]}>Upcoming Events</Text>
+        </View>
+        <View style={styles.infoCard}>
+          <Text style={styles.eventText}>
+            📅 Board Meeting - Next Tuesday at 7:00 PM
+          </Text>
+          <Text style={styles.eventText}>
+            🏠 Community Cleanup - This Saturday 9:00 AM
+          </Text>
+          <Text style={styles.eventText}>
+            🎉 Annual BBQ - June 15th at the Clubhouse
+          </Text>
+        </View>
+      </Animated.View>
+      
+      {/* Final spacer for extra scroll space */}
       <View style={styles.spacer} />
       </ScrollView>
       </View>
@@ -427,11 +541,31 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flex: 1,
   },
+  webScrollContainer: {
+    ...(Platform.OS === 'web' && {
+      cursor: 'grab' as any,
+      userSelect: 'none' as any,
+      WebkitUserSelect: 'none' as any,
+      MozUserSelect: 'none' as any,
+      msUserSelect: 'none' as any,
+      overflow: 'auto' as any,
+      height: '100vh' as any,
+      maxHeight: '100vh' as any,
+      position: 'relative' as any,
+    }),
+  },
   scrollContent: {
     paddingBottom: 20,
   },
+  webScrollContent: {
+    ...(Platform.OS === 'web' && {
+      minHeight: '100vh' as any,
+      flexGrow: 1,
+      paddingBottom: 100 as any,
+    }),
+  },
   spacer: {
-    height: 100,
+    height: Platform.OS === 'web' ? 200 : 100,
   },
   safeArea: {
     flex: 1,
@@ -736,6 +870,18 @@ const styles = StyleSheet.create({
     color: '#374151',
     marginLeft: 12,
     flex: 1,
+  },
+  guidelineText: {
+    fontSize: 14,
+    color: '#374151',
+    marginBottom: 8,
+    lineHeight: 20,
+  },
+  eventText: {
+    fontSize: 14,
+    color: '#374151',
+    marginBottom: 8,
+    lineHeight: 20,
   },
 });
 

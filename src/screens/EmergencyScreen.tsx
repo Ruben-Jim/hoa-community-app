@@ -741,7 +741,7 @@ const styles = StyleSheet.create({
   },
   floatingActionButton: {
     position: 'absolute',
-    top: 700,
+    top: 726,
     right: 20,
     width: 56,
     height: 56,

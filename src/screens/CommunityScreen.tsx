@@ -53,6 +53,9 @@ const CommunityScreen = () => {
   const postModalTranslateY = useRef(new Animated.Value(300)).current;
   const commentModalOpacity = useRef(new Animated.Value(0)).current;
   const commentModalTranslateY = useRef(new Animated.Value(400)).current;
+  
+  // ScrollView ref for better control
+  const scrollViewRef = useRef<ScrollView>(null);
 
   // Listen for window size changes (only on web/desktop)
   useEffect(() => {
@@ -64,6 +67,32 @@ const CommunityScreen = () => {
       return () => subscription?.remove();
     }
   }, []);
+
+  // Set initial cursor and cleanup on unmount (web only)
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      // Set initial cursor
+      document.body.style.cursor = 'grab';
+      
+      // Ensure scroll view is properly initialized
+      setTimeout(() => {
+        if (scrollViewRef.current) {
+          // Force a layout update
+          scrollViewRef.current.scrollTo({ y: 0, animated: false });
+          
+          // Debug: Log scroll view properties
+          console.log('CommunityScreen ScrollView initialized for web');
+          console.log('Screen width:', screenWidth);
+          console.log('Show mobile nav:', showMobileNav);
+          console.log('Show desktop nav:', showDesktopNav);
+        }
+      }, 100);
+      
+      return () => {
+        document.body.style.cursor = 'default';
+      };
+    }
+  }, [screenWidth, showMobileNav, showDesktopNav]);
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current; // Start at 0 for individual post animations
@@ -410,12 +439,40 @@ const CommunityScreen = () => {
 
       {/* Posts List */}
       <ScrollView 
-        style={styles.postsContainer}
+        ref={scrollViewRef}
+        style={[styles.postsContainer, Platform.OS === 'web' && styles.webScrollContainer]}
+        contentContainerStyle={[styles.scrollContent, Platform.OS === 'web' && styles.webScrollContent]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={true}
         bounces={true}
         scrollEnabled={true}
+        alwaysBounceVertical={false}
+        nestedScrollEnabled={true}
+        removeClippedSubviews={false}
+        scrollEventThrottle={16}
+        // Enhanced desktop scrolling
+        decelerationRate="normal"
+        directionalLockEnabled={true}
+        canCancelContentTouches={true}
+        // Web-specific enhancements
+        {...(Platform.OS === 'web' && {
+          onScrollBeginDrag: () => {
+            if (Platform.OS === 'web') {
+              document.body.style.cursor = 'grabbing';
+              document.body.style.userSelect = 'none';
+            }
+          },
+          onScrollEndDrag: () => {
+            if (Platform.OS === 'web') {
+              document.body.style.cursor = 'grab';
+              document.body.style.userSelect = 'auto';
+            }
+          },
+          onScroll: () => {
+            // Ensure scrolling is working
+          },
+        })}
       >
         {filteredPosts.length === 0 ? (
           <View style={styles.emptyState}>
@@ -589,6 +646,9 @@ const CommunityScreen = () => {
             </Animated.View>
           ))
         )}
+        
+        {/* Additional content to ensure scrollable content */}
+        <View style={styles.spacer} />
       </ScrollView>
 
       {/* Floating Action Button for Mobile */}
@@ -832,7 +892,7 @@ const styles = StyleSheet.create({
   },
   floatingActionButton: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 150,
     right: 20,
     width: 56,
     height: 56,
@@ -886,6 +946,26 @@ const styles = StyleSheet.create({
   postsContainer: {
     flex: 1,
     padding: 15,
+  },
+  webScrollContainer: {
+    ...(Platform.OS === 'web' && {
+      cursor: 'grab' as any,
+      userSelect: 'none' as any,
+      WebkitUserSelect: 'none' as any,
+      MozUserSelect: 'none' as any,
+      msUserSelect: 'none' as any,
+    }),
+  },
+  scrollContent: {
+    paddingBottom: 20,
+  },
+  webScrollContent: {
+    ...(Platform.OS === 'web' && {
+      paddingBottom: 100 as any,
+    }),
+  },
+  spacer: {
+    height: Platform.OS === 'web' ? 120 : 80,
   },
   emptyState: {
     alignItems: 'center',
