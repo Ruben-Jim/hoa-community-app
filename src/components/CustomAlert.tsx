@@ -24,6 +24,7 @@ interface CustomAlertProps {
   message: string;
   buttons?: AlertButton[];
   onClose: () => void;
+  type?: 'success' | 'error' | 'warning' | 'info';
 }
 
 const CustomAlert: React.FC<CustomAlertProps> = ({
@@ -32,6 +33,7 @@ const CustomAlert: React.FC<CustomAlertProps> = ({
   message,
   buttons = [],
   onClose,
+  type = 'info',
 }) => {
   const scaleAnim = React.useRef(new Animated.Value(0)).current;
   const opacityAnim = React.useRef(new Animated.Value(0)).current;
@@ -93,6 +95,21 @@ const CustomAlert: React.FC<CustomAlertProps> = ({
     }
   };
 
+  const getIconAndColor = () => {
+    switch (type) {
+      case 'success':
+        return { icon: 'checkmark-circle', color: '#10b981' };
+      case 'error':
+        return { icon: 'close-circle', color: '#dc2626' };
+      case 'warning':
+        return { icon: 'warning', color: '#f59e0b' };
+      default:
+        return { icon: 'information-circle', color: '#2563eb' };
+    }
+  };
+
+  const { icon, color } = getIconAndColor();
+
   if (!visible) return null;
 
   return (
@@ -116,8 +133,8 @@ const CustomAlert: React.FC<CustomAlertProps> = ({
           <View style={styles.alertContent}>
             {/* Header */}
             <View style={styles.header}>
-              <View style={styles.iconContainer}>
-                <Ionicons name="warning" size={24} color="#f59e0b" />
+              <View style={[styles.iconContainer, { backgroundColor: `${color}20` }]}>
+                <Ionicons name={icon as any} size={24} color={color} />
               </View>
               <Text style={styles.title}>{title}</Text>
             </View>

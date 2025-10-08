@@ -21,6 +21,8 @@ import { useAuth } from '../context/AuthContext';
 import { User } from '../types';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
 import { simpleAlert } from '../utils/webCompatibleAlert';
+import CustomAlert from '../components/CustomAlert';
+import { useCustomAlert } from '../hooks/useCustomAlert';
 
 type SignupScreenNavigationProp = StackNavigationProp<AuthStackParamList, 'Signup'>;
 
@@ -43,6 +45,7 @@ const SignupScreen = () => {
     isBoardMember: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const { alertState, showAlert, hideAlert } = useCustomAlert();
 
   const pickImage = async () => {
     try {
@@ -192,10 +195,20 @@ const SignupScreen = () => {
       };
 
       await signUp(userData);
-      simpleAlert('Account created successfully!', 'Success');
+      showAlert({
+        title: 'Success',
+        message: 'Account created successfully!',
+        buttons: [{ text: 'OK', onPress: () => {} }],
+        type: 'success'
+      });
     } catch (error) {
       console.error('Signup error:', error);
-      simpleAlert('Failed to create account. Please try again.', 'Error');
+      showAlert({
+        title: 'Error',
+        message: 'Failed to create account. Please try again.',
+        buttons: [{ text: 'OK', onPress: () => {} }],
+        type: 'error'
+      });
     }
   };
 
@@ -426,6 +439,16 @@ const SignupScreen = () => {
             </Text>
           </View>
       </ScrollView>
+      
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertState.visible}
+        title={alertState.title}
+        message={alertState.message}
+        buttons={alertState.buttons}
+        onClose={hideAlert}
+        type={alertState.type}
+      />
     </SafeAreaView>
   );
 };

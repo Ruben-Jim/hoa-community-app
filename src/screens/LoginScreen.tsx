@@ -16,6 +16,8 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { useAuth } from '../context/AuthContext';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
 import { simpleAlert } from '../utils/webCompatibleAlert';
+import CustomAlert from '../components/CustomAlert';
+import { useCustomAlert } from '../hooks/useCustomAlert';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 
@@ -30,6 +32,7 @@ const LoginScreen = () => {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const { alertState, showAlert, hideAlert } = useCustomAlert();
 
   // Get user by email for authentication
   const user = useQuery(api.residents.getByEmail, { email: formData.email.toLowerCase() });
@@ -61,27 +64,52 @@ const LoginScreen = () => {
     try {
       // Check if user exists and password matches
       if (!user) {
-        simpleAlert('No account found with this email address.', 'Login Failed');
+        showAlert({
+          title: 'Login Failed',
+          message: 'No account found with this email address.',
+          buttons: [{ text: 'OK', onPress: () => {} }],
+          type: 'error'
+        });
         return;
       }
 
       // In a real app, you would hash the password and compare
       // For now, we'll use a simple string comparison
       if (user.password !== formData.password) {
-        simpleAlert('Invalid password. Please try again.', 'Login Failed');
+        showAlert({
+          title: 'Login Failed',
+          message: 'Invalid password. Please try again.',
+          buttons: [{ text: 'OK', onPress: () => {} }],
+          type: 'error'
+        });
         return;
       }
 
       if (!user.isActive) {
-        simpleAlert('Your account is inactive. Please contact support.', 'Account Inactive');
+        showAlert({
+          title: 'Account Inactive',
+          message: 'Your account is inactive. Please contact support.',
+          buttons: [{ text: 'OK', onPress: () => {} }],
+          type: 'warning'
+        });
         return;
       }
 
       await signIn(user);
-      simpleAlert('Logged in successfully!', 'Success');
+      showAlert({
+        title: 'Success',
+        message: 'Logged in successfully!',
+        buttons: [{ text: 'OK', onPress: () => {} }],
+        type: 'success'
+      });
     } catch (error) {
       console.error('Login error:', error);
-      simpleAlert('Failed to login. Please try again.', 'Error');
+      showAlert({
+        title: 'Error',
+        message: 'Failed to login. Please try again.',
+        buttons: [{ text: 'OK', onPress: () => {} }],
+        type: 'error'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -159,6 +187,16 @@ const LoginScreen = () => {
           </View>
         </View>
       </KeyboardAvoidingView>
+      
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertState.visible}
+        title={alertState.title}
+        message={alertState.message}
+        buttons={alertState.buttons}
+        onClose={hideAlert}
+        type={alertState.type}
+      />
     </SafeAreaView>
   );
 };

@@ -10,6 +10,7 @@ interface AlertOptions {
   title: string;
   message: string;
   buttons?: AlertButton[];
+  type?: 'success' | 'error' | 'warning' | 'info';
 }
 
 export const useCustomAlert = () => {
@@ -18,20 +19,23 @@ export const useCustomAlert = () => {
     title: string;
     message: string;
     buttons: AlertButton[];
+    type: 'success' | 'error' | 'warning' | 'info';
   }>({
     visible: false,
     title: '',
     message: '',
     buttons: [],
+    type: 'info',
   });
 
   const showAlert = (options: AlertOptions) => {
-    const { title, message, buttons = [] } = options;
+    const { title, message, buttons = [], type = 'info' } = options;
     setAlertState({
       visible: true,
       title,
       message,
       buttons,
+      type,
     });
   };
 

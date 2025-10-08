@@ -148,11 +148,16 @@ const HomeScreen = () => {
         
         <ScrollView 
           style={styles.scrollContainer}
+          contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={true}
           bounces={true}
           scrollEnabled={true}
+          alwaysBounceVertical={false}
+          nestedScrollEnabled={true}
+          removeClippedSubviews={false}
+          scrollEventThrottle={16}
         >
       {/* Header */}
       <Animated.View style={{
@@ -395,6 +400,9 @@ const HomeScreen = () => {
           </View>
         </View>
       </Animated.View>
+      
+      {/* Additional spacing to ensure scrollable content */}
+      <View style={styles.spacer} />
       </ScrollView>
       </View>
       
@@ -405,6 +413,7 @@ const HomeScreen = () => {
         message={alertState.message}
         buttons={alertState.buttons}
         onClose={hideAlert}
+        type="warning"
       />
     </SafeAreaView>
   );
@@ -417,6 +426,12 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 20,
+  },
+  spacer: {
+    height: 100,
   },
   safeArea: {
     flex: 1,
