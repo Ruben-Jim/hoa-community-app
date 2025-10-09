@@ -57,7 +57,7 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
     { name: 'Community', icon: 'chatbubbles', label: 'Community', color: '#6b7280' },
     { name: 'Covenants', icon: 'document-text', label: 'Covenants', color: '#6b7280' },
     { name: 'Emergency', icon: 'warning', label: 'Emergency', color: '#6b7280' },
-    // Hide fees tab for renters (but show for dev users)
+    // Hide fees tab for renters (but show for dev)
     ...(isRenter && !isDev ? [] : [{ name: 'Fees', icon: 'card', label: 'Fees', color: '#6b7280' }]),
     ...(isBoardMember || isDev ? [{ name: 'Admin', icon: 'settings', label: 'Admin', color: '#6b7280' }] : []),
   ];
