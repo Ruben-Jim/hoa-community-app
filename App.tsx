@@ -41,6 +41,7 @@ const MainApp = () => {
   }
 
   const isBoardMember = user?.isBoardMember && user?.isActive;
+  const isDev = user?.isDev ?? false;
 
   return (
     <Stack.Navigator
@@ -53,13 +54,13 @@ const MainApp = () => {
       <Stack.Screen name="Covenants" component={CovenantsScreen} />
       <Stack.Screen name="Community" component={CommunityScreen} />
       <Stack.Screen name="Emergency" component={EmergencyScreen} />
-      {isBoardMember && (
+      <Stack.Screen name="Fees" component={FeesScreen} />
+      {(isBoardMember || isDev) && (
         <Stack.Screen 
           name="Admin" 
           component={AdminScreen}
         />
       )}
-      {/* <Stack.Screen name="Fees" component={FeesScreen} /> */}
     </Stack.Navigator>
   );
 };

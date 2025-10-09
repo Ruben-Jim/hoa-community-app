@@ -39,6 +39,8 @@ export const create = mutation({
     unitNumber: v.optional(v.string()),
     isResident: v.boolean(),
     isBoardMember: v.boolean(),
+    isRenter: v.boolean(),
+    isDev: v.optional(v.boolean()),
     password: v.optional(v.string()),
     profileImage: v.optional(v.string()),
   },
@@ -56,6 +58,7 @@ export const create = mutation({
     const now = Date.now();
     const id = await ctx.db.insert("residents", {
       ...args,
+      isDev: args.isDev ?? false, // Default to false if not provided
       isActive: true,
       isBlocked: false,
       blockReason: undefined,
@@ -79,6 +82,8 @@ export const update = mutation({
     unitNumber: v.optional(v.string()),
     isResident: v.optional(v.boolean()),
     isBoardMember: v.optional(v.boolean()),
+    isRenter: v.optional(v.boolean()),
+    isDev: v.optional(v.boolean()),
     isActive: v.optional(v.boolean()),
     password: v.optional(v.string()),
   },

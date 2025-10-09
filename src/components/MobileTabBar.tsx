@@ -37,6 +37,8 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
   const overlayOpacity = useRef(new Animated.Value(0)).current;
 
   const isBoardMember = user?.isBoardMember && user?.isActive;
+  const isRenter = user?.isRenter;
+  const isDev = user?.isDev ?? false;
 
   // Handle external menu state changes
   useEffect(() => {
@@ -50,12 +52,14 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
   }, [externalIsMenuOpen]);
 
   const tabs: TabItem[] = [
-    { name: 'Home', icon: 'home', label: 'Home', color: '#2563eb' },
-    { name: 'Board', icon: 'people', label: 'Board', color: '#059669' },
-    { name: 'Community', icon: 'chatbubbles', label: 'Community', color: '#7c3aed' },
-    { name: 'Covenants', icon: 'document-text', label: 'Covenants', color: '#dc2626' },
-    { name: 'Emergency', icon: 'warning', label: 'Emergency', color: '#ea580c' },
-    ...(isBoardMember ? [{ name: 'Admin', icon: 'settings', label: 'Admin', color: '#8b5cf6' }] : []),
+    { name: 'Home', icon: 'home', label: 'Home', color: '#6b7280' },
+    { name: 'Board', icon: 'people', label: 'Board', color: '#6b7280' },
+    { name: 'Community', icon: 'chatbubbles', label: 'Community', color: '#6b7280' },
+    { name: 'Covenants', icon: 'document-text', label: 'Covenants', color: '#6b7280' },
+    { name: 'Emergency', icon: 'warning', label: 'Emergency', color: '#6b7280' },
+    // Hide fees tab for renters (but show for dev users)
+    ...(isRenter && !isDev ? [] : [{ name: 'Fees', icon: 'card', label: 'Fees', color: '#6b7280' }]),
+    ...(isBoardMember || isDev ? [{ name: 'Admin', icon: 'settings', label: 'Admin', color: '#6b7280' }] : []),
   ];
 
   const handleTabPress = (tabName: string) => {
@@ -166,7 +170,7 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
                       {user.firstName} {user.lastName}
                     </Text>
                     <Text style={styles.userRole}>
-                      {user.isBoardMember ? 'Board Member' : 'Resident'}
+                      {(user.isDev ?? false) ? 'Developer' : user.isBoardMember ? 'Board Member' : user.isRenter ? 'Renter' : 'Resident'}
                     </Text>
                   </View>
                 </View>

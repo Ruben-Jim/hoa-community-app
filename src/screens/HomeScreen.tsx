@@ -19,6 +19,7 @@ import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
+import DeveloperIndicator from '../components/DeveloperIndicator';
 import CustomTabBar from '../components/CustomTabBar';
 import MobileTabBar from '../components/MobileTabBar';
 import { webCompatibleAlert } from '../utils/webCompatibleAlert';
@@ -252,10 +253,11 @@ const HomeScreen = () => {
               <Text style={styles.userName}>
                 Welcome back, {user.firstName} {user.lastName}
               </Text>
+              <DeveloperIndicator />
               <BoardMemberIndicator />
             </View>
             <Text style={styles.userRole}>
-              {user.isBoardMember ? 'Board Member' : 'Resident'} • {user.address}
+              {(user.isDev ?? false) ? 'Developer' : user.isBoardMember ? 'Board Member' : user.isRenter ? 'Renter' : 'Resident'} • {user.address}
             </Text>
           </View>
         )}

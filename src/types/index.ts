@@ -88,6 +88,8 @@ export interface User {
   unitNumber?: string;
   isResident: boolean;
   isBoardMember: boolean;
+  isRenter: boolean;
+  isDev?: boolean;
   isActive: boolean;
   isBlocked: boolean;
   blockReason?: string;

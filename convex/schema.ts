@@ -132,6 +132,8 @@ export default defineSchema({
     unitNumber: v.optional(v.string()),
     isResident: v.boolean(),
     isBoardMember: v.boolean(),
+    isRenter: v.boolean(),
+    isDev: v.optional(v.boolean()),
     isActive: v.boolean(),
     isBlocked: v.boolean(),
     blockReason: v.optional(v.string()),

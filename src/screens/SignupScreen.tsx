@@ -45,6 +45,7 @@ const SignupScreen = () => {
     unitNumber: '',
     isResident: true,
     isBoardMember: false,
+    isRenter: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { alertState, showAlert, hideAlert } = useCustomAlert();
@@ -218,6 +219,7 @@ const SignupScreen = () => {
         unitNumber: formData.unitNumber.trim() || undefined,
         isResident: formData.isResident,
         isBoardMember: formData.isBoardMember,
+        isRenter: formData.isRenter,
         isBlocked: false,
         profileImage: profileImageUrl,
       };
@@ -429,20 +431,46 @@ const SignupScreen = () => {
               <TouchableOpacity
                 style={[
                   styles.roleButton,
-                  formData.isResident && styles.roleButtonActive
+                  formData.isResident && !formData.isRenter && styles.roleButtonActive
                 ]}
-                onPress={() => updateFormData('isResident', true)}
+                onPress={() => {
+                  updateFormData('isResident', true);
+                  updateFormData('isRenter', false);
+                }}
               >
                 <Ionicons 
                   name="home" 
                   size={20} 
-                  color={formData.isResident ? '#ffffff' : '#6b7280'} 
+                  color={formData.isResident && !formData.isRenter ? '#ffffff' : '#6b7280'} 
                 />
                 <Text style={[
                   styles.roleButtonText,
-                  formData.isResident && styles.roleButtonTextActive
+                  formData.isResident && !formData.isRenter && styles.roleButtonTextActive
                 ]}>
                   Resident
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.roleButton,
+                  formData.isRenter && styles.roleButtonActive
+                ]}
+                onPress={() => {
+                  updateFormData('isRenter', true);
+                  updateFormData('isResident', false);
+                }}
+              >
+                <Ionicons 
+                  name="key" 
+                  size={20} 
+                  color={formData.isRenter ? '#ffffff' : '#6b7280'} 
+                />
+                <Text style={[
+                  styles.roleButtonText,
+                  formData.isRenter && styles.roleButtonTextActive
+                ]}>
+                  Renter
                 </Text>
               </TouchableOpacity>
 
@@ -595,18 +623,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 16,
+    flexWrap: 'wrap',
+    gap: 8,
   },
   roleButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     borderRadius: 12,
     backgroundColor: '#f3f4f6',
     borderWidth: 2,
     borderColor: 'transparent',
-    width: '48%',
+    flex: 1,
+    minWidth: '30%',
   },
   roleButtonActive: {
     backgroundColor: '#2563eb',

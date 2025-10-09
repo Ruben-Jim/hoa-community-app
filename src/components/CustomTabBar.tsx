@@ -20,6 +20,8 @@ const CustomTabBar = () => {
   const { user } = useAuth();
 
   const isBoardMember = user?.isBoardMember && user?.isActive;
+  const isRenter = user?.isRenter;
+  const isDev = user?.isDev ?? false;
 
   // Hide tab bar on mobile devices
   if (isMobile) {
@@ -32,7 +34,9 @@ const CustomTabBar = () => {
     { name: 'Community', icon: 'chatbubbles', label: 'Community', color: '#6b7280' },
     { name: 'Covenants', icon: 'document-text', label: 'Covenants', color: '#6b7280' },
     { name: 'Emergency', icon: 'warning', label: 'Emergency', color: '#6b7280' },
-    ...(isBoardMember ? [{ name: 'Admin', icon: 'settings', label: 'Admin', color: '#6b7280' }] : []),
+    // Hide fees tab for renters (but show for dev users)
+    ...(isRenter && !isDev ? [] : [{ name: 'Fees', icon: 'card', label: 'Fees', color: '#6b7280' }]),
+    ...(isBoardMember || isDev ? [{ name: 'Admin', icon: 'settings', label: 'Admin', color: '#6b7280' }] : []),
   ];
 
   const handleTabPress = (tabName: string) => {

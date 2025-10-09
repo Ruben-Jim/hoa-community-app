@@ -17,6 +17,7 @@ import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
+import DeveloperIndicator from '../components/DeveloperIndicator';
 import CustomTabBar from '../components/CustomTabBar';
 import MobileTabBar from '../components/MobileTabBar';
 
@@ -138,6 +139,7 @@ const CovenantsScreen = () => {
             <View style={styles.headerLeft}>
               <View style={styles.titleContainer}>
                 <Text style={styles.headerTitle}>Covenants & Rules</Text>
+                <DeveloperIndicator />
                 <BoardMemberIndicator />
               </View>
               <Text style={styles.headerSubtitle}>

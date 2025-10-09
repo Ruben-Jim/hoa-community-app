@@ -20,6 +20,7 @@ import { api } from '../../convex/_generated/api';
 
 import { useAuth } from '../context/AuthContext';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
+import DeveloperIndicator from '../components/DeveloperIndicator';
 import CustomTabBar from '../components/CustomTabBar';
 import MobileTabBar from '../components/MobileTabBar';
 
@@ -191,6 +192,7 @@ const BoardScreen = () => {
               <View style={styles.headerLeft}>
                 <View style={styles.titleContainer}>
                   <Text style={styles.headerTitle}>Board of Directors</Text>
+                  <DeveloperIndicator />
                   <BoardMemberIndicator />
                 </View>
                 <Text style={styles.headerSubtitle}>

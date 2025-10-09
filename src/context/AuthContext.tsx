@@ -101,6 +101,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         unitNumber: userData.unitNumber,
         isResident: userData.isResident,
         isBoardMember: userData.isBoardMember,
+        isRenter: userData.isRenter,
+        isDev: userData.isDev ?? false, // Default to false if not provided
         profileImage: userData.profileImage,
       });
       console.log('✅ Resident created with ID:', residentId);
