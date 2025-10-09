@@ -153,8 +153,138 @@ const FeesScreen = () => {
     );
   };
 
-  const fees = useQuery(api.fees.getAll) ?? [];
-  const fines = useQuery(api.fines.getAll) ?? [];
+  // 🚧 MOCK DATA FOR DEMONSTRATION 🚧
+  // This shows what the FeesScreen will look like with real data
+  // Replace with actual Convex queries when ready:
+  // const fees = useQuery(api.fees.getAll) ?? [];
+  // const fines = useQuery(api.fines.getAll) ?? [];
+  
+  const mockFees = [
+    {
+      _id: 'mock-fee-1',
+      name: 'Monthly HOA Dues',
+      amount: 250,
+      frequency: 'Monthly',
+      dueDate: '2024-08-01',
+      description: 'Standard monthly HOA assessment for maintenance and services',
+      isLate: false,
+    },
+    {
+      _id: 'mock-fee-2',
+      name: 'Landscape Maintenance',
+      amount: 75,
+      frequency: 'Monthly',
+      dueDate: '2024-08-01',
+      description: 'Front yard maintenance and irrigation service',
+      isLate: false,
+    },
+    {
+      _id: 'mock-fee-3',
+      name: 'Annual Assessment',
+      amount: 500,
+      frequency: 'Annually',
+      dueDate: '2024-12-31',
+      description: 'Annual capital improvement fund for community projects',
+      isLate: false,
+    },
+    {
+      _id: 'mock-fee-4',
+      name: 'Trash Collection',
+      amount: 35,
+      frequency: 'Monthly',
+      dueDate: '2024-08-15',
+      description: 'Monthly trash and recycling collection service',
+      isLate: true,
+    },
+    {
+      _id: 'mock-fee-5',
+      name: 'Pool Maintenance',
+      amount: 120,
+      frequency: 'Monthly',
+      dueDate: '2024-08-01',
+      description: 'Community pool maintenance, cleaning, and chemical treatment',
+      isLate: false,
+    },
+    {
+      _id: 'mock-fee-6',
+      name: 'Security Service',
+      amount: 45,
+      frequency: 'Monthly',
+      dueDate: '2024-08-01',
+      description: 'Night security patrol and gate monitoring',
+      isLate: false,
+    }
+  ];
+
+  const mockFines = [
+    {
+      _id: 'mock-fine-1',
+      violation: 'Unauthorized Parking',
+      amount: 50,
+      dateIssued: '2024-07-15',
+      dueDate: '2024-08-15',
+      status: 'Pending',
+      description: 'Vehicle parked on street overnight without permit',
+    },
+    {
+      _id: 'mock-fine-2',
+      violation: 'Landscaping Violation',
+      amount: 100,
+      dateIssued: '2024-07-10',
+      dueDate: '2024-08-10',
+      status: 'Paid',
+      description: 'Unapproved plants in front yard - not in compliance with HOA guidelines',
+    },
+    {
+      _id: 'mock-fine-3',
+      violation: 'Noise Complaint',
+      amount: 75,
+      dateIssued: '2024-07-20',
+      dueDate: '2024-08-20',
+      status: 'Overdue',
+      description: 'Excessive noise after 10 PM - multiple neighbor complaints',
+    },
+    {
+      _id: 'mock-fine-4',
+      violation: 'Pet Violation',
+      amount: 25,
+      dateIssued: '2024-07-25',
+      dueDate: '2024-08-25',
+      status: 'Pending',
+      description: 'Dog off leash in common areas - first offense',
+    },
+    {
+      _id: 'mock-fine-5',
+      violation: 'Garbage Violation',
+      amount: 40,
+      dateIssued: '2024-07-05',
+      dueDate: '2024-08-05',
+      status: 'Paid',
+      description: 'Garbage cans left out past collection day',
+    },
+    {
+      _id: 'mock-fine-6',
+      violation: 'Exterior Modification',
+      amount: 150,
+      dateIssued: '2024-07-12',
+      dueDate: '2024-08-12',
+      status: 'Overdue',
+      description: 'Exterior paint color change without HOA approval',
+    },
+    {
+      _id: 'mock-fine-7',
+      violation: 'Holiday Decorations',
+      amount: 30,
+      dateIssued: '2024-07-30',
+      dueDate: '2024-08-30',
+      status: 'Pending',
+      description: 'Holiday decorations left up past allowed timeframe',
+    }
+  ];
+
+  // Use mock data for demonstration
+  const fees = mockFees;
+  const fines = mockFines;
   const totalFees = fees.reduce((sum: number, fee: any) => sum + fee.amount, 0);
   const totalFines = fines.reduce((sum: number, fine: any) => sum + fine.amount, 0);
   const overdueFines = fines.filter((fine: any) => fine.status === 'Overdue').reduce((sum: number, fine: any) => sum + fine.amount, 0);
@@ -194,6 +324,9 @@ const FeesScreen = () => {
               <View style={styles.headerLeft}>
                 <View style={styles.titleContainer}>
                   <Text style={styles.headerTitle}>Fees & Fines</Text>
+                  <View style={styles.demoBadge}>
+                    <Text style={styles.demoBadgeText}>DEMO DATA</Text>
+                  </View>
                   <DeveloperIndicator />
                   <BoardMemberIndicator />
                 </View>
@@ -552,6 +685,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     marginBottom: 4,
+    flexWrap: 'wrap',
+  },
+  demoBadge: {
+    backgroundColor: '#f59e0b',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  demoBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#ffffff',
   },
   headerTitle: {
     color: '#ffffff',
