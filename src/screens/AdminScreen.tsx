@@ -1502,6 +1502,7 @@ const AdminScreen = () => {
             </Animated.View>
           </Animated.View>
         </Modal>
+
         </ScrollView>
       </View>
     </SafeAreaView>

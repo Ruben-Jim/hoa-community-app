@@ -552,6 +552,10 @@ const styles = StyleSheet.create({
       WebkitUserSelect: 'none' as any,
       MozUserSelect: 'none' as any,
       msUserSelect: 'none' as any,
+      overflow: 'auto' as any,
+      height: '100vh' as any,
+      maxHeight: '100vh' as any,
+      position: 'relative' as any,
     }),
   },
   scrollContent: {
@@ -559,6 +563,8 @@ const styles = StyleSheet.create({
   },
   webScrollContent: {
     ...(Platform.OS === 'web' && {
+      minHeight: '100vh' as any,
+      flexGrow: 1,
       paddingBottom: 100 as any,
     }),
   },

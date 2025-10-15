@@ -15,7 +15,10 @@
         "ios": {
             "supportsTablet": true,
             "bundleIdentifier": "com.yourcompany.hoacommunityapp",
-            "buildNumber": "1"
+            "buildNumber": "1",
+            "infoPlist": {
+                "UIBackgroundModes": ["background-fetch", "remote-notification"]
+            }
         },
         "android": {
             "package": "com.yourcompany.hoacommunityapp",
@@ -24,7 +27,12 @@
                 "foregroundImage": "./assets/adaptive-icon.png",
                 "backgroundColor": "#ffffff"
             },
-            "edgeToEdgeEnabled": true
+            "edgeToEdgeEnabled": true,
+            "permissions": [
+                "android.permission.RECEIVE_BOOT_COMPLETED",
+                "android.permission.VIBRATE",
+                "android.permission.WAKE_LOCK"
+            ]
         },
         "web": {
             "favicon": "./assets/favicon.jpg"
@@ -40,7 +48,15 @@
             }
         },
         "plugins": [
-            "expo-router"
+            "expo-router",
+            [
+                "expo-notifications",
+                {
+                    "icon": "./assets/icon.png",
+                    "color": "#ffffff",
+                    "defaultChannel": "default"
+                }
+            ]
         ]
     }
 }

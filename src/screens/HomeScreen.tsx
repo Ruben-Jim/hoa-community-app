@@ -36,6 +36,12 @@ const HomeScreen = () => {
   
   // State for dynamic responsive behavior (only for web/desktop)
   const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
+  const [showIOSInstallPrompt, setShowIOSInstallPrompt] = useState(false);
+  
+  // Check if app is already installed (standalone mode)
+  const isAppInstalled = Platform.OS === 'web' && 
+    ('standalone' in window.navigator) && 
+    (window.navigator as any).standalone;
   
   // Dynamic responsive check - show mobile nav when screen is too narrow for desktop nav
   // On mobile, always show mobile nav regardless of screen size
@@ -46,7 +52,6 @@ const HomeScreen = () => {
   // Animation values
   const fadeAnim = useRef(new Animated.Value(1)).current; // Start at 1 to avoid white flash
   const quickActionsAnim = useRef(new Animated.Value(0)).current;
-  const notificationsAnim = useRef(new Animated.Value(0)).current;
   const postsAnim = useRef(new Animated.Value(0)).current;
   const officeAnim = useRef(new Animated.Value(0)).current;
   
@@ -58,11 +63,6 @@ const HomeScreen = () => {
   const animateStaggeredContent = () => {
     Animated.stagger(200, [
       Animated.timing(quickActionsAnim, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.timing(notificationsAnim, {
         toValue: 1,
         duration: 500,
         useNativeDriver: true,
@@ -164,6 +164,38 @@ const HomeScreen = () => {
   };
 
   const activeNotifications = emergencyNotifications?.filter((n: any) => n.isActive) ?? [];
+
+  // iOS Home Screen functionality
+  const handleIOSInstall = () => {
+    if (Platform.OS === 'web') {
+      // Check if it's iOS Safari
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      
+      if (isIOS) {
+        setShowIOSInstallPrompt(true);
+      } else {
+        showAlert({
+          title: 'Not Available',
+          message: 'This feature is only available on iOS Safari.',
+          buttons: [
+            { text: 'OK', onPress: () => {} }
+          ]
+        });
+      }
+    } else {
+      showAlert({
+        title: 'Not Available',
+        message: 'This feature is only available on iOS Safari.',
+        buttons: [
+          { text: 'OK', onPress: () => {} }
+        ]
+      });
+    }
+  };
+
+  const dismissIOSPrompt = () => {
+    setShowIOSInstallPrompt(false);
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -313,20 +345,55 @@ const HomeScreen = () => {
         </View>
       </Animated.View> */}
 
-      {/* Active Notifications */}
-      {activeNotifications.length > 0 && (
+       {/* iOS Install Button - Only show on iOS Safari and when app is not installed */}
+       {Platform.OS === 'web' && /iPad|iPhone|iPod/.test(navigator.userAgent) && !isAppInstalled && (
         <Animated.View style={[
-          styles.section, 
-          styles.emergencySection,
+          styles.section,
           {
-            opacity: notificationsAnim,
+            opacity: quickActionsAnim,
             transform: [{
-              translateY: notificationsAnim.interpolate({
+              translateY: quickActionsAnim.interpolate({
                 inputRange: [0, 1],
                 outputRange: [50, 0],
               })
             }]
           }
+        ]}>
+          <View style={styles.iosInstallContainer}>
+            <View style={styles.iosInstallContent}>
+              <Ionicons name="phone-portrait" size={32} color="#007AFF" />
+              <View style={styles.iosInstallText}>
+                <Text style={styles.iosInstallTitle}>Try the App</Text>
+                <Text style={styles.iosInstallDescription}>
+                  Add to your home screen for a better experience
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.iosInstallButton}
+                onPress={handleIOSInstall}
+              >
+                <Ionicons name="add-circle" size={20} color="#ffffff" />
+                <Text style={styles.iosInstallButtonText}>Install</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Animated.View>
+      )}
+
+      {/* Active Notifications */}
+      {activeNotifications.length > 0 && (
+        <Animated.View style={[
+          styles.section, 
+        styles.emergencySection,
+        {
+          opacity: quickActionsAnim,
+          transform: [{
+            translateY: quickActionsAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [50, 0],
+            })
+          }]
+        }
         ]}>
           <View style={styles.emergencyHeader}>
             <Ionicons name="warning" size={24} color="#ef4444" />
@@ -350,6 +417,7 @@ const HomeScreen = () => {
           ))}
         </Animated.View>
       )}
+
 
       {/* Recent Community Posts */}
       <Animated.View style={[
@@ -521,6 +589,7 @@ const HomeScreen = () => {
       <View style={styles.spacer} />
       </ScrollView>
       </View>
+
       
       {/* Custom Alert */}
       <CustomAlert
@@ -531,6 +600,82 @@ const HomeScreen = () => {
         onClose={hideAlert}
         type="warning"
       />
+
+      {/* iOS Install Prompt Modal */}
+      {showIOSInstallPrompt && (
+        <View style={styles.iosModalOverlay}>
+          <TouchableOpacity 
+            style={styles.iosModalOverlayTouchable}
+            activeOpacity={1}
+            onPress={dismissIOSPrompt}
+          >
+            <TouchableOpacity 
+              style={styles.iosModalContainer}
+              activeOpacity={1}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <View style={styles.iosModalHeader}>
+                <Ionicons name="phone-portrait" size={48} color="#007AFF" />
+                <Text style={styles.iosModalTitle}>Add to Home Screen</Text>
+                <TouchableOpacity
+                  style={styles.iosModalCloseButton}
+                  onPress={dismissIOSPrompt}
+                >
+                  <Ionicons name="close" size={24} color="#6b7280" />
+                </TouchableOpacity>
+              </View>
+            
+            <View style={styles.iosModalContent}>
+              <Text style={styles.iosModalDescription}>
+                To install this app on your iPhone:
+              </Text>
+              
+              <View style={styles.iosStepsContainer}>
+                <View style={styles.iosStep}>
+                  <View style={styles.iosStepNumber}>
+                    <Text style={styles.iosStepNumberText}>1</Text>
+                  </View>
+                  <Text style={styles.iosStepText}>
+                    Tap the <Ionicons name="share" size={16} color="#007AFF" /> Share button at the bottom of Safari
+                  </Text>
+                </View>
+                
+                <View style={styles.iosStep}>
+                  <View style={styles.iosStepNumber}>
+                    <Text style={styles.iosStepNumberText}>2</Text>
+                  </View>
+                  <Text style={styles.iosStepText}>
+                    Scroll down and tap "Add to Home Screen"
+                  </Text>
+                </View>
+                
+                <View style={styles.iosStep}>
+                  <View style={styles.iosStepNumber}>
+                    <Text style={styles.iosStepNumberText}>3</Text>
+                  </View>
+                  <Text style={styles.iosStepText}>
+                    Tap "Add" to confirm
+                  </Text>
+                </View>
+              </View>
+              
+              <Text style={styles.iosModalNote}>
+                The app will appear on your home screen like a native app!
+              </Text>
+            </View>
+            
+              <View style={styles.iosModalButtons}>
+                <TouchableOpacity
+                  style={styles.iosModalButton}
+                  onPress={dismissIOSPrompt}
+                >
+                  <Text style={styles.iosModalButtonText}>Got it!</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -882,6 +1027,164 @@ const styles = StyleSheet.create({
     color: '#374151',
     marginBottom: 8,
     lineHeight: 20,
+  },
+  // iOS Install Button Styles
+  iosInstallContainer: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 16,
+  },
+  iosInstallContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iosInstallText: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 12,
+  },
+  iosInstallTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  iosInstallDescription: {
+    fontSize: 14,
+    color: '#6b7280',
+    lineHeight: 20,
+  },
+  iosInstallButton: {
+    backgroundColor: '#007AFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  iosInstallButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  // iOS Install Modal Styles
+  iosModalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  iosModalOverlayTouchable: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    height: '100%',
+  },
+  iosModalContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    margin: 20,
+    maxWidth: 400,
+    width: '90%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  iosModalHeader: {
+    alignItems: 'center',
+    paddingTop: 24,
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+    position: 'relative',
+  },
+  iosModalCloseButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#f3f4f6',
+  },
+  iosModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginTop: 12,
+  },
+  iosModalContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+  },
+  iosModalDescription: {
+    fontSize: 16,
+    color: '#374151',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 24,
+  },
+  iosStepsContainer: {
+    marginBottom: 20,
+  },
+  iosStep: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  iosStepNumber: {
+    backgroundColor: '#007AFF',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    marginTop: 2,
+  },
+  iosStepNumberText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  iosStepText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
+  },
+  iosModalNote: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    lineHeight: 20,
+  },
+  iosModalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+  },
+  iosModalButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  iosModalButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

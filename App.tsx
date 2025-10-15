@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
@@ -8,6 +8,7 @@ import { ConvexProvider, ConvexReactClient } from 'convex/react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import AuthNavigator from './src/navigation/AuthNavigator';
+import enhancedUnifiedNotificationManager from './src/services/EnhancedUnifiedNotificationManager';
 
 import HomeScreen from './src/screens/HomeScreen';
 import BoardScreen from './src/screens/BoardScreen';
@@ -72,6 +73,20 @@ export default function App() {
     if (!convexUrl) return null;
     return new ConvexReactClient(convexUrl);
   }, [convexUrl]);
+
+  // Initialize notifications when app starts
+  useEffect(() => {
+    const initializeNotifications = async () => {
+      try {
+        await enhancedUnifiedNotificationManager.initialize();
+        console.log('Notifications initialized successfully');
+      } catch (error) {
+        console.error('Failed to initialize notifications:', error);
+      }
+    };
+
+    initializeNotifications();
+  }, []);
 
   const content = (
     <SafeAreaProvider>

@@ -23,12 +23,14 @@ import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import DeveloperIndicator from '../components/DeveloperIndicator';
 import CustomTabBar from '../components/CustomTabBar';
 import MobileTabBar from '../components/MobileTabBar';
+import useNotifications from '../hooks/useNotifications';
 
 const EmergencyScreen = () => {
   const { user } = useAuth();
   const notifications = useQuery(api.emergencyNotifications.getAll) ?? [];
   const createNotification = useMutation(api.emergencyNotifications.create);
   const deactivateNotification = useMutation(api.emergencyNotifications.deactivate);
+  const { sendEmergencyAlert, sendAlert, sendInfo, isEnabled: notificationsEnabled } = useNotifications();
   const [selectedPriority, setSelectedPriority] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showNewAlertModal, setShowNewAlertModal] = useState(false);
@@ -252,24 +254,69 @@ const EmergencyScreen = () => {
       return;
     }
     
-    await createNotification({
-      title: newAlert.title,
-      content: newAlert.content,
-      type: newAlert.type,
-      priority: newAlert.priority,
-      category: newAlert.category,
-      isActive: true,
-    });
-    setNewAlert({
-      title: '',
-      content: '',
-      type: 'Alert',
-      priority: 'Medium',
-      category: 'Other',
-    });
-    animateOut(() => {
-      setShowNewAlertModal(false);
-    });
+    try {
+      // Create the notification in the database
+      await createNotification({
+        title: newAlert.title,
+        content: newAlert.content,
+        type: newAlert.type,
+        priority: newAlert.priority,
+        category: newAlert.category,
+        isActive: true,
+      });
+
+      // Send push notification to all users
+      if (notificationsEnabled) {
+        let notificationSent = false;
+        
+        switch (newAlert.type) {
+          case 'Emergency':
+            notificationSent = (await sendEmergencyAlert(
+              newAlert.title,
+              newAlert.content,
+              newAlert.priority
+            )) !== null;
+            break;
+          case 'Alert':
+            notificationSent = (await sendAlert(
+              newAlert.title,
+              newAlert.content,
+              newAlert.priority
+            )) !== null;
+            break;
+          case 'Info':
+            notificationSent = (await sendInfo(
+              newAlert.title,
+              newAlert.content
+            )) !== null;
+            break;
+        }
+
+        if (notificationSent) {
+          console.log('Notification sent successfully for new alert:', newAlert.title);
+        } else {
+          console.warn('Failed to send notification for new alert:', newAlert.title);
+        }
+      } else {
+        console.log('Notifications not enabled, skipping push notification');
+      }
+
+      // Reset form
+      setNewAlert({
+        title: '',
+        content: '',
+        type: 'Alert',
+        priority: 'Medium',
+        category: 'Other',
+      });
+      
+      animateOut(() => {
+        setShowNewAlertModal(false);
+      });
+    } catch (error) {
+      console.error('Failed to create alert:', error);
+      Alert.alert('Error', 'Failed to create alert. Please try again.');
+    }
   };
 
   const handleDeactivate = async (id: string) => {

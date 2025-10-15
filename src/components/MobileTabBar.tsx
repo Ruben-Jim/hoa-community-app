@@ -7,10 +7,13 @@ import {
   Animated, 
   Dimensions,
   Modal,
-  Platform
+  Platform,
+  Image
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { useQuery } from 'convex/react';
+import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
 
 interface TabItem {
@@ -30,6 +33,10 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
   const route = useRoute();
   const { user } = useAuth();
   const [internalMenuOpen, setInternalMenuOpen] = useState(false);
+  
+  // Get user's profile image from residents table
+  const residents = useQuery(api.residents.getAll) ?? [];
+  const currentUser = residents.find(resident => resident.email === user?.email);
   
   const isMenuOpen = externalIsMenuOpen !== undefined ? externalIsMenuOpen : internalMenuOpen;
   
@@ -163,7 +170,15 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
               <View style={styles.userSection}>
                 <View style={styles.userInfo}>
                   <View style={styles.userAvatar}>
-                    <Ionicons name="person" size={20} color="#6b7280" />
+                    {currentUser?.profileImage ? (
+                      <Image 
+                        source={{ uri: currentUser.profileImage }} 
+                        style={styles.userAvatarImage}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <Ionicons name="person" size={20} color="#6b7280" />
+                    )}
                   </View>
                   <View style={styles.userDetails}>
                     <Text style={styles.userName}>
@@ -276,6 +291,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    overflow: 'hidden',
+  },
+  userAvatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   userDetails: {
     flex: 1,
