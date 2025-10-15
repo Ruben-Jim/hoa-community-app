@@ -131,7 +131,7 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
           <Animated.View style={[styles.sideMenu, { transform: [{ translateX: slideAnim }] }]}>
             {/* Menu Header */}
             <View style={styles.menuHeader}>
-              <Text style={styles.menuTitle}>Navigation</Text>
+              <Text style={styles.menuTitle}>Shelton Springs</Text>
               <TouchableOpacity onPress={closeMenu}>
                 <Ionicons name="close" size={24} color="#374151" />
               </TouchableOpacity>
