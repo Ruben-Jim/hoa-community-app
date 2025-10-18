@@ -35,7 +35,7 @@ const CustomTabBar = () => {
     { name: 'Covenants', icon: 'document-text', label: 'Covenants', color: '#6b7280' },
     { name: 'Emergency', icon: 'warning', label: 'Emergency', color: '#6b7280' },
     // Hide fees tab for renters and regular residents (only show for board members and dev users)
-    ...(isBoardMember || isDev ? [{ name: 'Fees', icon: 'card', label: 'Fees', color: '#6b7280' }] : []),
+    ...(isBoardMember || !isRenter ? [{ name: 'Fees', icon: 'card', label: 'Fees', color: '#6b7280' }] : []),
     ...(isBoardMember || isDev ? [{ name: 'Admin', icon: 'settings', label: 'Admin', color: '#6b7280' }] : []),
   ];
 

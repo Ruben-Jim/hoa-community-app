@@ -41,6 +41,21 @@ export const update = mutation({
   },
 });
 
+// Mark fine as paid
+export const markAsPaid = mutation({
+  args: {
+    id: v.id("fines"),
+    status: v.union(v.literal("Pending"), v.literal("Paid"), v.literal("Overdue")),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    await ctx.db.patch(args.id, {
+      status: args.status,
+      updatedAt: now,
+    });
+  },
+});
+
 export const remove = mutation({
   args: { id: v.id("fines") },
   handler: async (ctx, args) => {

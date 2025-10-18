@@ -42,9 +42,14 @@ export default defineSchema({
     dueDate: v.string(),
     description: v.string(),
     isLate: v.boolean(),
+    residentId: v.optional(v.id("residents")), // Link to specific resident
+    isPaid: v.boolean(), // Payment status
+    paidAt: v.optional(v.number()), // When it was paid
+    paymentMethod: v.optional(v.string()), // How it was paid (stripe, check, etc.)
+    stripePaymentIntentId: v.optional(v.string()), // Stripe payment intent ID
     createdAt: v.number(),
     updatedAt: v.number(),
-  }),
+  }).index("by_resident", ["residentId"]).index("by_payment_status", ["isPaid"]),
 
   fines: defineTable({
     violation: v.string(),
@@ -142,4 +147,25 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_email", ["email"]),
+
+  payments: defineTable({
+    residentId: v.id("residents"),
+    feeId: v.optional(v.id("fees")),
+    fineId: v.optional(v.id("fines")),
+    amount: v.number(),
+    currency: v.string(), // e.g., "usd"
+    status: v.union(
+      v.literal("pending"),
+      v.literal("succeeded"),
+      v.literal("failed"),
+      v.literal("canceled")
+    ),
+    paymentMethod: v.string(), // "stripe", "check", "cash", etc.
+    stripePaymentIntentId: v.optional(v.string()),
+    stripeChargeId: v.optional(v.string()),
+    description: v.string(),
+    metadata: v.optional(v.any()), // Additional payment metadata
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_resident", ["residentId"]).index("by_status", ["status"]).index("by_fee", ["feeId"]).index("by_fine", ["fineId"]),
 }); 

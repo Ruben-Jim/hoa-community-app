@@ -1,62 +1,82 @@
 {
-    "expo": {
-        "name": "HOA Community",
-        "slug": "hoa-community-app",
-        "version": "1.0.0",
-        "orientation": "portrait",
-        "icon": "./assets/icon.png",
-        "userInterfaceStyle": "light",
-        "newArchEnabled": true,
-        "splash": {
-            "image": "./assets/splash-icon.png",
-            "resizeMode": "contain",
-            "backgroundColor": "#ffffff"
-        },
-        "ios": {
-            "supportsTablet": true,
-            "bundleIdentifier": "com.yourcompany.hoacommunityapp",
-            "buildNumber": "1",
-            "infoPlist": {
-                "UIBackgroundModes": ["background-fetch", "remote-notification"]
-            }
-        },
-        "android": {
-            "package": "com.yourcompany.hoacommunityapp",
-            "versionCode": 1,
-            "adaptiveIcon": {
-                "foregroundImage": "./assets/adaptive-icon.png",
-                "backgroundColor": "#ffffff"
-            },
-            "edgeToEdgeEnabled": true,
-            "permissions": [
-                "android.permission.RECEIVE_BOOT_COMPLETED",
-                "android.permission.VIBRATE",
-                "android.permission.WAKE_LOCK"
-            ]
-        },
-        "web": {
-            "favicon": "./assets/favicon.jpg"
-        },
-        "experiments": {
-            "typedRoutes": true,
-            "baseUrl": "/hoa-community-app"
-        },
-        "extra": {
-            "convexUrl": "${EXPO_PUBLIC_CONVEX_URL}",
-            "eas": {
-                "projectId": "a30576d8-ca43-4d96-8957-d6080ae9076d"
-            }
-        },
-        "plugins": [
-            "expo-router",
-            [
-                "expo-notifications",
-                {
-                    "icon": "./assets/icon.png",
-                    "color": "#ffffff",
-                    "defaultChannel": "default"
-                }
-            ]
-        ]
-    }
+  "expo": {
+    "name": "HOA Community",
+    "slug": "hoa-community-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "hoa-community-app",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourcompany.hoacommunityapp",
+      "buildNumber": "1",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "background-fetch",
+          "remote-notification",
+          "background-fetch",
+          "remote-notification"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.yourcompany.hoacommunityapp",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK"
+      ]
+    },
+    "web": {
+      "output": "server",
+      "favicon": "./assets/favicon.jpg"
+    },
+    "experiments": {
+      "typedRoutes": true,
+      "baseUrl": "/hoa-community-app"
+    },
+    "extra": {
+      "convexUrl": "${EXPO_PUBLIC_CONVEX_URL}",
+      "eas": {
+        "projectId": "a30576d8-ca43-4d96-8957-d6080ae9076d"
+      }
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "origin": "https://ruben-jim.github.io/hoa-community-app"
+        }
+      ],
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.hoacommunityapp",
+          "publishableKey": "${EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY}"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#ffffff",
+          "defaultChannel": "default"
+        }
+      ]
+    ]
+  }
 }

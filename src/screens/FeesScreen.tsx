@@ -10,21 +10,34 @@ import {
   Animated,
   Dimensions,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
+import { usePayments } from '../hooks/usePayments';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import DeveloperIndicator from '../components/DeveloperIndicator';
 import CustomTabBar from '../components/CustomTabBar';
 import MobileTabBar from '../components/MobileTabBar';
+import { Id } from '../../convex/_generated/dataModel';
 
 const FeesScreen = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'fees' | 'fines'>('fees');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  
+  // Payment hook
+  const { 
+    paymentState, 
+    payments, 
+    paymentStats, 
+    processFeePayment, 
+    processFinePayment, 
+    resetPaymentState 
+  } = usePayments();
 
   // State for dynamic responsive behavior (only for web/desktop)
   const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
@@ -66,11 +79,7 @@ const FeesScreen = () => {
           // Force a layout update
           scrollViewRef.current.scrollTo({ y: 0, animated: false });
           
-          // Debug: Log scroll view properties
-          console.log('FeesScreen ScrollView initialized for web');
-          console.log('Screen width:', screenWidth);
-          console.log('Show mobile nav:', showMobileNav);
-          console.log('Show desktop nav:', showDesktopNav);
+          // ScrollView initialized for web
         }
       }, 100);
       
@@ -142,152 +151,80 @@ const FeesScreen = () => {
     }
   };
 
-  const handlePayment = (item: any, type: 'fee' | 'fine') => {
+  const handlePayment = async (item: any, type: 'fee' | 'fine') => {
+    if (!user) {
+      Alert.alert('Error', 'You must be logged in to make payments.');
+      return;
+    }
+
+    const itemName = type === 'fee' ? item.name : item.violation;
+    const description = `Payment for ${itemName} - ${type === 'fee' ? 'HOA Fee' : 'Violation Fine'}`;
+
     Alert.alert(
       `Pay ${type === 'fee' ? 'Fee' : 'Fine'}`,
-      `Would you like to pay ${formatCurrency(item.amount)} for ${type === 'fee' ? item.name : item.violation}?`,
+      `Would you like to pay ${formatCurrency(item.amount)} for ${itemName}?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Pay Now', onPress: () => Alert.alert('Payment', 'Payment processing would be integrated here.') }
+        { 
+          text: 'Pay Now', 
+          onPress: async () => {
+            try {
+              resetPaymentState();
+              
+              if (type === 'fee') {
+                await processFeePayment(
+                  item._id as Id<"fees">,
+                  item.amount,
+                  description
+                );
+              } else {
+                await processFinePayment(
+                  item._id as Id<"fines">,
+                  item.amount,
+                  description
+                );
+              }
+
+              if (paymentState.success) {
+                Alert.alert(
+                  'Payment Successful', 
+                  `Your payment of ${formatCurrency(item.amount)} has been processed successfully.`
+                );
+              } else if (paymentState.error) {
+                Alert.alert('Payment Failed', paymentState.error);
+              }
+            } catch (error) {
+              console.error('Payment error:', error);
+              Alert.alert(
+                'Payment Error', 
+                'An error occurred while processing your payment. Please try again.'
+              );
+            }
+          }
+        }
       ]
     );
   };
 
-  // 🚧 MOCK DATA FOR DEMONSTRATION 🚧
-  // This shows what the FeesScreen will look like with real data
-  // Replace with actual Convex queries when ready:
-  // const fees = useQuery(api.fees.getAll) ?? [];
-  // const fines = useQuery(api.fines.getAll) ?? [];
+  // Dynamic data queries
+  const fees = useQuery(
+    api.fees.getByResident,
+    user ? { residentId: user._id as Id<"residents"> } : "skip"
+  ) ?? [];
   
-  const mockFees = [
-    {
-      _id: 'mock-fee-1',
-      name: 'Monthly HOA Dues',
-      amount: 250,
-      frequency: 'Monthly',
-      dueDate: '2024-08-01',
-      description: 'Standard monthly HOA assessment for maintenance and services',
-      isLate: false,
-    },
-    {
-      _id: 'mock-fee-2',
-      name: 'Landscape Maintenance',
-      amount: 75,
-      frequency: 'Monthly',
-      dueDate: '2024-08-01',
-      description: 'Front yard maintenance and irrigation service',
-      isLate: false,
-    },
-    {
-      _id: 'mock-fee-3',
-      name: 'Annual Assessment',
-      amount: 500,
-      frequency: 'Annually',
-      dueDate: '2024-12-31',
-      description: 'Annual capital improvement fund for community projects',
-      isLate: false,
-    },
-    {
-      _id: 'mock-fee-4',
-      name: 'Trash Collection',
-      amount: 35,
-      frequency: 'Monthly',
-      dueDate: '2024-08-15',
-      description: 'Monthly trash and recycling collection service',
-      isLate: true,
-    },
-    {
-      _id: 'mock-fee-5',
-      name: 'Pool Maintenance',
-      amount: 120,
-      frequency: 'Monthly',
-      dueDate: '2024-08-01',
-      description: 'Community pool maintenance, cleaning, and chemical treatment',
-      isLate: false,
-    },
-    {
-      _id: 'mock-fee-6',
-      name: 'Security Service',
-      amount: 45,
-      frequency: 'Monthly',
-      dueDate: '2024-08-01',
-      description: 'Night security patrol and gate monitoring',
-      isLate: false,
-    }
-  ];
+  const fines = useQuery(
+    api.fines.getAll,
+    {}
+  ) ?? [];
 
-  const mockFines = [
-    {
-      _id: 'mock-fine-1',
-      violation: 'Unauthorized Parking',
-      amount: 50,
-      dateIssued: '2024-07-15',
-      dueDate: '2024-08-15',
-      status: 'Pending',
-      description: 'Vehicle parked on street overnight without permit',
-    },
-    {
-      _id: 'mock-fine-2',
-      violation: 'Landscaping Violation',
-      amount: 100,
-      dateIssued: '2024-07-10',
-      dueDate: '2024-08-10',
-      status: 'Paid',
-      description: 'Unapproved plants in front yard - not in compliance with HOA guidelines',
-    },
-    {
-      _id: 'mock-fine-3',
-      violation: 'Noise Complaint',
-      amount: 75,
-      dateIssued: '2024-07-20',
-      dueDate: '2024-08-20',
-      status: 'Overdue',
-      description: 'Excessive noise after 10 PM - multiple neighbor complaints',
-    },
-    {
-      _id: 'mock-fine-4',
-      violation: 'Pet Violation',
-      amount: 25,
-      dateIssued: '2024-07-25',
-      dueDate: '2024-08-25',
-      status: 'Pending',
-      description: 'Dog off leash in common areas - first offense',
-    },
-    {
-      _id: 'mock-fine-5',
-      violation: 'Garbage Violation',
-      amount: 40,
-      dateIssued: '2024-07-05',
-      dueDate: '2024-08-05',
-      status: 'Paid',
-      description: 'Garbage cans left out past collection day',
-    },
-    {
-      _id: 'mock-fine-6',
-      violation: 'Exterior Modification',
-      amount: 150,
-      dateIssued: '2024-07-12',
-      dueDate: '2024-08-12',
-      status: 'Overdue',
-      description: 'Exterior paint color change without HOA approval',
-    },
-    {
-      _id: 'mock-fine-7',
-      violation: 'Holiday Decorations',
-      amount: 30,
-      dateIssued: '2024-07-30',
-      dueDate: '2024-08-30',
-      status: 'Pending',
-      description: 'Holiday decorations left up past allowed timeframe',
-    }
-  ];
-
-  // Use mock data for demonstration
-  const fees = mockFees;
-  const fines = mockFines;
+  // Filter fines for current user
+  const userFines = fines.filter((fine: any) => fine.residentId === user?._id);
+  
+  // Calculate totals
   const totalFees = fees.reduce((sum: number, fee: any) => sum + fee.amount, 0);
-  const totalFines = fines.reduce((sum: number, fine: any) => sum + fine.amount, 0);
-  const overdueFines = fines.filter((fine: any) => fine.status === 'Overdue').reduce((sum: number, fine: any) => sum + fine.amount, 0);
+  const totalFines = userFines.reduce((sum: number, fine: any) => sum + fine.amount, 0);
+  const overdueFines = userFines.filter((fine: any) => fine.status === 'Overdue').reduce((sum: number, fine: any) => sum + fine.amount, 0);
+  const unpaidFees = fees.filter((fee: any) => !fee.isPaid).reduce((sum: number, fee: any) => sum + fee.amount, 0);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -324,9 +261,6 @@ const FeesScreen = () => {
               <View style={styles.headerLeft}>
                 <View style={styles.titleContainer}>
                   <Text style={styles.headerTitle}>Fees & Fines</Text>
-                  <View style={styles.demoBadge}>
-                    <Text style={styles.demoBadgeText}>DEMO DATA</Text>
-                  </View>
                   <DeveloperIndicator />
                   <BoardMemberIndicator />
                 </View>
@@ -398,15 +332,15 @@ const FeesScreen = () => {
         ]}>
           <View style={styles.summaryContainer}>
             <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>Total Fees</Text>
-              <Text style={styles.summaryAmount}>{formatCurrency(totalFees)}</Text>
-              <Text style={styles.summarySubtext}>{fees.length} active fees</Text>
+              <Text style={styles.summaryLabel}>Unpaid Fees</Text>
+              <Text style={styles.summaryAmount}>{formatCurrency(unpaidFees)}</Text>
+              <Text style={styles.summarySubtext}>{fees.filter((fee: any) => !fee.isPaid).length} unpaid fees</Text>
             </View>
             
             <View style={styles.summaryCard}>
               <Text style={styles.summaryLabel}>Total Fines</Text>
               <Text style={styles.summaryAmount}>{formatCurrency(totalFines)}</Text>
-              <Text style={styles.summarySubtext}>{fines.length} violations</Text>
+              <Text style={styles.summarySubtext}>{userFines.length} violations</Text>
             </View>
             
             {overdueFines > 0 && (
@@ -443,7 +377,7 @@ const FeesScreen = () => {
                 color={activeTab === 'fees' ? '#2563eb' : '#6b7280'} 
               />
               <Text style={[styles.tabText, activeTab === 'fees' && styles.activeTabText]}>
-                Fees ({fees.length})
+                Fees ({fees.filter((fee: any) => !fee.isPaid).length})
               </Text>
             </TouchableOpacity>
             
@@ -457,7 +391,7 @@ const FeesScreen = () => {
                 color={activeTab === 'fines' ? '#2563eb' : '#6b7280'} 
               />
               <Text style={[styles.tabText, activeTab === 'fines' && styles.activeTabText]}>
-                Fines ({fines.length})
+                Fines ({userFines.length})
               </Text>
             </TouchableOpacity>
           </View>
@@ -479,53 +413,75 @@ const FeesScreen = () => {
           {activeTab === 'fees' ? (
             <View>
               <Text style={styles.sectionTitle}>HOA Fees</Text>
-              {fees.map((fee: any) => (
-                <View key={fee._id} style={styles.itemCard}>
-                  <View style={styles.itemHeader}>
-                    <View style={styles.itemInfo}>
-                      <Text style={styles.itemTitle}>{fee.name}</Text>
-                      <Text style={styles.itemDescription}>{fee.description}</Text>
-                      <Text style={styles.itemFrequency}>{fee.frequency}</Text>
-                    </View>
-                    <View style={styles.itemAmount}>
-                      <Text style={styles.amountText}>{formatCurrency(fee.amount)}</Text>
-                      <Text style={styles.dueDate}>Due: {formatDate(fee.dueDate)}</Text>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.itemFooter}>
-                    <View style={styles.statusContainer}>
-                      <Ionicons 
-                        name={fee.isLate ? "warning" : "checkmark-circle"} 
-                        size={16} 
-                        color={fee.isLate ? "#ef4444" : "#10b981"} 
-                      />
-                      <Text style={[styles.statusText, { color: fee.isLate ? "#ef4444" : "#10b981" }]}>
-                        {fee.isLate ? 'Late' : 'Current'}
-                      </Text>
+              {fees.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="checkmark-circle" size={48} color="#10b981" />
+                  <Text style={styles.emptyStateText}>No fees found</Text>
+                  <Text style={styles.emptyStateSubtext}>All caught up!</Text>
+                </View>
+              ) : (
+                fees.map((fee: any) => (
+                  <View key={fee._id} style={styles.itemCard}>
+                    <View style={styles.itemHeader}>
+                      <View style={styles.itemInfo}>
+                        <Text style={styles.itemTitle}>{fee.name}</Text>
+                        <Text style={styles.itemDescription}>{fee.description}</Text>
+                        <Text style={styles.itemFrequency}>{fee.frequency}</Text>
+                      </View>
+                      <View style={styles.itemAmount}>
+                        <Text style={styles.amountText}>{formatCurrency(fee.amount)}</Text>
+                        <Text style={styles.dueDate}>Due: {formatDate(fee.dueDate)}</Text>
+                      </View>
                     </View>
                     
-                    <TouchableOpacity
-                      style={styles.payButton}
-                      onPress={() => handlePayment(fee, 'fee')}
-                    >
-                      <Text style={styles.payButtonText}>Pay Now</Text>
-                    </TouchableOpacity>
+                    <View style={styles.itemFooter}>
+                      <View style={styles.statusContainer}>
+                        <Ionicons 
+                          name={fee.isPaid ? "checkmark-circle" : (fee.isLate ? "warning" : "time")} 
+                          size={16} 
+                          color={fee.isPaid ? "#10b981" : (fee.isLate ? "#ef4444" : "#f59e0b")} 
+                        />
+                        <Text style={[styles.statusText, { 
+                          color: fee.isPaid ? "#10b981" : (fee.isLate ? "#ef4444" : "#f59e0b") 
+                        }]}>
+                          {fee.isPaid ? 'Paid' : (fee.isLate ? 'Overdue' : 'Pending')}
+                        </Text>
+                        {fee.isPaid && fee.paidAt && (
+                          <Text style={styles.paidDate}>
+                            Paid: {formatDate(new Date(fee.paidAt).toISOString())}
+                          </Text>
+                        )}
+                      </View>
+                      
+                      {!fee.isPaid && (
+                        <TouchableOpacity
+                          style={[styles.payButton, paymentState.isProcessing && styles.payButtonDisabled]}
+                          onPress={() => handlePayment(fee, 'fee')}
+                          disabled={paymentState.isProcessing}
+                        >
+                          {paymentState.isProcessing ? (
+                            <ActivityIndicator size="small" color="#ffffff" />
+                          ) : (
+                            <Text style={styles.payButtonText}>Pay Now</Text>
+                          )}
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
-                </View>
-              ))}
+                ))
+              )}
             </View>
           ) : (
             <View>
               <Text style={styles.sectionTitle}>Violations & Fines</Text>
-              {fines.length === 0 ? (
+              {userFines.length === 0 ? (
                 <View style={styles.emptyState}>
                   <Ionicons name="checkmark-circle" size={48} color="#10b981" />
                   <Text style={styles.emptyStateText}>No violations found</Text>
                   <Text style={styles.emptyStateSubtext}>Keep up the good work!</Text>
                 </View>
               ) : (
-                fines.map((fine: any) => (
+                userFines.map((fine: any) => (
                   <View key={fine._id} style={styles.itemCard}>
                     <View style={styles.itemHeader}>
                       <View style={styles.itemInfo}>
@@ -553,10 +509,15 @@ const FeesScreen = () => {
                       
                       {fine.status !== 'Paid' && (
                         <TouchableOpacity
-                          style={styles.payButton}
+                          style={[styles.payButton, paymentState.isProcessing && styles.payButtonDisabled]}
                           onPress={() => handlePayment(fine, 'fine')}
+                          disabled={paymentState.isProcessing}
                         >
-                          <Text style={styles.payButtonText}>Pay Now</Text>
+                          {paymentState.isProcessing ? (
+                            <ActivityIndicator size="small" color="#ffffff" />
+                          ) : (
+                            <Text style={styles.payButtonText}>Pay Now</Text>
+                          )}
                         </TouchableOpacity>
                       )}
                     </View>
@@ -908,6 +869,14 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '600',
+  },
+  payButtonDisabled: {
+    opacity: 0.6,
+  },
+  paidDate: {
+    fontSize: 10,
+    color: '#9ca3af',
+    marginTop: 2,
   },
   infoText: {
     fontSize: 14,
