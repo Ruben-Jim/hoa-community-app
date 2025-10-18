@@ -89,6 +89,24 @@ const FeesScreen = () => {
     }
   }, [screenWidth, showMobileNav, showDesktopNav]);
 
+  // Load Stripe buy button script (web only)
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const script = document.createElement('script');
+      script.src = 'https://js.stripe.com/v3/buy-button.js';
+      script.async = true;
+      document.head.appendChild(script);
+
+      return () => {
+        // Cleanup script on unmount
+        const existingScript = document.querySelector('script[src="https://js.stripe.com/v3/buy-button.js"]');
+        if (existingScript) {
+          document.head.removeChild(existingScript);
+        }
+      };
+    }
+  }, []);
+
   // Animation functions
   const animateStaggeredContent = () => {
     Animated.stagger(200, [
@@ -554,6 +572,24 @@ const FeesScreen = () => {
           <Text style={styles.infoText}>
             • For payment questions, contact the treasurer
           </Text>
+          
+          {/* Stripe Buy Button - Web Only */}
+          {Platform.OS === 'web' && (
+            <View style={styles.stripeButtonContainer}>
+              <Text style={styles.stripeButtonLabel}>Quick Payment</Text>
+              <div 
+                style={styles.stripeBuyButton}
+                dangerouslySetInnerHTML={{
+                  __html: `
+                    <stripe-buy-button
+                      buy-button-id="buy_btn_1SJiY9LDGfYmHnW7N87xGnmo"
+                      publishable-key="pk_live_51RmkEpLDGfYmHnW7nIvibKQRIwmYPwWFObKKQ8uqNVMsgSjkPK0e8bKnh196YfpegHhcLOi4CaKJjF3qZWScRWrP00EH6Tq5Pf"
+                    ></stripe-buy-button>
+                  `
+                }}
+              />
+            </View>
+          )}
         </Animated.View>
         
         {/* Additional content to ensure scrollable content */}
@@ -883,6 +919,25 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     lineHeight: 20,
     marginBottom: 6,
+  },
+  stripeButtonContainer: {
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    alignItems: 'center',
+  },
+  stripeButtonLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 12,
+  },
+  stripeBuyButton: {
+    width: '100%',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
