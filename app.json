@@ -42,7 +42,6 @@
       ]
     },
     "web": {
-      "output": "server",
       "favicon": "./assets/favicon.jpg"
     },
     "experiments": {
