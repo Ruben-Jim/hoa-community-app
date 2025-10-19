@@ -53,28 +53,6 @@ const AdminScreen = () => {
     }
   }, []);
 
-  // Set initial cursor and cleanup on unmount (web only)
-  useEffect(() => {
-    if (Platform.OS === 'web') {
-      // Set initial cursor
-      document.body.style.cursor = 'grab';
-      
-      // Ensure scroll view is properly initialized
-      setTimeout(() => {
-        if (scrollViewRef.current) {
-          // Force a layout update
-          scrollViewRef.current.scrollTo({ y: 0, animated: false });
-          
-          // ScrollView initialized for web
-        }
-      }, 100);
-      
-      return () => {
-        document.body.style.cursor = 'default';
-      };
-    }
-  }, [screenWidth, showMobileNav, showDesktopNav]);
-
   // Data queries
   const residents = useQuery(api.residents.getAll) ?? [];
   const boardMembers = useQuery(api.boardMembers.getAll) ?? [];
@@ -82,6 +60,7 @@ const AdminScreen = () => {
   const communityPosts = useQuery(api.communityPosts.getAll) ?? [];
   const comments = useQuery(api.communityPosts.getAllComments) ?? [];
   const emergencyAlerts = useQuery(api.emergencyNotifications.getAll) ?? [];
+  const homeownersPaymentStatus = useQuery(api.fees.getAllHomeownersPaymentStatus) ?? [];
   
   // Mutations
   const setBlockStatus = useMutation(api.residents.setBlockStatus);
@@ -95,12 +74,6 @@ const AdminScreen = () => {
   const createEmergencyAlert = useMutation(api.emergencyNotifications.create);
   const updateEmergencyAlert = useMutation(api.emergencyNotifications.update);
   const deleteEmergencyAlert = useMutation(api.emergencyNotifications.remove);
-  
-  // Fee management mutations
-  const createYearlyHOAFee = useMutation(api.fees.createYearlyHOAFee);
-  const createCurrentYearHOAFee = useMutation(api.fees.createCurrentYearHOAFee);
-  const remove = useMutation(api.fees.remove);
-  const getAllYearlyFees = useQuery(api.fees.getAllYearlyFees);
   
   // State
   const [refreshing, setRefreshing] = useState(false);
@@ -137,15 +110,6 @@ const AdminScreen = () => {
     isActive: true,
   });
 
-  // Yearly fee management state
-  const [showYearlyFeeModal, setShowYearlyFeeModal] = useState(false);
-  const [yearlyFeeForm, setYearlyFeeForm] = useState({
-    year: new Date().getFullYear(),
-    amount: 300,
-  });
-  const [isCreatingFees, setIsCreatingFees] = useState(false);
-  const [isDeletingFees, setIsDeletingFees] = useState(false);
-
   // Animation values
   const blockModalOpacity = useRef(new Animated.Value(0)).current;
   const blockModalTranslateY = useRef(new Animated.Value(300)).current;
@@ -155,74 +119,65 @@ const AdminScreen = () => {
   const boardMemberModalTranslateY = useRef(new Animated.Value(300)).current;
   const emergencyModalOpacity = useRef(new Animated.Value(0)).current;
   const emergencyModalTranslateY = useRef(new Animated.Value(300)).current;
-  const yearlyFeeModalOpacity = useRef(new Animated.Value(0)).current;
-  const yearlyFeeModalTranslateY = useRef(new Animated.Value(300)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current; // Start at 0 for individual item animations
-  
-  // ScrollView ref for better control
-  const scrollViewRef = useRef<ScrollView>(null);
 
   // Check if current user is a board member
   const isBoardMember = user?.isBoardMember && user?.isActive;
 
   // Modern animation functions
-  const animateIn = (modalType: 'block' | 'delete' | 'boardMember' | 'emergency' | 'yearlyFee') => {
+  const animateIn = (modalType: 'block' | 'delete' | 'boardMember' | 'emergency') => {
     const opacity = modalType === 'block' ? blockModalOpacity : 
                    modalType === 'delete' ? deleteModalOpacity :
-                   modalType === 'boardMember' ? boardMemberModalOpacity : 
-                   modalType === 'emergency' ? emergencyModalOpacity : yearlyFeeModalOpacity;
+                   modalType === 'boardMember' ? boardMemberModalOpacity : emergencyModalOpacity;
     const translateY = modalType === 'block' ? blockModalTranslateY : 
                       modalType === 'delete' ? deleteModalTranslateY :
-                      modalType === 'boardMember' ? boardMemberModalTranslateY : 
-                      modalType === 'emergency' ? emergencyModalTranslateY : yearlyFeeModalTranslateY;
+                      modalType === 'boardMember' ? boardMemberModalTranslateY : emergencyModalTranslateY;
     
     Animated.parallel([
       Animated.timing(overlayOpacity, {
         toValue: 1,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(opacity, {
         toValue: 1,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.spring(translateY, {
         toValue: 0,
         tension: 100,
         friction: 8,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
   };
 
-  const animateOut = (modalType: 'block' | 'delete' | 'boardMember' | 'emergency' | 'yearlyFee', callback: () => void) => {
+  const animateOut = (modalType: 'block' | 'delete' | 'boardMember' | 'emergency', callback: () => void) => {
     const opacity = modalType === 'block' ? blockModalOpacity : 
                    modalType === 'delete' ? deleteModalOpacity :
-                   modalType === 'boardMember' ? boardMemberModalOpacity : 
-                   modalType === 'emergency' ? emergencyModalOpacity : yearlyFeeModalOpacity;
+                   modalType === 'boardMember' ? boardMemberModalOpacity : emergencyModalOpacity;
     const translateY = modalType === 'block' ? blockModalTranslateY : 
                       modalType === 'delete' ? deleteModalTranslateY :
-                      modalType === 'boardMember' ? boardMemberModalTranslateY : 
-                      modalType === 'emergency' ? emergencyModalTranslateY : yearlyFeeModalTranslateY;
+                      modalType === 'boardMember' ? boardMemberModalTranslateY : emergencyModalTranslateY;
     
     Animated.parallel([
       Animated.timing(overlayOpacity, {
         toValue: 0,
         duration: 250,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(opacity, {
         toValue: 0,
         duration: 250,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(translateY, {
         toValue: 300,
         duration: 250,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start(() => {
       callback();
@@ -234,12 +189,12 @@ const AdminScreen = () => {
       Animated.timing(buttonScale, {
         toValue: 0.95,
         duration: 100,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(buttonScale, {
         toValue: 1,
         duration: 100,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
   };
@@ -248,7 +203,7 @@ const AdminScreen = () => {
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 600,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   };
 
@@ -258,7 +213,7 @@ const AdminScreen = () => {
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 600,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   }, []);
 
@@ -539,88 +494,6 @@ const AdminScreen = () => {
     });
   };
 
-  // Yearly fee management handlers
-  const handleCreateYearlyFees = async () => {
-    if (!yearlyFeeForm.year || !yearlyFeeForm.amount || yearlyFeeForm.amount <= 0) {
-      Alert.alert('Error', 'Please enter a valid year and amount.');
-      return;
-    }
-
-    setIsCreatingFees(true);
-    try {
-      const result = await createYearlyHOAFee({
-        year: yearlyFeeForm.year,
-        amount: yearlyFeeForm.amount,
-      });
-
-      if (result.success) {
-        Alert.alert(
-          'Success', 
-          `Created yearly HOA fees for ${result.residentCount} residents.\nTotal amount: $${result.totalAmount}`
-        );
-        animateOut('yearlyFee', () => {
-          setShowYearlyFeeModal(false);
-          setYearlyFeeForm({
-            year: new Date().getFullYear(),
-            amount: 300,
-          });
-        });
-      } else {
-        Alert.alert('Error', 'Failed to create yearly fees.');
-      }
-    } catch (error) {
-      console.error('Error creating yearly fees:', error);
-      Alert.alert('Error', 'Failed to create yearly fees. Please try again.');
-    } finally {
-      setIsCreatingFees(false);
-    }
-  };
-
-  const handleCreateCurrentYearFees = async () => {
-    setIsCreatingFees(true);
-    try {
-      const result = await createCurrentYearHOAFee();
-      
-      if (result.success) {
-        Alert.alert(
-          'Success', 
-          `Created ${new Date().getFullYear()} HOA fees for ${result.residentCount} residents.\nTotal amount: $${result.totalAmount}`
-        );
-      } else {
-        Alert.alert('Error', 'Failed to create current year fees.');
-      }
-    } catch (error) {
-      console.error('Error creating current year fees:', error);
-      Alert.alert('Error', 'Failed to create current year fees. Please try again.');
-    } finally {
-      setIsCreatingFees(false);
-    }
-  };
-
-  const handleCancelYearlyFee = () => {
-    animateOut('yearlyFee', () => {
-      setShowYearlyFeeModal(false);
-      setYearlyFeeForm({
-        year: new Date().getFullYear(),
-        amount: 300,
-      });
-    });
-  };
-
-  // Delete individual fee handler
-  const handleDeleteFee = async (feeId: string) => {
-    setIsDeletingFees(true);
-    try {
-      await remove({ id: feeId as any });
-      Alert.alert('Success', 'Fee deleted successfully.');
-    } catch (error) {
-      console.error('Error deleting fee:', error);
-      Alert.alert('Error', 'Failed to delete fee. Please try again.');
-    } finally {
-      setIsDeletingFees(false);
-    }
-  };
-
   // Image upload functions
   const pickImage = async () => {
     try {
@@ -713,83 +586,81 @@ const AdminScreen = () => {
     switch (activeTab) {
       case 'residents':
         return (
-          <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={true} persistentScrollbar={true}>
-            <FlatList
-              data={residents}
-              keyExtractor={(item) => item._id}
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-              }
-              renderItem={({ item }) => (
-                <Animated.View 
-                  style={[
-                    styles.tableRow,
-                    {
-                      opacity: fadeAnim,
-                      transform: [{
-                        translateY: fadeAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [50, 0],
-                        })
-                      }]
-                    }
-                  ]}
-                >
-                  <View style={styles.rowContent}>
-                    <View style={styles.residentHeader}>
-                      <View style={styles.profileImageContainer}>
-                        {item.profileImage ? (
-                          <Image source={{ uri: item.profileImage }} style={styles.profileImage} />
-                        ) : (
-                          <View style={styles.profileImagePlaceholder}>
-                            <Ionicons name="person" size={20} color="#9ca3af" />
+          <FlatList
+            data={residents}
+            keyExtractor={(item) => item._id}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+            }
+            renderItem={({ item }) => (
+              <Animated.View 
+                style={[
+                  styles.tableRow,
+                  {
+                    opacity: fadeAnim,
+                    transform: [{
+                      translateY: fadeAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [50, 0],
+                      })
+                    }]
+                  }
+                ]}
+              >
+                <View style={styles.rowContent}>
+                  <View style={styles.residentHeader}>
+                    <View style={styles.profileImageContainer}>
+                      {item.profileImage ? (
+                        <Image source={{ uri: item.profileImage }} style={styles.profileImage} />
+                      ) : (
+                        <View style={styles.profileImagePlaceholder}>
+                          <Ionicons name="person" size={20} color="#9ca3af" />
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.residentInfo}>
+                      <Text style={styles.rowTitle}>{item.firstName} {item.lastName}</Text>
+                      <Text style={styles.rowSubtitle}>{item.email}</Text>
+                      <View style={styles.badges}>
+                        {item.isBoardMember && (
+                          <View style={styles.boardMemberBadge}>
+                            <Text style={styles.badgeText}>Board</Text>
+                          </View>
+                        )}
+                        {item.isBlocked && (
+                          <View style={styles.blockedBadge}>
+                            <Text style={styles.badgeText}>Blocked</Text>
                           </View>
                         )}
                       </View>
-                      <View style={styles.residentInfo}>
-                        <Text style={styles.rowTitle}>{item.firstName} {item.lastName}</Text>
-                        <Text style={styles.rowSubtitle}>{item.email}</Text>
-                        <View style={styles.badges}>
-                          {item.isBoardMember && (
-                            <View style={styles.boardMemberBadge}>
-                              <Text style={styles.badgeText}>Board</Text>
-                            </View>
-                          )}
-                          {item.isBlocked && (
-                            <View style={styles.blockedBadge}>
-                              <Text style={styles.badgeText}>Blocked</Text>
-                            </View>
-                          )}
-                        </View>
-                      </View>
                     </View>
                   </View>
-                  <View style={styles.rowActions}>
-                    {item.isBlocked ? (
-                      <TouchableOpacity
-                        style={styles.actionButton}
-                        onPress={() => handleUnblockResident(item)}
-                      >
-                        <Ionicons name="checkmark-circle" size={20} color="#10b981" />
-                      </TouchableOpacity>
-                    ) : (
-                      <TouchableOpacity
-                        style={styles.actionButton}
-                        onPress={() => handleBlockResident(item)}
-                      >
-                        <Ionicons name="ban" size={20} color="#ef4444" />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </Animated.View>
-              )}
-            />
-          </ScrollView>
+                </View>
+                <View style={styles.rowActions}>
+                  {item.isBlocked ? (
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => handleUnblockResident(item)}
+                    >
+                      <Ionicons name="checkmark-circle" size={20} color="#10b981" />
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => handleBlockResident(item)}
+                    >
+                      <Ionicons name="ban" size={20} color="#ef4444" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </Animated.View>
+            )}
+          />
         );
       
       case 'board':
         return (
-          <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={true} persistentScrollbar={true}>
+          <View style={styles.tabContent}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Board Members</Text>
               <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
@@ -870,143 +741,137 @@ const AdminScreen = () => {
                 </Animated.View>
               )}
             />
-          </ScrollView>
+          </View>
         );
       
       case 'covenants':
         return (
-          <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={true} persistentScrollbar={true}>
-            <FlatList
-              data={covenants}
-              keyExtractor={(item) => item._id}
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-              }
-              renderItem={({ item }) => (
-                <Animated.View 
-                  style={[
-                    styles.tableRow,
-                    {
-                      opacity: fadeAnim,
-                      transform: [{
-                        translateY: fadeAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [50, 0],
-                        })
-                      }]
-                    }
-                  ]}
-                >
-                  <View style={styles.rowContent}>
-                    <Text style={styles.rowTitle}>{item.title}</Text>
-                    <Text style={styles.rowSubtitle}>{item.category}</Text>
-                    <Text style={styles.rowDetail} numberOfLines={2}>{item.description}</Text>
-                  </View>
-                  <View style={styles.rowActions}>
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={() => handleDeleteItem(item, 'covenant')}
-                    >
-                      <Ionicons name="trash" size={20} color="#ef4444" />
-                    </TouchableOpacity>
-                  </View>
-                </Animated.View>
-              )}
-            />
-          </ScrollView>
+          <FlatList
+            data={covenants}
+            keyExtractor={(item) => item._id}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+            }
+            renderItem={({ item }) => (
+              <Animated.View 
+                style={[
+                  styles.tableRow,
+                  {
+                    opacity: fadeAnim,
+                    transform: [{
+                      translateY: fadeAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [50, 0],
+                      })
+                    }]
+                  }
+                ]}
+              >
+                <View style={styles.rowContent}>
+                  <Text style={styles.rowTitle}>{item.title}</Text>
+                  <Text style={styles.rowSubtitle}>{item.category}</Text>
+                  <Text style={styles.rowDetail} numberOfLines={2}>{item.description}</Text>
+                </View>
+                <View style={styles.rowActions}>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => handleDeleteItem(item, 'covenant')}
+                  >
+                    <Ionicons name="trash" size={20} color="#ef4444" />
+                  </TouchableOpacity>
+                </View>
+              </Animated.View>
+            )}
+          />
         );
       
       case 'posts':
         return (
-          <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={true} persistentScrollbar={true}>
-            <FlatList
-              data={communityPosts}
-              keyExtractor={(item) => item._id}
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-              }
-              renderItem={({ item }) => (
-                <Animated.View 
-                  style={[
-                    styles.tableRow,
-                    {
-                      opacity: fadeAnim,
-                      transform: [{
-                        translateY: fadeAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [50, 0],
-                        })
-                      }]
-                    }
-                  ]}
-                >
-                  <View style={styles.rowContent}>
-                    <Text style={styles.rowTitle}>{item.title}</Text>
-                    <Text style={styles.rowSubtitle}>By: {item.author}</Text>
-                    <Text style={styles.rowDetail} numberOfLines={2}>{item.content}</Text>
-                    <Text style={styles.rowDate}>{formatDate(item.createdAt)}</Text>
-                  </View>
-                  <View style={styles.rowActions}>
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={() => handleDeleteItem(item, 'post')}
-                    >
-                      <Ionicons name="trash" size={20} color="#ef4444" />
-                    </TouchableOpacity>
-                  </View>
-                </Animated.View>
-              )}
-            />
-          </ScrollView>
+          <FlatList
+            data={communityPosts}
+            keyExtractor={(item) => item._id}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+            }
+            renderItem={({ item }) => (
+              <Animated.View 
+                style={[
+                  styles.tableRow,
+                  {
+                    opacity: fadeAnim,
+                    transform: [{
+                      translateY: fadeAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [50, 0],
+                      })
+                    }]
+                  }
+                ]}
+              >
+                <View style={styles.rowContent}>
+                  <Text style={styles.rowTitle}>{item.title}</Text>
+                  <Text style={styles.rowSubtitle}>By: {item.author}</Text>
+                  <Text style={styles.rowDetail} numberOfLines={2}>{item.content}</Text>
+                  <Text style={styles.rowDate}>{formatDate(item.createdAt)}</Text>
+                </View>
+                <View style={styles.rowActions}>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => handleDeleteItem(item, 'post')}
+                  >
+                    <Ionicons name="trash" size={20} color="#ef4444" />
+                  </TouchableOpacity>
+                </View>
+              </Animated.View>
+            )}
+          />
         );
       
       case 'comments':
         return (
-          <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={true} persistentScrollbar={true}>
-            <FlatList
-              data={comments}
-              keyExtractor={(item) => item._id}
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-              }
-              renderItem={({ item }) => (
-                <Animated.View 
-                  style={[
-                    styles.tableRow,
-                    {
-                      opacity: fadeAnim,
-                      transform: [{
-                        translateY: fadeAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [50, 0],
-                        })
-                      }]
-                    }
-                  ]}
-                >
-                  <View style={styles.rowContent}>
-                    <Text style={styles.rowTitle}>Comment by: {item.author}</Text>
-                    <Text style={styles.rowSubtitle}>On: {item.postTitle}</Text>
-                    <Text style={styles.rowDetail} numberOfLines={3}>{item.content}</Text>
-                    <Text style={styles.rowDate}>{formatDate(item.createdAt)}</Text>
-                  </View>
-                  <View style={styles.rowActions}>
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={() => handleDeleteItem(item, 'comment')}
-                    >
-                      <Ionicons name="trash" size={20} color="#ef4444" />
-                    </TouchableOpacity>
-                  </View>
-                </Animated.View>
-              )}
-            />
-          </ScrollView>
+          <FlatList
+            data={comments}
+            keyExtractor={(item) => item._id}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+            }
+            renderItem={({ item }) => (
+              <Animated.View 
+                style={[
+                  styles.tableRow,
+                  {
+                    opacity: fadeAnim,
+                    transform: [{
+                      translateY: fadeAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [50, 0],
+                      })
+                    }]
+                  }
+                ]}
+              >
+                <View style={styles.rowContent}>
+                  <Text style={styles.rowTitle}>Comment by: {item.author}</Text>
+                  <Text style={styles.rowSubtitle}>On: {item.postTitle}</Text>
+                  <Text style={styles.rowDetail} numberOfLines={3}>{item.content}</Text>
+                  <Text style={styles.rowDate}>{formatDate(item.createdAt)}</Text>
+                </View>
+                <View style={styles.rowActions}>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => handleDeleteItem(item, 'comment')}
+                  >
+                    <Ionicons name="trash" size={20} color="#ef4444" />
+                  </TouchableOpacity>
+                </View>
+              </Animated.View>
+            )}
+          />
         );
       
       case 'emergency':
         return (
-          <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={true} persistentScrollbar={true}>
+          <View style={styles.tabContent}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Emergency Alerts</Text>
               <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
@@ -1091,57 +956,48 @@ const AdminScreen = () => {
                 </Animated.View>
               )}
             />
-          </ScrollView>
+          </View>
         );
       
       case 'fees':
         return (
           <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={true} persistentScrollbar={true}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Yearly Fee Management</Text>
-              <View style={styles.feeButtonsContainer}>
-                <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-                  <TouchableOpacity
-                    style={styles.addButton}
-                    onPress={() => {
-                      animateButtonPress();
-                      setShowYearlyFeeModal(true);
-                      animateIn('yearlyFee');
-                    }}
-                  >
-                    <Ionicons name="add" size={20} color="#ffffff" />
-                    <Text style={styles.addButtonText}>Custom Year</Text>
-                  </TouchableOpacity>
-                </Animated.View>
-                <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-                  <TouchableOpacity
-                    style={[styles.addButton, styles.currentYearButton]}
-                    onPress={() => {
-                      animateButtonPress();
-                      handleCreateCurrentYearFees();
-                    }}
-                    disabled={isCreatingFees}
-                  >
-                    <Ionicons name="calendar" size={20} color="#ffffff" />
-                    <Text style={styles.addButtonText}>
-                      {isCreatingFees ? 'Creating...' : `${new Date().getFullYear()} Fees`}
-                    </Text>
-                  </TouchableOpacity>
-                </Animated.View>
+              <Text style={styles.sectionTitle}>Homeowner Fee Status</Text>
+            </View>
+            
+            {/* Fee Statistics */}
+            <View style={styles.feeStatsContainer}>
+              <View style={styles.feeStatCard}>
+                <Text style={styles.feeStatLabel}>Total Homeowners</Text>
+                <Text style={styles.feeStatValue}>{homeownersPaymentStatus.length}</Text>
+              </View>
+              <View style={styles.feeStatCard}>
+                <Text style={styles.feeStatLabel}>Paid</Text>
+                <Text style={[styles.feeStatValue, { color: '#10b981' }]}>
+                  {homeownersPaymentStatus.filter(h => h.hasPaidAnnualFee).length}
+                </Text>
+              </View>
+              <View style={styles.feeStatCard}>
+                <Text style={styles.feeStatLabel}>Pending</Text>
+                <Text style={[styles.feeStatValue, { color: '#f59e0b' }]}>
+                  {homeownersPaymentStatus.filter(h => !h.hasPaidAnnualFee).length}
+                </Text>
               </View>
             </View>
             
-            {/* Yearly Fees List */}
+            {/* Homeowners Fee Status Grid */}
             <FlatList
-              data={getAllYearlyFees || []}
+              data={homeownersPaymentStatus}
               keyExtractor={(item) => item._id}
+              numColumns={2}
               refreshControl={
                 <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
               }
               renderItem={({ item }) => (
                 <Animated.View 
                   style={[
-                    styles.tableRow,
+                    styles.gridCard,
                     {
                       opacity: fadeAnim,
                       transform: [{
@@ -1153,48 +1009,51 @@ const AdminScreen = () => {
                     }
                   ]}
                 >
-                  <View style={styles.rowContent}>
-                    <View style={styles.feeHeader}>
-                      <Text style={styles.rowTitle}>{item.name}</Text>
-                      <Text style={styles.rowSubtitle}>{item.description}</Text>
-                      <View style={styles.feeDetails}>
-                        <Text style={styles.feeAmount}>${item.amount}</Text>
-                        <Text style={styles.feeDueDate}>Due: {item.dueDate}</Text>
-                        <View style={styles.feeStatus}>
-                          <Ionicons 
-                            name={item.isPaid ? "checkmark-circle" : "time"} 
-                            size={16} 
-                            color={item.isPaid ? "#10b981" : "#f59e0b"} 
-                          />
-                          <Text style={[
-                            styles.statusText, 
-                            { color: item.isPaid ? "#10b981" : "#f59e0b" }
-                          ]}>
-                            {item.isPaid ? 'Paid' : 'Unpaid'}
-                          </Text>
-                        </View>
+                  <View style={styles.gridCardContent}>
+                    <View style={styles.gridProfileSection}>
+                      <View style={styles.gridProfileImage}>
+                        {item.profileImage ? (
+                          <Image source={{ uri: item.profileImage }} style={styles.gridProfileImageSrc} />
+                        ) : (
+                          <View style={styles.gridProfilePlaceholder}>
+                            <Text style={styles.gridProfileText}>
+                              {item.firstName.charAt(0)}{item.lastName.charAt(0)}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                      <View style={styles.gridProfileInfo}>
+                        <Text style={styles.gridName} numberOfLines={1}>
+                          {item.firstName} {item.lastName}
+                        </Text>
+                        <Text style={styles.gridRole} numberOfLines={1}>
+                          {item.userType === 'board-member' ? 'Board Member' : 'Homeowner'}
+                        </Text>
+                        <Text style={styles.gridAddress} numberOfLines={1}>
+                          {item.address} {item.unitNumber && `Unit ${item.unitNumber}`}
+                        </Text>
                       </View>
                     </View>
-                    <View style={styles.feeActions}>
-                      <TouchableOpacity
-                        style={styles.deleteFeeButton}
-                        onPress={() => {
-                          Alert.alert(
-                            'Delete Fee',
-                            'Are you sure you want to delete this fee?',
-                            [
-                              { text: 'Cancel', style: 'cancel' },
-                              { 
-                                text: 'Delete', 
-                                style: 'destructive',
-                                onPress: () => handleDeleteFee(item._id)
-                              }
-                            ]
-                          );
-                        }}
-                      >
-                        <Ionicons name="trash" size={16} color="#ef4444" />
-                      </TouchableOpacity>
+                    
+                    <View style={styles.gridFeeSection}>
+                      <Text style={styles.gridFeeAmount}>${item.annualFeeAmount}</Text>
+                      <Text style={styles.gridFeeLabel}>Annual Fee</Text>
+                      <View style={[
+                        styles.gridStatusBadge,
+                        item.hasPaidAnnualFee ? styles.gridPaidBadge : styles.gridPendingBadge
+                      ]}>
+                        <Ionicons 
+                          name={item.hasPaidAnnualFee ? "checkmark-circle" : "time"} 
+                          size={14} 
+                          color={item.hasPaidAnnualFee ? "#10b981" : "#f59e0b"} 
+                        />
+                        <Text style={[
+                          styles.gridStatusText,
+                          { color: item.hasPaidAnnualFee ? "#10b981" : "#f59e0b" }
+                        ]}>
+                          {item.hasPaidAnnualFee ? 'Paid' : 'Pending'}
+                        </Text>
+                      </View>
                     </View>
                   </View>
                 </Animated.View>
@@ -1202,9 +1061,9 @@ const AdminScreen = () => {
               ListEmptyComponent={
                 <View style={styles.emptyState}>
                   <Ionicons name="card" size={48} color="#9ca3af" />
-                  <Text style={styles.emptyStateText}>No yearly fees created yet</Text>
+                  <Text style={styles.emptyStateText}>No homeowners found</Text>
                   <Text style={styles.emptyStateSubtext}>
-                    Create yearly HOA fees for all residents using the buttons above
+                    Homeowners will appear here once they are registered in the system
                   </Text>
                 </View>
               }
@@ -1229,38 +1088,12 @@ const AdminScreen = () => {
         )}
         
         <ScrollView 
-          ref={scrollViewRef}
           style={styles.scrollContainer}
-          contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={true}
-          persistentScrollbar={true}
           bounces={true}
           scrollEnabled={true}
-          alwaysBounceVertical={false}
-          nestedScrollEnabled={true}
-          removeClippedSubviews={false}
-          scrollEventThrottle={16}
-          // Enhanced desktop scrolling
-          decelerationRate="normal"
-          directionalLockEnabled={true}
-          canCancelContentTouches={true}
-          // Web-specific enhancements
-          {...(Platform.OS === 'web' && {
-            onScrollBeginDrag: () => {
-              if (Platform.OS === 'web') {
-                document.body.style.cursor = 'grabbing';
-                document.body.style.userSelect = 'none';
-              }
-            },
-            onScrollEndDrag: () => {
-              if (Platform.OS === 'web') {
-                document.body.style.cursor = 'grab';
-                document.body.style.userSelect = 'auto';
-              }
-            },
-          })}
         >
           {/* Header with ImageBackground */}
           <ImageBackground
@@ -1371,7 +1204,7 @@ const AdminScreen = () => {
           >
             <Ionicons name="card" size={20} color={activeTab === 'fees' ? '#2563eb' : '#6b7280'} />
             <Text style={[styles.folderTabText, activeTab === 'fees' && styles.activeFolderTabText]}>
-              Fees ({getAllYearlyFees?.length || 0})
+              Fees ({homeownersPaymentStatus.length})
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -1501,7 +1334,7 @@ const AdminScreen = () => {
                 </TouchableOpacity>
               </View>
               
-              <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={true} persistentScrollbar={true}>
+              <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Name *</Text>
                   <TextInput
@@ -1656,7 +1489,7 @@ const AdminScreen = () => {
                 </TouchableOpacity>
               </View>
               
-              <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={true} persistentScrollbar={true}>
+              <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Title *</Text>
                   <TextInput
@@ -1793,102 +1626,6 @@ const AdminScreen = () => {
           </Animated.View>
         </Modal>
 
-        {/* Yearly Fee Modal */}
-        <Modal
-          visible={showYearlyFeeModal}
-          transparent={true}
-          animationType="none"
-          onRequestClose={handleCancelYearlyFee}
-        >
-          <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
-            <Animated.View style={[
-              styles.emergencyModalContent,
-              {
-                opacity: yearlyFeeModalOpacity,
-                transform: [{ translateY: yearlyFeeModalTranslateY }],
-              }
-            ]}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Create Yearly HOA Fees</Text>
-                <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={handleCancelYearlyFee}
-                >
-                  <Ionicons name="close" size={24} color="#6b7280" />
-                </TouchableOpacity>
-              </View>
-              
-              <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={true} persistentScrollbar={true}>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Year *</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="Enter year (e.g., 2024)"
-                    value={yearlyFeeForm.year.toString()}
-                    onChangeText={(text) => {
-                      const year = parseInt(text);
-                      if (!isNaN(year) && year > 2000 && year < 2100) {
-                        setYearlyFeeForm(prev => ({ ...prev, year }));
-                      }
-                    }}
-                    keyboardType="numeric"
-                  />
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Amount per Resident *</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="Enter amount (e.g., 300)"
-                    value={yearlyFeeForm.amount.toString()}
-                    onChangeText={(text) => {
-                      const amount = parseFloat(text);
-                      if (!isNaN(amount) && amount > 0) {
-                        setYearlyFeeForm(prev => ({ ...prev, amount }));
-                      }
-                    }}
-                    keyboardType="numeric"
-                  />
-                </View>
-
-                <View style={styles.feePreview}>
-                  <Text style={styles.feePreviewTitle}>Preview</Text>
-                  <Text style={styles.feePreviewText}>
-                    Year: {yearlyFeeForm.year}
-                  </Text>
-                  <Text style={styles.feePreviewText}>
-                    Amount per resident: ${yearlyFeeForm.amount}
-                  </Text>
-                  <Text style={styles.feePreviewText}>
-                    Due date: {yearlyFeeForm.year}-12-31
-                  </Text>
-                  <Text style={styles.feePreviewText}>
-                    Note: Fees will be created for all active residents
-                  </Text>
-                </View>
-              </ScrollView>
-              
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={handleCancelYearlyFee}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.confirmButton, isCreatingFees && styles.disabledButton]}
-                  onPress={handleCreateYearlyFees}
-                  disabled={isCreatingFees}
-                >
-                  <Text style={styles.confirmButtonText}>
-                    {isCreatingFees ? 'Creating...' : 'Create Fees'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </Animated.View>
-          </Animated.View>
-        </Modal>
-
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -1905,9 +1642,6 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
   },
   accessDeniedContainer: {
     flex: 1,
@@ -2483,101 +2217,224 @@ const styles = StyleSheet.create({
   checkboxTextActive: {
     color: '#2563eb',
   },
-  // Yearly fee management styles
-  feeButtonsContainer: {
+  // Fee management styles
+  feeStatsContainer: {
     flexDirection: 'row',
     gap: 12,
+    marginTop: 16,
   },
-  currentYearButton: {
-    backgroundColor: '#10b981',
-  },
-  feeHeader: {
+  feeStatCard: {
     flex: 1,
-  },
-  feeActions: {
+    backgroundColor: '#f8fafc',
+    padding: 16,
+    borderRadius: 12,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingLeft: 12,
-  },
-  deleteFeeButton: {
-    padding: 8,
-    borderRadius: 6,
-    backgroundColor: '#fef2f2',
     borderWidth: 1,
-    borderColor: '#fecaca',
+    borderColor: '#e2e8f0',
+  },
+  feeStatLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginBottom: 4,
+    fontWeight: '500',
+  },
+  feeStatValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1f2937',
   },
   feeDetails: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginTop: 8,
+    gap: 16,
   },
   feeAmount: {
-    fontSize: 16,
+    alignItems: 'center',
+  },
+  feeAmountText: {
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#1f2937',
+    marginBottom: 2,
+  },
+  feeLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  paymentStatusContainer: {
+    alignItems: 'center',
+  },
+  paymentStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  paidBadge: {
+    backgroundColor: '#d1fae5',
+  },
+  pendingBadge: {
+    backgroundColor: '#fef3c7',
+  },
+  paymentStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  paidText: {
+    color: '#065f46',
+  },
+  pendingText: {
+    color: '#92400e',
+  },
+  profileImageText: {
+    color: '#6b7280',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  rowDescription: {
+    fontSize: 12,
+    color: '#9ca3af',
+    marginBottom: 2,
+  },
+  // Enhanced fee management styles
+  feeHeader: {
+    flex: 1,
   },
   feeDueDate: {
     fontSize: 12,
-    color: '#6b7280',
+    color: '#9ca3af',
+    marginTop: 4,
   },
   feeStatus: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 8,
     gap: 4,
   },
   statusText: {
     fontSize: 12,
-    fontWeight: '500',
-  },
-  feePreview: {
-    backgroundColor: '#f8fafc',
-    padding: 16,
-    borderRadius: 8,
-    marginTop: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  feePreviewTitle: {
-    fontSize: 16,
     fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  feePreviewText: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 4,
-  },
-  feePreviewTotal: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#10b981',
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-  },
-  disabledButton: {
-    opacity: 0.6,
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 20,
+    padding: 40,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    margin: 20,
   },
   emptyStateText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#6b7280',
-    marginTop: 16,
-    textAlign: 'center',
+    marginTop: 12,
+    marginBottom: 4,
   },
   emptyStateSubtext: {
     fontSize: 14,
     color: '#9ca3af',
-    marginTop: 8,
     textAlign: 'center',
+    lineHeight: 20,
+  },
+  // Grid layout styles
+  gridCard: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    margin: 6,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    maxWidth: '47%',
+  },
+  gridCardContent: {
+    padding: 12,
+  },
+  gridProfileSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  gridProfileImage: {
+    marginRight: 8,
+  },
+  gridProfileImageSrc: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  gridProfilePlaceholder: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f3f4f6',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gridProfileText: {
+    color: '#6b7280',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  gridProfileInfo: {
+    flex: 1,
+  },
+  gridName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 2,
+  },
+  gridRole: {
+    fontSize: 11,
+    color: '#6b7280',
+    marginBottom: 1,
+  },
+  gridAddress: {
+    fontSize: 10,
+    color: '#9ca3af',
+  },
+  gridFeeSection: {
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+    paddingTop: 8,
+  },
+  gridFeeAmount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 2,
+  },
+  gridFeeLabel: {
+    fontSize: 10,
+    color: '#6b7280',
+    marginBottom: 6,
+  },
+  gridStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  gridPaidBadge: {
+    backgroundColor: '#d1fae5',
+  },
+  gridPendingBadge: {
+    backgroundColor: '#fef3c7',
+  },
+  gridStatusText: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginLeft: 4,
   },
 });
 

@@ -18,24 +18,17 @@ export interface Covenant {
 }
 
 export interface Fee {
-  _id: string;
+  id: string;
   name: string;
   amount: number;
   frequency: 'Monthly' | 'Quarterly' | 'Annually' | 'One-time';
   dueDate: string;
   description: string;
   isLate: boolean;
-  residentId?: string;
-  isPaid: boolean;
-  paidAt?: number;
-  paymentMethod?: string;
-  stripePaymentIntentId?: string;
-  createdAt: number;
-  updatedAt: number;
 }
 
 export interface Fine {
-  _id: string;
+  id: string;
   violation: string;
   amount: number;
   dateIssued: string;
@@ -43,25 +36,6 @@ export interface Fine {
   status: 'Pending' | 'Paid' | 'Overdue';
   description: string;
   residentId?: string;
-  createdAt: number;
-  updatedAt: number;
-}
-
-export interface Payment {
-  _id: string;
-  residentId: string;
-  feeId?: string;
-  fineId?: string;
-  amount: number;
-  currency: string;
-  status: 'pending' | 'succeeded' | 'failed' | 'canceled';
-  paymentMethod: string;
-  stripePaymentIntentId?: string;
-  stripeChargeId?: string;
-  description: string;
-  metadata?: any;
-  createdAt: number;
-  updatedAt: number;
 }
 
 export interface CommunityPost {

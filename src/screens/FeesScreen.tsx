@@ -10,34 +10,22 @@ import {
   Animated,
   Dimensions,
   Platform,
-  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery } from 'convex/react';
+import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
-import { usePayments } from '../hooks/usePayments';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import DeveloperIndicator from '../components/DeveloperIndicator';
 import CustomTabBar from '../components/CustomTabBar';
 import MobileTabBar from '../components/MobileTabBar';
-import { Id } from '../../convex/_generated/dataModel';
 
 const FeesScreen = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'fees' | 'fines'>('fees');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  
-  // Payment hook
-  const { 
-    paymentState, 
-    payments, 
-    paymentStats, 
-    processFeePayment, 
-    processFinePayment, 
-    resetPaymentState 
-  } = usePayments();
+  const [hasPaidAnnualFee, setHasPaidAnnualFee] = useState(false);
 
   // State for dynamic responsive behavior (only for web/desktop)
   const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
@@ -89,36 +77,18 @@ const FeesScreen = () => {
     }
   }, [screenWidth, showMobileNav, showDesktopNav]);
 
-  // Load Stripe buy button script (web only)
-  useEffect(() => {
-    if (Platform.OS === 'web') {
-      const script = document.createElement('script');
-      script.src = 'https://js.stripe.com/v3/buy-button.js';
-      script.async = true;
-      document.head.appendChild(script);
-
-      return () => {
-        // Cleanup script on unmount
-        const existingScript = document.querySelector('script[src="https://js.stripe.com/v3/buy-button.js"]');
-        if (existingScript) {
-          document.head.removeChild(existingScript);
-        }
-      };
-    }
-  }, []);
-
   // Animation functions
   const animateStaggeredContent = () => {
     Animated.stagger(200, [
       Animated.timing(summaryAnim, {
         toValue: 1,
         duration: 500,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(contentAnim, {
         toValue: 1,
         duration: 500,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
   };
@@ -127,6 +97,18 @@ const FeesScreen = () => {
   useEffect(() => {
     animateStaggeredContent();
   }, []);
+
+  // Check if user has paid their annual fee
+  const userPaymentStatus = useQuery(
+    api.fees.hasPaidAnnualFee,
+    user ? { userId: user._id } : "skip"
+  );
+
+  useEffect(() => {
+    if (userPaymentStatus !== undefined) {
+      setHasPaidAnnualFee(userPaymentStatus);
+    }
+  }, [userPaymentStatus]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -169,54 +151,37 @@ const FeesScreen = () => {
     }
   };
 
+  // Convex mutations
+  const recordPayment = useMutation(api.fees.recordPayment);
+
   const handlePayment = async (item: any, type: 'fee' | 'fine') => {
-    if (!user) {
-      Alert.alert('Error', 'You must be logged in to make payments.');
-      return;
-    }
-
-    const itemName = type === 'fee' ? item.name : item.violation;
-    const description = `Payment for ${itemName} - ${type === 'fee' ? 'HOA Fee' : 'Violation Fine'}`;
-
     Alert.alert(
       `Pay ${type === 'fee' ? 'Fee' : 'Fine'}`,
-      `Would you like to pay ${formatCurrency(item.amount)} for ${itemName}?`,
+      `Would you like to pay ${formatCurrency(item.amount)} for ${type === 'fee' ? item.name : item.violation}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
           text: 'Pay Now', 
           onPress: async () => {
             try {
-              resetPaymentState();
-              
-              if (type === 'fee') {
-                await processFeePayment(
-                  item._id as Id<"fees">,
-                  item.amount,
-                  description
-                );
+              if (type === 'fee' && user) {
+                // Record the payment
+                await recordPayment({
+                  userId: user._id,
+                  feeType: item.name,
+                  amount: item.amount,
+                  paymentDate: new Date().toISOString().split('T')[0],
+                });
+                
+                // Update local state
+                setHasPaidAnnualFee(true);
+                
+                Alert.alert('Success', 'Payment recorded successfully!');
               } else {
-                await processFinePayment(
-                  item._id as Id<"fines">,
-                  item.amount,
-                  description
-                );
-              }
-
-              if (paymentState.success) {
-                Alert.alert(
-                  'Payment Successful', 
-                  `Your payment of ${formatCurrency(item.amount)} has been processed successfully.`
-                );
-              } else if (paymentState.error) {
-                Alert.alert('Payment Failed', paymentState.error);
+                Alert.alert('Payment', 'Payment processing would be integrated here.');
               }
             } catch (error) {
-              console.error('Payment error:', error);
-              Alert.alert(
-                'Payment Error', 
-                'An error occurred while processing your payment. Please try again.'
-              );
+              Alert.alert('Error', 'Failed to record payment. Please try again.');
             }
           }
         }
@@ -224,25 +189,30 @@ const FeesScreen = () => {
     );
   };
 
-  // Dynamic data queries
+  // Dynamic fee generation based on user status
+  const getUserType = () => {
+    if (!user) return 'guest';
+    if (user.isBoardMember) return 'board-member';
+    if (user.isRenter) return 'renter';
+    if (user.isResident) return 'resident';
+    return 'guest';
+  };
+
+  // Get user-specific fees from Convex
   const fees = useQuery(
-    api.fees.getByResident,
-    user ? { residentId: user._id as Id<"residents"> } : "skip"
-  ) ?? [];
-  
-  const fines = useQuery(
-    api.fines.getAll,
-    {}
+    api.fees.getUserFees,
+    user ? {
+      userId: user._id,
+      userType: getUserType(),
+      hasPaid: hasPaidAnnualFee,
+    } : "skip"
   ) ?? [];
 
-  // Filter fines for current user
-  const userFines = fines.filter((fine: any) => fine.residentId === user?._id);
-  
-  // Calculate totals
+  // Get fines for the user (if any)
+  const fines = useQuery(api.fines.getAll) ?? [];
   const totalFees = fees.reduce((sum: number, fee: any) => sum + fee.amount, 0);
-  const totalFines = userFines.reduce((sum: number, fine: any) => sum + fine.amount, 0);
-  const overdueFines = userFines.filter((fine: any) => fine.status === 'Overdue').reduce((sum: number, fine: any) => sum + fine.amount, 0);
-  const unpaidFees = fees.filter((fee: any) => !fee.isPaid).reduce((sum: number, fee: any) => sum + fee.amount, 0);
+  const totalFines = fines.reduce((sum: number, fine: any) => sum + fine.amount, 0);
+  const overdueFines = fines.filter((fine: any) => fine.status === 'Overdue').reduce((sum: number, fine: any) => sum + fine.amount, 0);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -279,6 +249,9 @@ const FeesScreen = () => {
               <View style={styles.headerLeft}>
                 <View style={styles.titleContainer}>
                   <Text style={styles.headerTitle}>Fees & Fines</Text>
+                  <View style={styles.demoBadge}>
+                    <Text style={styles.demoBadgeText}>DEMO DATA</Text>
+                  </View>
                   <DeveloperIndicator />
                   <BoardMemberIndicator />
                 </View>
@@ -350,15 +323,15 @@ const FeesScreen = () => {
         ]}>
           <View style={styles.summaryContainer}>
             <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>Unpaid Fees</Text>
-              <Text style={styles.summaryAmount}>{formatCurrency(unpaidFees)}</Text>
-              <Text style={styles.summarySubtext}>{fees.filter((fee: any) => !fee.isPaid).length} unpaid fees</Text>
+              <Text style={styles.summaryLabel}>Total Fees</Text>
+              <Text style={styles.summaryAmount}>{formatCurrency(totalFees)}</Text>
+              <Text style={styles.summarySubtext}>{fees.length} active fees</Text>
             </View>
             
             <View style={styles.summaryCard}>
               <Text style={styles.summaryLabel}>Total Fines</Text>
               <Text style={styles.summaryAmount}>{formatCurrency(totalFines)}</Text>
-              <Text style={styles.summarySubtext}>{userFines.length} violations</Text>
+              <Text style={styles.summarySubtext}>{fines.length} violations</Text>
             </View>
             
             {overdueFines > 0 && (
@@ -370,6 +343,62 @@ const FeesScreen = () => {
             )}
           </View>
         </Animated.View>
+
+        {/* User Status Section */}
+        {user && (
+          <Animated.View style={[
+            styles.section,
+            {
+              opacity: contentAnim,
+              transform: [{
+                translateY: contentAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [50, 0],
+                })
+              }]
+            }
+          ]}>
+            <View style={styles.userStatusCard}>
+              <View style={styles.userInfo}>
+                <View style={styles.userAvatar}>
+                  <Text style={styles.userAvatarText}>
+                    {user.firstName.charAt(0)}{user.lastName.charAt(0)}
+                  </Text>
+                </View>
+                <View style={styles.userDetails}>
+                  <Text style={styles.userName}>{user.firstName} {user.lastName}</Text>
+                  <Text style={styles.userType}>
+                    {user.isBoardMember ? 'Board Member' : 
+                     user.isRenter ? 'Renter' : 
+                     user.isResident ? 'Homeowner' : 'Resident'}
+                  </Text>
+                  <Text style={styles.userAddress}>
+                    {user.address} {user.unitNumber && `Unit ${user.unitNumber}`}
+                  </Text>
+                </View>
+              </View>
+              
+              <View style={styles.feeStatus}>
+                <View style={[
+                  styles.statusBadge,
+                  hasPaidAnnualFee ? styles.paidBadge : styles.pendingBadge
+                ]}>
+                  <Ionicons 
+                    name={hasPaidAnnualFee ? "checkmark-circle" : "time"} 
+                    size={16} 
+                    color={hasPaidAnnualFee ? "#10b981" : "#f59e0b"} 
+                  />
+                  <Text style={[
+                    styles.statusText,
+                    hasPaidAnnualFee ? styles.paidText : styles.pendingText
+                  ]}>
+                    {hasPaidAnnualFee ? 'Annual Fee Paid' : 'Annual Fee Pending'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </Animated.View>
+        )}
 
         {/* Tab Navigation */}
         <Animated.View style={[
@@ -395,7 +424,7 @@ const FeesScreen = () => {
                 color={activeTab === 'fees' ? '#2563eb' : '#6b7280'} 
               />
               <Text style={[styles.tabText, activeTab === 'fees' && styles.activeTabText]}>
-                Fees ({fees.filter((fee: any) => !fee.isPaid).length})
+                Fees ({fees.length})
               </Text>
             </TouchableOpacity>
             
@@ -409,7 +438,7 @@ const FeesScreen = () => {
                 color={activeTab === 'fines' ? '#2563eb' : '#6b7280'} 
               />
               <Text style={[styles.tabText, activeTab === 'fines' && styles.activeTabText]}>
-                Fines ({userFines.length})
+                Fines ({fines.length})
               </Text>
             </TouchableOpacity>
           </View>
@@ -431,75 +460,53 @@ const FeesScreen = () => {
           {activeTab === 'fees' ? (
             <View>
               <Text style={styles.sectionTitle}>HOA Fees</Text>
-              {fees.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <Ionicons name="checkmark-circle" size={48} color="#10b981" />
-                  <Text style={styles.emptyStateText}>No fees found</Text>
-                  <Text style={styles.emptyStateSubtext}>All caught up!</Text>
-                </View>
-              ) : (
-                fees.map((fee: any) => (
-                  <View key={fee._id} style={styles.itemCard}>
-                    <View style={styles.itemHeader}>
-                      <View style={styles.itemInfo}>
-                        <Text style={styles.itemTitle}>{fee.name}</Text>
-                        <Text style={styles.itemDescription}>{fee.description}</Text>
-                        <Text style={styles.itemFrequency}>{fee.frequency}</Text>
-                      </View>
-                      <View style={styles.itemAmount}>
-                        <Text style={styles.amountText}>{formatCurrency(fee.amount)}</Text>
-                        <Text style={styles.dueDate}>Due: {formatDate(fee.dueDate)}</Text>
-                      </View>
+              {fees.map((fee: any) => (
+                <View key={fee._id} style={styles.itemCard}>
+                  <View style={styles.itemHeader}>
+                    <View style={styles.itemInfo}>
+                      <Text style={styles.itemTitle}>{fee.name}</Text>
+                      <Text style={styles.itemDescription}>{fee.description}</Text>
+                      <Text style={styles.itemFrequency}>{fee.frequency}</Text>
                     </View>
-                    
-                    <View style={styles.itemFooter}>
-                      <View style={styles.statusContainer}>
-                        <Ionicons 
-                          name={fee.isPaid ? "checkmark-circle" : (fee.isLate ? "warning" : "time")} 
-                          size={16} 
-                          color={fee.isPaid ? "#10b981" : (fee.isLate ? "#ef4444" : "#f59e0b")} 
-                        />
-                        <Text style={[styles.statusText, { 
-                          color: fee.isPaid ? "#10b981" : (fee.isLate ? "#ef4444" : "#f59e0b") 
-                        }]}>
-                          {fee.isPaid ? 'Paid' : (fee.isLate ? 'Overdue' : 'Pending')}
-                        </Text>
-                        {fee.isPaid && fee.paidAt && (
-                          <Text style={styles.paidDate}>
-                            Paid: {formatDate(new Date(fee.paidAt).toISOString())}
-                          </Text>
-                        )}
-                      </View>
-                      
-                      {!fee.isPaid && (
-                        <TouchableOpacity
-                          style={[styles.payButton, paymentState.isProcessing && styles.payButtonDisabled]}
-                          onPress={() => handlePayment(fee, 'fee')}
-                          disabled={paymentState.isProcessing}
-                        >
-                          {paymentState.isProcessing ? (
-                            <ActivityIndicator size="small" color="#ffffff" />
-                          ) : (
-                            <Text style={styles.payButtonText}>Pay Now</Text>
-                          )}
-                        </TouchableOpacity>
-                      )}
+                    <View style={styles.itemAmount}>
+                      <Text style={styles.amountText}>{formatCurrency(fee.amount)}</Text>
+                      <Text style={styles.dueDate}>Due: {formatDate(fee.dueDate)}</Text>
                     </View>
                   </View>
-                ))
-              )}
+                  
+                  <View style={styles.itemFooter}>
+                    <View style={styles.statusContainer}>
+                      <Ionicons 
+                        name={fee.isLate ? "warning" : "checkmark-circle"} 
+                        size={16} 
+                        color={fee.isLate ? "#ef4444" : "#10b981"} 
+                      />
+                      <Text style={[styles.statusText, { color: fee.isLate ? "#ef4444" : "#10b981" }]}>
+                        {fee.isLate ? 'Late' : 'Current'}
+                      </Text>
+                    </View>
+                    
+                    <TouchableOpacity
+                      style={styles.payButton}
+                      onPress={() => handlePayment(fee, 'fee')}
+                    >
+                      <Text style={styles.payButtonText}>Pay Now</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
             </View>
           ) : (
             <View>
               <Text style={styles.sectionTitle}>Violations & Fines</Text>
-              {userFines.length === 0 ? (
+              {fines.length === 0 ? (
                 <View style={styles.emptyState}>
                   <Ionicons name="checkmark-circle" size={48} color="#10b981" />
                   <Text style={styles.emptyStateText}>No violations found</Text>
                   <Text style={styles.emptyStateSubtext}>Keep up the good work!</Text>
                 </View>
               ) : (
-                userFines.map((fine: any) => (
+                fines.map((fine: any) => (
                   <View key={fine._id} style={styles.itemCard}>
                     <View style={styles.itemHeader}>
                       <View style={styles.itemInfo}>
@@ -527,15 +534,10 @@ const FeesScreen = () => {
                       
                       {fine.status !== 'Paid' && (
                         <TouchableOpacity
-                          style={[styles.payButton, paymentState.isProcessing && styles.payButtonDisabled]}
+                          style={styles.payButton}
                           onPress={() => handlePayment(fine, 'fine')}
-                          disabled={paymentState.isProcessing}
                         >
-                          {paymentState.isProcessing ? (
-                            <ActivityIndicator size="small" color="#ffffff" />
-                          ) : (
-                            <Text style={styles.payButtonText}>Pay Now</Text>
-                          )}
+                          <Text style={styles.payButtonText}>Pay Now</Text>
                         </TouchableOpacity>
                       )}
                     </View>
@@ -572,24 +574,6 @@ const FeesScreen = () => {
           <Text style={styles.infoText}>
             • For payment questions, contact the treasurer
           </Text>
-          
-          {/* Stripe Buy Button - Web Only */}
-          {Platform.OS === 'web' && (
-            <View style={styles.stripeButtonContainer}>
-              <Text style={styles.stripeButtonLabel}>Quick Payment</Text>
-              <div 
-                style={styles.stripeBuyButton}
-                dangerouslySetInnerHTML={{
-                  __html: `
-                    <stripe-buy-button
-                      buy-button-id="buy_btn_1SJiY9LDGfYmHnW7N87xGnmo"
-                      publishable-key="pk_live_51RmkEpLDGfYmHnW7nIvibKQRIwmYPwWFObKKQ8uqNVMsgSjkPK0e8bKnh196YfpegHhcLOi4CaKJjF3qZWScRWrP00EH6Tq5Pf"
-                    ></stripe-buy-button>
-                  `
-                }}
-              />
-            </View>
-          )}
         </Animated.View>
         
         {/* Additional content to ensure scrollable content */}
@@ -885,11 +869,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginLeft: 4,
-  },
   payButton: {
     backgroundColor: '#2563eb',
     paddingHorizontal: 16,
@@ -906,38 +885,88 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  payButtonDisabled: {
-    opacity: 0.6,
-  },
-  paidDate: {
-    fontSize: 10,
-    color: '#9ca3af',
-    marginTop: 2,
-  },
   infoText: {
     fontSize: 14,
     color: '#6b7280',
     lineHeight: 20,
     marginBottom: 6,
   },
-  stripeButtonContainer: {
-    marginTop: 20,
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    alignItems: 'center',
+  userStatusCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
   },
-  stripeButtonLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
   },
-  stripeBuyButton: {
-    width: '100%',
-    display: 'flex',
+  userAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#2563eb',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 12,
+  },
+  userAvatarText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  userDetails: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 2,
+  },
+  userType: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 2,
+  },
+  userAddress: {
+    fontSize: 12,
+    color: '#9ca3af',
+  },
+  feeStatus: {
+    alignItems: 'flex-end',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  paidBadge: {
+    backgroundColor: '#d1fae5',
+  },
+  pendingBadge: {
+    backgroundColor: '#fef3c7',
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  paidText: {
+    color: '#065f46',
+  },
+  pendingText: {
+    color: '#92400e',
   },
 });
 
