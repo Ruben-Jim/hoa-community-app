@@ -61,6 +61,8 @@ const AdminScreen = () => {
   const comments = useQuery(api.communityPosts.getAllComments) ?? [];
   const emergencyAlerts = useQuery(api.emergencyNotifications.getAll) ?? [];
   const homeownersPaymentStatus = useQuery(api.fees.getAllHomeownersPaymentStatus) ?? [];
+  const allFeesFromDatabase = useQuery(api.fees.getAllFeesFromDatabase) ?? [];
+  const allFinesFromDatabase = useQuery(api.fees.getAllFines) ?? [];
   
   // Mutations
   const setBlockStatus = useMutation(api.residents.setBlockStatus);
@@ -74,6 +76,10 @@ const AdminScreen = () => {
   const createEmergencyAlert = useMutation(api.emergencyNotifications.create);
   const updateEmergencyAlert = useMutation(api.emergencyNotifications.update);
   const deleteEmergencyAlert = useMutation(api.emergencyNotifications.remove);
+  
+  // Fee management mutations
+  const createYearFeesForAllHomeowners = useMutation(api.fees.createYearFeesForAllHomeowners);
+  const addFineToProperty = useMutation(api.fees.addFineToProperty);
   
   // State
   const [refreshing, setRefreshing] = useState(false);
@@ -110,6 +116,22 @@ const AdminScreen = () => {
     isActive: true,
   });
 
+  // Fee management modal state
+  const [showYearFeeModal, setShowYearFeeModal] = useState(false);
+  const [showAddFineModal, setShowAddFineModal] = useState(false);
+  const [yearFeeForm, setYearFeeForm] = useState({
+    year: new Date().getFullYear().toString(),
+    amount: '300',
+    description: 'Annual HOA Fee',
+  });
+  const [fineForm, setFineForm] = useState({
+    selectedAddress: '',
+    amount: '',
+    reason: '',
+    description: '',
+    dueDate: '',
+  });
+
   // Animation values
   const blockModalOpacity = useRef(new Animated.Value(0)).current;
   const blockModalTranslateY = useRef(new Animated.Value(300)).current;
@@ -119,6 +141,10 @@ const AdminScreen = () => {
   const boardMemberModalTranslateY = useRef(new Animated.Value(300)).current;
   const emergencyModalOpacity = useRef(new Animated.Value(0)).current;
   const emergencyModalTranslateY = useRef(new Animated.Value(300)).current;
+  const yearFeeModalOpacity = useRef(new Animated.Value(0)).current;
+  const yearFeeModalTranslateY = useRef(new Animated.Value(300)).current;
+  const addFineModalOpacity = useRef(new Animated.Value(0)).current;
+  const addFineModalTranslateY = useRef(new Animated.Value(300)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current; // Start at 0 for individual item animations
@@ -127,13 +153,17 @@ const AdminScreen = () => {
   const isBoardMember = user?.isBoardMember && user?.isActive;
 
   // Modern animation functions
-  const animateIn = (modalType: 'block' | 'delete' | 'boardMember' | 'emergency') => {
+  const animateIn = (modalType: 'block' | 'delete' | 'boardMember' | 'emergency' | 'yearFee' | 'addFine') => {
     const opacity = modalType === 'block' ? blockModalOpacity : 
                    modalType === 'delete' ? deleteModalOpacity :
-                   modalType === 'boardMember' ? boardMemberModalOpacity : emergencyModalOpacity;
+                   modalType === 'boardMember' ? boardMemberModalOpacity : 
+                   modalType === 'emergency' ? emergencyModalOpacity :
+                   modalType === 'yearFee' ? yearFeeModalOpacity : addFineModalOpacity;
     const translateY = modalType === 'block' ? blockModalTranslateY : 
                       modalType === 'delete' ? deleteModalTranslateY :
-                      modalType === 'boardMember' ? boardMemberModalTranslateY : emergencyModalTranslateY;
+                      modalType === 'boardMember' ? boardMemberModalTranslateY : 
+                      modalType === 'emergency' ? emergencyModalTranslateY :
+                      modalType === 'yearFee' ? yearFeeModalTranslateY : addFineModalTranslateY;
     
     Animated.parallel([
       Animated.timing(overlayOpacity, {
@@ -155,13 +185,17 @@ const AdminScreen = () => {
     ]).start();
   };
 
-  const animateOut = (modalType: 'block' | 'delete' | 'boardMember' | 'emergency', callback: () => void) => {
+  const animateOut = (modalType: 'block' | 'delete' | 'boardMember' | 'emergency' | 'yearFee' | 'addFine', callback: () => void) => {
     const opacity = modalType === 'block' ? blockModalOpacity : 
                    modalType === 'delete' ? deleteModalOpacity :
-                   modalType === 'boardMember' ? boardMemberModalOpacity : emergencyModalOpacity;
+                   modalType === 'boardMember' ? boardMemberModalOpacity : 
+                   modalType === 'emergency' ? emergencyModalOpacity :
+                   modalType === 'yearFee' ? yearFeeModalOpacity : addFineModalOpacity;
     const translateY = modalType === 'block' ? blockModalTranslateY : 
                       modalType === 'delete' ? deleteModalTranslateY :
-                      modalType === 'boardMember' ? boardMemberModalTranslateY : emergencyModalTranslateY;
+                      modalType === 'boardMember' ? boardMemberModalTranslateY : 
+                      modalType === 'emergency' ? emergencyModalTranslateY :
+                      modalType === 'yearFee' ? yearFeeModalTranslateY : addFineModalTranslateY;
     
     Animated.parallel([
       Animated.timing(overlayOpacity, {
@@ -492,6 +526,116 @@ const AdminScreen = () => {
       });
       setSelectedItem(null);
     });
+  };
+
+  // Fee management handlers
+  const handleAddYearFees = async () => {
+    try {
+      const year = parseInt(yearFeeForm.year);
+      const amount = parseFloat(yearFeeForm.amount);
+      
+      if (!year || !amount) {
+        Alert.alert('Error', 'Please enter valid year and amount.');
+        return;
+      }
+
+      // Call Convex mutation to create annual fees for all homeowners
+      const result = await createYearFeesForAllHomeowners({
+        year: year,
+        amount: amount,
+        description: yearFeeForm.description,
+      });
+
+      if (result.success) {
+        Alert.alert(
+          'Year Fees Added', 
+          result.message
+        );
+        
+        setShowYearFeeModal(false);
+        setYearFeeForm({
+          year: new Date().getFullYear().toString(),
+          amount: '300',
+          description: 'Annual HOA Fee',
+        });
+      } else {
+        Alert.alert('Error', 'Failed to create year fees. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error adding year fees:', error);
+      Alert.alert('Error', 'Failed to add year fees. Please try again.');
+    }
+  };
+
+  const handleAddFine = async () => {
+    try {
+      const amount = parseFloat(fineForm.amount);
+      
+      if (!fineForm.selectedAddress || !amount || !fineForm.reason) {
+        Alert.alert('Error', 'Please fill in all required fields.');
+        return;
+      }
+
+      // Find the homeowner ID for the selected address
+      const selectedHomeowner = homeownersPaymentStatus?.find(homeowner => 
+        `${homeowner.address}${homeowner.unitNumber ? ` Unit ${homeowner.unitNumber}` : ''}` === fineForm.selectedAddress
+      );
+
+      if (!selectedHomeowner) {
+        Alert.alert('Error', 'Could not find homeowner for selected address.');
+        return;
+      }
+
+      // Call Convex mutation to add a fine to the selected address
+      const result = await addFineToProperty({
+        address: fineForm.selectedAddress,
+        homeownerId: selectedHomeowner._id,
+        amount: amount,
+        reason: fineForm.reason,
+        description: fineForm.description,
+        dueDate: fineForm.dueDate,
+      });
+
+      if (result.success) {
+        Alert.alert(
+          'Fine Added', 
+          result.message
+        );
+        
+        setShowAddFineModal(false);
+        setFineForm({
+          selectedAddress: '',
+          amount: '',
+          reason: '',
+          description: '',
+          dueDate: '',
+        });
+      } else {
+        Alert.alert('Error', 'Failed to add fine. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error adding fine:', error);
+      Alert.alert('Error', 'Failed to add fine. Please try again.');
+    }
+  };
+
+  // Get unique addresses for fine selection
+  const getUniqueAddresses = () => {
+    if (!homeownersPaymentStatus) return [];
+    
+    const addresses = homeownersPaymentStatus.map(homeowner => ({
+      address: `${homeowner.address}${homeowner.unitNumber ? ` Unit ${homeowner.unitNumber}` : ''}`,
+      fullAddress: `${homeowner.address}${homeowner.unitNumber ? ` Unit ${homeowner.unitNumber}` : ''}`,
+      homeownerId: homeowner._id,
+      homeownerName: `${homeowner.firstName} ${homeowner.lastName}`
+    }));
+    
+    // Remove duplicates based on address
+    const uniqueAddresses = addresses.filter((address, index, self) => 
+      index === self.findIndex(a => a.address === address.address)
+    );
+    
+    return uniqueAddresses;
   };
 
   // Image upload functions
@@ -964,110 +1108,164 @@ const AdminScreen = () => {
           <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={true} persistentScrollbar={true}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Homeowner Fee Status</Text>
+              <View style={styles.adminFeeButtonsContainer}>
+                <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+                  <TouchableOpacity
+                    style={styles.adminFeeButton}
+                    onPress={() => {
+                      animateButtonPress();
+                      setShowYearFeeModal(true);
+                      animateIn('yearFee');
+                    }}
+                  >
+                    <Ionicons name="calendar" size={16} color="#ffffff" />
+                    <Text style={styles.adminFeeButtonText}>Add Year Fees</Text>
+                  </TouchableOpacity>
+                </Animated.View>
+                <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+                  <TouchableOpacity
+                    style={[styles.adminFeeButton, styles.addFineButton]}
+                    onPress={() => {
+                      animateButtonPress();
+                      setShowAddFineModal(true);
+                      animateIn('addFine');
+                    }}
+                  >
+                    <Ionicons name="warning" size={16} color="#ffffff" />
+                    <Text style={styles.adminFeeButtonText}>Add Fine</Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              </View>
             </View>
             
-            {/* Fee Statistics */}
+            {/* Database Fees & Fines Summary */}
             <View style={styles.feeStatsContainer}>
               <View style={styles.feeStatCard}>
-                <Text style={styles.feeStatLabel}>Total Homeowners</Text>
-                <Text style={styles.feeStatValue}>{homeownersPaymentStatus.length}</Text>
+                <Text style={styles.feeStatLabel}>Total Fees Created</Text>
+                <Text style={styles.feeStatValue}>{allFeesFromDatabase.length}</Text>
               </View>
               <View style={styles.feeStatCard}>
-                <Text style={styles.feeStatLabel}>Paid</Text>
-                <Text style={[styles.feeStatValue, { color: '#10b981' }]}>
-                  {homeownersPaymentStatus.filter(h => h.hasPaidAnnualFee).length}
+                <Text style={styles.feeStatLabel}>Total Fines Issued</Text>
+                <Text style={[styles.feeStatValue, { color: '#dc2626' }]}>
+                  {allFinesFromDatabase.length}
                 </Text>
               </View>
               <View style={styles.feeStatCard}>
-                <Text style={styles.feeStatLabel}>Pending</Text>
-                <Text style={[styles.feeStatValue, { color: '#f59e0b' }]}>
-                  {homeownersPaymentStatus.filter(h => !h.hasPaidAnnualFee).length}
+                <Text style={styles.feeStatLabel}>Total Revenue</Text>
+                <Text style={[styles.feeStatValue, { color: '#059669' }]}>
+                  ${allFeesFromDatabase.reduce((sum: number, fee: any) => sum + fee.amount, 0) + 
+                    allFinesFromDatabase.reduce((sum: number, fine: any) => sum + fine.amount, 0)}
                 </Text>
               </View>
             </View>
-            
-            {/* Homeowners Fee Status Grid */}
-            <FlatList
-              data={homeownersPaymentStatus}
-              keyExtractor={(item) => item._id}
-              numColumns={2}
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-              }
-              renderItem={({ item }) => (
-                <Animated.View 
-                  style={[
-                    styles.gridCard,
-                    {
-                      opacity: fadeAnim,
-                      transform: [{
-                        translateY: fadeAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [50, 0],
-                        })
-                      }]
-                    }
-                  ]}
-                >
-                  <View style={styles.gridCardContent}>
-                    <View style={styles.gridProfileSection}>
-                      <View style={styles.gridProfileImage}>
-                        {item.profileImage ? (
-                          <Image source={{ uri: item.profileImage }} style={styles.gridProfileImageSrc} />
-                        ) : (
-                          <View style={styles.gridProfilePlaceholder}>
-                            <Text style={styles.gridProfileText}>
-                              {item.firstName.charAt(0)}{item.lastName.charAt(0)}
-                            </Text>
+
+            {/* All Fees and Fines Overview */}
+            <View style={styles.section}>
+              {/* Fees by Homeowner */}
+              {homeownersPaymentStatus.length > 0 && (
+                <View>
+                  {homeownersPaymentStatus.map((homeowner: any) => {
+                    const homeownerFees = allFeesFromDatabase.filter((fee: any) => fee.userId === homeowner._id);
+                    const homeownerFines = allFinesFromDatabase.filter((fine: any) => fine.userId === homeowner._id);
+                    
+                    if (homeownerFees.length === 0 && homeownerFines.length === 0) return null;
+                    
+                    return (
+                      <View key={homeowner._id} style={styles.homeownerSection}>
+                        <Text style={styles.homeownerName}>
+                          {homeowner.firstName} {homeowner.lastName} - {homeowner.address}{homeowner.unitNumber ? ` Unit ${homeowner.unitNumber}` : ''}
+                        </Text>
+                        
+                        {/* Fees */}
+                        {homeownerFees.length > 0 && (
+                          <View style={styles.feesGroup}>
+                            <Text style={styles.feesGroupTitle}>Fees ({homeownerFees.length})</Text>
+                            {homeownerFees.map((fee: any) => (
+                              <View key={fee._id} style={styles.feeItemCompact}>
+                                <View style={styles.feeItemHeader}>
+                                  <Text style={styles.feeItemTitle}>{fee.name}</Text>
+                                  <Text style={styles.feeItemAmount}>${fee.amount}</Text>
+                                </View>
+                                <Text style={styles.feeItemDate}>Due: {fee.dueDate}</Text>
+                                <Text style={styles.feeItemDate}>Created: {new Date(fee.createdAt).toLocaleDateString()}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                        
+                        {/* Fines */}
+                        {homeownerFines.length > 0 && (
+                          <View style={styles.feesGroup}>
+                            <Text style={styles.feesGroupTitle}>Fines ({homeownerFines.length})</Text>
+                            {homeownerFines.map((fine: any) => (
+                              <View key={fine._id} style={styles.fineItemCompact}>
+                                <View style={styles.feeItemHeader}>
+                                  <Text style={styles.feeItemTitle}>{fine.name}</Text>
+                                  <Text style={styles.feeItemAmount}>${fine.amount}</Text>
+                                </View>
+                                <Text style={styles.feeItemDate}>Reason: {fine.reason}</Text>
+                                <Text style={styles.feeItemDate}>Address: {fine.address}</Text>
+                                <Text style={styles.feeItemDate}>Issued: {new Date(fine.createdAt).toLocaleDateString()}</Text>
+                              </View>
+                            ))}
                           </View>
                         )}
                       </View>
-                      <View style={styles.gridProfileInfo}>
-                        <Text style={styles.gridName} numberOfLines={1}>
-                          {item.firstName} {item.lastName}
-                        </Text>
-                        <Text style={styles.gridRole} numberOfLines={1}>
-                          {item.userType === 'board-member' ? 'Board Member' : 'Homeowner'}
-                        </Text>
-                        <Text style={styles.gridAddress} numberOfLines={1}>
-                          {item.address} {item.unitNumber && `Unit ${item.unitNumber}`}
-                        </Text>
-                      </View>
-                    </View>
-                    
-                    <View style={styles.gridFeeSection}>
-                      <Text style={styles.gridFeeAmount}>${item.annualFeeAmount}</Text>
-                      <Text style={styles.gridFeeLabel}>Annual Fee</Text>
-                      <View style={[
-                        styles.gridStatusBadge,
-                        item.hasPaidAnnualFee ? styles.gridPaidBadge : styles.gridPendingBadge
-                      ]}>
-                        <Ionicons 
-                          name={item.hasPaidAnnualFee ? "checkmark-circle" : "time"} 
-                          size={14} 
-                          color={item.hasPaidAnnualFee ? "#10b981" : "#f59e0b"} 
-                        />
-                        <Text style={[
-                          styles.gridStatusText,
-                          { color: item.hasPaidAnnualFee ? "#10b981" : "#f59e0b" }
-                        ]}>
-                          {item.hasPaidAnnualFee ? 'Paid' : 'Pending'}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                </Animated.View>
+                    );
+                  })}
+                </View>
               )}
-              ListEmptyComponent={
+              
+              {allFeesFromDatabase.length === 0 && allFinesFromDatabase.length === 0 && (
                 <View style={styles.emptyState}>
                   <Ionicons name="card" size={48} color="#9ca3af" />
-                  <Text style={styles.emptyStateText}>No homeowners found</Text>
+                  <Text style={styles.emptyStateText}>No fees or fines created yet</Text>
                   <Text style={styles.emptyStateSubtext}>
-                    Homeowners will appear here once they are registered in the system
+                    Use the buttons above to create annual fees or add fines to properties
                   </Text>
                 </View>
-              }
-            />
+              )}
+            </View>
+
+            {/* Database Fees List */}
+            {allFeesFromDatabase.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Created Fees</Text>
+                <ScrollView style={styles.feesList} nestedScrollEnabled>
+                  {allFeesFromDatabase.map((fee: any) => (
+                    <View key={fee._id} style={styles.feeItem}>
+                      <View style={styles.feeItemHeader}>
+                        <Text style={styles.feeItemTitle}>{fee.name}</Text>
+                        <Text style={styles.feeItemAmount}>${fee.amount}</Text>
+                      </View>
+                      <Text style={styles.feeItemDescription}>{fee.description}</Text>
+                      <Text style={styles.feeItemDate}>Created: {new Date(fee.createdAt).toLocaleDateString()}</Text>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* Database Fines List */}
+            {allFinesFromDatabase.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Issued Fines</Text>
+                <ScrollView style={styles.feesList} nestedScrollEnabled>
+                  {allFinesFromDatabase.map((fine: any) => (
+                    <View key={fine._id} style={styles.fineItem}>
+                      <View style={styles.feeItemHeader}>
+                        <Text style={styles.feeItemTitle}>{fine.name}</Text>
+                        <Text style={styles.feeItemAmount}>${fine.amount}</Text>
+                      </View>
+                      <Text style={styles.feeItemDescription}>{fine.description}</Text>
+                      <Text style={styles.feeItemDate}>Address: {fine.address}</Text>
+                      <Text style={styles.feeItemDate}>Reason: {fine.reason}</Text>
+                      <Text style={styles.feeItemDate}>Issued: {new Date(fine.createdAt).toLocaleDateString()}</Text>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
           </ScrollView>
         );
       
@@ -1204,7 +1402,7 @@ const AdminScreen = () => {
           >
             <Ionicons name="card" size={20} color={activeTab === 'fees' ? '#2563eb' : '#6b7280'} />
             <Text style={[styles.folderTabText, activeTab === 'fees' && styles.activeFolderTabText]}>
-              Fees ({homeownersPaymentStatus.length})
+              Fees ({allFeesFromDatabase.length + allFinesFromDatabase.length})
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -1622,6 +1820,205 @@ const AdminScreen = () => {
                   </Text>
                 </TouchableOpacity>
               </View>
+            </Animated.View>
+          </Animated.View>
+        </Modal>
+
+        {/* Year Fee Modal */}
+        <Modal
+          visible={showYearFeeModal}
+          transparent={true}
+          animationType="none"
+          onRequestClose={() => animateOut('yearFee', () => setShowYearFeeModal(false))}
+        >
+          <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
+            <Animated.View style={[
+              styles.emergencyModalContent,
+              {
+                opacity: yearFeeModalOpacity,
+                transform: [{ translateY: yearFeeModalTranslateY }],
+              }
+            ]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Add Year Fees</Text>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => animateOut('yearFee', () => setShowYearFeeModal(false))}
+                >
+                  <Ionicons name="close" size={24} color="#6b7280" />
+                </TouchableOpacity>
+              </View>
+              
+              <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Year *</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Enter year (e.g., 2024)"
+                    value={yearFeeForm.year}
+                    onChangeText={(text) => setYearFeeForm(prev => ({ ...prev, year: text }))}
+                    keyboardType="numeric"
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Amount ($) *</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Enter fee amount"
+                    value={yearFeeForm.amount}
+                    onChangeText={(text) => setYearFeeForm(prev => ({ ...prev, amount: text }))}
+                    keyboardType="numeric"
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Description</Text>
+                  <TextInput
+                    style={[styles.textInput, styles.textArea]}
+                    placeholder="Enter fee description"
+                    value={yearFeeForm.description}
+                    onChangeText={(text) => setYearFeeForm(prev => ({ ...prev, description: text }))}
+                    multiline
+                    numberOfLines={3}
+                    textAlignVertical="top"
+                  />
+                </View>
+
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={() => animateOut('yearFee', () => setShowYearFeeModal(false))}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.confirmButton}
+                    onPress={handleAddYearFees}
+                  >
+                    <Text style={styles.confirmButtonText}>Add Year Fees</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </Animated.View>
+          </Animated.View>
+        </Modal>
+
+        {/* Add Fine Modal */}
+        <Modal
+          visible={showAddFineModal}
+          transparent={true}
+          animationType="none"
+          onRequestClose={() => animateOut('addFine', () => setShowAddFineModal(false))}
+        >
+          <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
+            <Animated.View style={[
+              styles.emergencyModalContent,
+              {
+                opacity: addFineModalOpacity,
+                transform: [{ translateY: addFineModalTranslateY }],
+              }
+            ]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Add Fine to Property</Text>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => animateOut('addFine', () => setShowAddFineModal(false))}
+                >
+                  <Ionicons name="close" size={24} color="#6b7280" />
+                </TouchableOpacity>
+              </View>
+              
+              <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Select Property Address *</Text>
+                  <ScrollView style={styles.addressSelector} nestedScrollEnabled>
+                    {getUniqueAddresses().map((address, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={[
+                          styles.addressOption,
+                          fineForm.selectedAddress === address.address && styles.addressOptionSelected
+                        ]}
+                        onPress={() => setFineForm(prev => ({ ...prev, selectedAddress: address.address }))}
+                      >
+                        <Text style={[
+                          styles.addressOptionText,
+                          fineForm.selectedAddress === address.address && styles.addressOptionTextSelected
+                        ]}>
+                          {address.address}
+                        </Text>
+                        <Text style={[
+                          styles.addressOptionSubtext,
+                          fineForm.selectedAddress === address.address && styles.addressOptionSubtextSelected
+                        ]}>
+                          {address.homeownerName}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Fine Amount ($) *</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Enter fine amount"
+                    value={fineForm.amount}
+                    onChangeText={(text) => setFineForm(prev => ({ ...prev, amount: text }))}
+                    keyboardType="numeric"
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Reason for Fine *</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Enter reason for fine"
+                    value={fineForm.reason}
+                    onChangeText={(text) => setFineForm(prev => ({ ...prev, reason: text }))}
+                    autoCapitalize="words"
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Description</Text>
+                  <TextInput
+                    style={[styles.textInput, styles.textArea]}
+                    placeholder="Enter additional details"
+                    value={fineForm.description}
+                    onChangeText={(text) => setFineForm(prev => ({ ...prev, description: text }))}
+                    multiline
+                    numberOfLines={3}
+                    textAlignVertical="top"
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Due Date</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="YYYY-MM-DD (optional)"
+                    value={fineForm.dueDate}
+                    onChangeText={(text) => setFineForm(prev => ({ ...prev, dueDate: text }))}
+                  />
+                </View>
+
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={() => animateOut('addFine', () => setShowAddFineModal(false))}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.confirmButton}
+                    onPress={handleAddFine}
+                  >
+                    <Text style={styles.confirmButtonText}>Add Fine</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
             </Animated.View>
           </Animated.View>
         </Modal>
@@ -2435,6 +2832,159 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     marginLeft: 4,
+  },
+  // Admin fee management buttons
+  adminFeeButtonsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 16,
+  },
+  adminFeeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+  },
+  addFineButton: {
+    backgroundColor: '#dc2626',
+  },
+  adminFeeButtonText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  // Address selector styles for fine modal
+  addressSelector: {
+    maxHeight: 200,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 8,
+    backgroundColor: '#ffffff',
+  },
+  addressOption: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  addressOptionSelected: {
+    backgroundColor: '#dbeafe',
+    borderBottomColor: '#3b82f6',
+  },
+  addressOptionText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  addressOptionTextSelected: {
+    color: '#1d4ed8',
+    fontWeight: '600',
+  },
+  addressOptionSubtext: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  addressOptionSubtextSelected: {
+    color: '#3b82f6',
+  },
+  // Fee and fine list styles
+  feesList: {
+    maxHeight: 300,
+  },
+  feeItem: {
+    backgroundColor: '#ffffff',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  fineItem: {
+    backgroundColor: '#fef2f2',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  feeItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  feeItemTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    flex: 1,
+  },
+  feeItemAmount: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  feeItemDescription: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 8,
+  },
+  feeItemDate: {
+    fontSize: 12,
+    color: '#9ca3af',
+    marginBottom: 4,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  subsectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 16,
+    marginTop: 8,
+  },
+  homeownerSection: {
+    backgroundColor: '#ffffff',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  homeownerName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  feesGroup: {
+    marginBottom: 12,
+  },
+  feesGroupTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginBottom: 8,
+  },
+  feeItemCompact: {
+    backgroundColor: '#f9fafb',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  fineItemCompact: {
+    backgroundColor: '#fef2f2',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#fecaca',
   },
 });
 

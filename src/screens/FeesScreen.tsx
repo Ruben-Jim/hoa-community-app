@@ -10,6 +10,7 @@ import {
   Animated,
   Dimensions,
   Platform,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -198,21 +199,22 @@ const FeesScreen = () => {
     return 'guest';
   };
 
-  // Get user-specific fees from Convex
+  // Get fees from database only
   const fees = useQuery(
-    api.fees.getUserFees,
-    user ? {
-      userId: user._id,
-      userType: getUserType(),
-      hasPaid: hasPaidAnnualFee,
-    } : "skip"
+    api.fees.getFeesForHomeownerFromDatabase,
+    user ? { homeownerId: user._id } : "skip"
   ) ?? [];
 
   // Get fines for the user (if any)
-  const fines = useQuery(api.fines.getAll) ?? [];
+  const allFines = useQuery(api.fees.getAllFines) ?? [];
+  
+  // Filter fines for the current user if they are a homeowner
+  const fines = user && (user.isResident && !user.isRenter) 
+    ? allFines.filter((fine: any) => fine.userId === user._id)
+    : [];
   const totalFees = fees.reduce((sum: number, fee: any) => sum + fee.amount, 0);
   const totalFines = fines.reduce((sum: number, fine: any) => sum + fine.amount, 0);
-  const overdueFines = fines.filter((fine: any) => fine.status === 'Overdue').reduce((sum: number, fine: any) => sum + fine.amount, 0);
+  const overdueFines = fines.filter((fine: any) => (fine.status || 'Pending') === 'Overdue').reduce((sum: number, fine: any) => sum + fine.amount, 0);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -249,9 +251,6 @@ const FeesScreen = () => {
               <View style={styles.headerLeft}>
                 <View style={styles.titleContainer}>
                   <Text style={styles.headerTitle}>Fees & Fines</Text>
-                  <View style={styles.demoBadge}>
-                    <Text style={styles.demoBadgeText}>DEMO DATA</Text>
-                  </View>
                   <DeveloperIndicator />
                   <BoardMemberIndicator />
                 </View>
@@ -308,6 +307,60 @@ const FeesScreen = () => {
             },
           })}
         >
+        {/* User Status Section - Compact */}
+        {user && (
+          <Animated.View style={[
+            styles.section,
+            {
+              opacity: contentAnim,
+              transform: [{
+                translateY: contentAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [50, 0],
+                })
+              }]
+            }
+          ]}>
+            <View style={styles.compactUserCard}>
+              <View style={styles.compactUserInfo}>
+                <View style={styles.compactAvatar}>
+                  {user.profileImage ? (
+                    <Image source={{ uri: user.profileImage }} style={styles.compactAvatarImage} />
+                  ) : (
+                    <Text style={styles.compactAvatarText}>
+                      {user.firstName.charAt(0)}{user.lastName.charAt(0)}
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.compactUserDetails}>
+                  <Text style={styles.compactUserName}>{user.firstName} {user.lastName}</Text>
+                  <Text style={styles.compactUserType}>
+                    {user.isBoardMember ? 'Board Member' : 
+                     user.isRenter ? 'Renter' : 
+                     user.isResident ? 'Homeowner' : 'Resident'}
+                  </Text>
+                </View>
+                <View style={[
+                  styles.compactStatusBadge,
+                  hasPaidAnnualFee ? styles.compactPaidBadge : styles.compactPendingBadge
+                ]}>
+                  <Ionicons 
+                    name={hasPaidAnnualFee ? "checkmark-circle" : "time"} 
+                    size={14} 
+                    color={hasPaidAnnualFee ? "#10b981" : "#f59e0b"} 
+                  />
+                  <Text style={[
+                    styles.compactStatusText,
+                    { color: hasPaidAnnualFee ? "#10b981" : "#f59e0b" }
+                  ]}>
+                    {hasPaidAnnualFee ? 'Paid' : 'Pending'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </Animated.View>
+        )}
+
         {/* Summary Cards */}
         <Animated.View style={[
           styles.section,
@@ -343,62 +396,6 @@ const FeesScreen = () => {
             )}
           </View>
         </Animated.View>
-
-        {/* User Status Section */}
-        {user && (
-          <Animated.View style={[
-            styles.section,
-            {
-              opacity: contentAnim,
-              transform: [{
-                translateY: contentAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [50, 0],
-                })
-              }]
-            }
-          ]}>
-            <View style={styles.userStatusCard}>
-              <View style={styles.userInfo}>
-                <View style={styles.userAvatar}>
-                  <Text style={styles.userAvatarText}>
-                    {user.firstName.charAt(0)}{user.lastName.charAt(0)}
-                  </Text>
-                </View>
-                <View style={styles.userDetails}>
-                  <Text style={styles.userName}>{user.firstName} {user.lastName}</Text>
-                  <Text style={styles.userType}>
-                    {user.isBoardMember ? 'Board Member' : 
-                     user.isRenter ? 'Renter' : 
-                     user.isResident ? 'Homeowner' : 'Resident'}
-                  </Text>
-                  <Text style={styles.userAddress}>
-                    {user.address} {user.unitNumber && `Unit ${user.unitNumber}`}
-                  </Text>
-                </View>
-              </View>
-              
-              <View style={styles.feeStatus}>
-                <View style={[
-                  styles.statusBadge,
-                  hasPaidAnnualFee ? styles.paidBadge : styles.pendingBadge
-                ]}>
-                  <Ionicons 
-                    name={hasPaidAnnualFee ? "checkmark-circle" : "time"} 
-                    size={16} 
-                    color={hasPaidAnnualFee ? "#10b981" : "#f59e0b"} 
-                  />
-                  <Text style={[
-                    styles.statusText,
-                    hasPaidAnnualFee ? styles.paidText : styles.pendingText
-                  ]}>
-                    {hasPaidAnnualFee ? 'Annual Fee Paid' : 'Annual Fee Pending'}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </Animated.View>
-        )}
 
         {/* Tab Navigation */}
         <Animated.View style={[
@@ -477,12 +474,14 @@ const FeesScreen = () => {
                   <View style={styles.itemFooter}>
                     <View style={styles.statusContainer}>
                       <Ionicons 
-                        name={fee.isLate ? "warning" : "checkmark-circle"} 
+                        name={fee.status === 'Paid' ? "checkmark-circle" : fee.isLate ? "warning" : "time"} 
                         size={16} 
-                        color={fee.isLate ? "#ef4444" : "#10b981"} 
+                        color={fee.status === 'Paid' ? "#10b981" : fee.isLate ? "#ef4444" : "#f59e0b"} 
                       />
-                      <Text style={[styles.statusText, { color: fee.isLate ? "#ef4444" : "#10b981" }]}>
-                        {fee.isLate ? 'Late' : 'Current'}
+                      <Text style={[styles.compactStatusText, { 
+                        color: fee.status === 'Paid' ? "#10b981" : fee.isLate ? "#ef4444" : "#f59e0b"
+                      }]}>
+                        {fee.status === 'Paid' ? 'Paid' : fee.isLate ? 'Late' : 'Pending'}
                       </Text>
                     </View>
                     
@@ -510,9 +509,10 @@ const FeesScreen = () => {
                   <View key={fine._id} style={styles.itemCard}>
                     <View style={styles.itemHeader}>
                       <View style={styles.itemInfo}>
-                        <Text style={styles.itemTitle}>{fine.violation}</Text>
+                        <Text style={styles.itemTitle}>{fine.name}</Text>
                         <Text style={styles.itemDescription}>{fine.description}</Text>
-                        <Text style={styles.itemDate}>Issued: {formatDate(fine.dateIssued)}</Text>
+                        <Text style={styles.itemDate}>Reason: {fine.reason}</Text>
+                        <Text style={styles.itemDate}>Address: {fine.address}</Text>
                       </View>
                       <View style={styles.itemAmount}>
                         <Text style={styles.amountText}>{formatCurrency(fine.amount)}</Text>
@@ -523,16 +523,16 @@ const FeesScreen = () => {
                     <View style={styles.itemFooter}>
                       <View style={styles.statusContainer}>
                         <Ionicons 
-                          name={getStatusIcon(fine.status) as any} 
+                          name={getStatusIcon(fine.status || 'Pending') as any} 
                           size={16} 
-                          color={getStatusColor(fine.status)} 
+                          color={getStatusColor(fine.status || 'Pending')} 
                         />
-                        <Text style={[styles.statusText, { color: getStatusColor(fine.status) }]}>
-                          {fine.status}
+                        <Text style={[styles.compactStatusText, { color: getStatusColor(fine.status || 'Pending') }]}>
+                          {fine.status || 'Pending'}
                         </Text>
                       </View>
                       
-                      {fine.status !== 'Paid' && (
+                      {(fine.status || 'Pending') !== 'Paid' && (
                         <TouchableOpacity
                           style={styles.payButton}
                           onPress={() => handlePayment(fine, 'fine')}
@@ -667,17 +667,6 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 4,
     flexWrap: 'wrap',
-  },
-  demoBadge: {
-    backgroundColor: '#f59e0b',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  demoBadgeText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#ffffff',
   },
   headerTitle: {
     color: '#ffffff',
@@ -891,82 +880,75 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 6,
   },
-  userStatusCard: {
+  // Compact user status styles
+  compactUserCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowRadius: 2,
+    elevation: 1,
     borderWidth: 1,
     borderColor: '#f1f5f9',
   },
-  userInfo: {
+  compactUserInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
   },
-  userAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  compactAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#2563eb',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 10,
   },
-  userAvatarText: {
+  compactAvatarImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  compactAvatarText: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
   },
-  userDetails: {
+  compactUserDetails: {
     flex: 1,
   },
-  userName: {
-    fontSize: 16,
-    fontWeight: 'bold',
+  compactUserName: {
+    fontSize: 14,
+    fontWeight: '600',
     color: '#1f2937',
     marginBottom: 2,
   },
-  userType: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 2,
-  },
-  userAddress: {
+  compactUserType: {
     fontSize: 12,
-    color: '#9ca3af',
+    color: '#6b7280',
   },
-  feeStatus: {
-    alignItems: 'flex-end',
-  },
-  statusBadge: {
+  compactStatusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
-  paidBadge: {
+  compactPaidBadge: {
     backgroundColor: '#d1fae5',
   },
-  pendingBadge: {
+  compactPendingBadge: {
     backgroundColor: '#fef3c7',
   },
-  statusText: {
-    fontSize: 12,
+  compactStatusText: {
+    fontSize: 11,
     fontWeight: '600',
     marginLeft: 4,
-  },
-  paidText: {
-    color: '#065f46',
-  },
-  pendingText: {
-    color: '#92400e',
   },
 });
 

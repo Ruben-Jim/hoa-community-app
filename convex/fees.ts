@@ -199,6 +199,172 @@ export const getAllHomeownersPaymentStatus = query({
   },
 });
 
+// Create annual fees for all homeowners for a specific year
+export const createYearFeesForAllHomeowners = mutation({
+  args: {
+    year: v.number(),
+    amount: v.number(),
+    description: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const residents = await ctx.db.query("residents").collect();
+    
+    // Filter to only include homeowners (isResident = true and not renters)
+    const homeowners = residents.filter(resident => resident.isResident && !resident.isRenter);
+    
+    const now = Date.now();
+    const feeRecords = [];
+    
+    // Create fee records for each homeowner
+    for (const homeowner of homeowners) {
+      const feeRecord = await ctx.db.insert("fees", {
+        name: `${args.description} ${args.year}`,
+        amount: args.amount,
+        frequency: "Annually",
+        dueDate: `${args.year}-12-31`,
+        description: args.description,
+        isLate: false, // Initially not late
+        userId: homeowner._id, // Link to specific homeowner
+        year: args.year,
+        createdAt: now,
+        updatedAt: now,
+      });
+      
+      feeRecords.push(feeRecord);
+    }
+    
+    return {
+      success: true,
+      feesCreated: feeRecords.length,
+      message: `Created ${feeRecords.length} annual fees for year ${args.year}`,
+    };
+  },
+});
+
+// Add a fine to a specific property address
+export const addFineToProperty = mutation({
+  args: {
+    address: v.string(),
+    homeownerId: v.string(),
+    amount: v.number(),
+    reason: v.string(),
+    description: v.optional(v.string()),
+    dueDate: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const currentDate = new Date();
+    
+    // Create the fine record
+    const fineRecord = await ctx.db.insert("fees", {
+      name: `Fine - ${args.reason}`,
+      amount: args.amount,
+      frequency: "One-time",
+      dueDate: args.dueDate || new Date(currentDate.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
+      description: args.description || `Fine for ${args.reason} at ${args.address}`,
+      isLate: false, // Initially not late
+      userId: args.homeownerId,
+      address: args.address,
+      reason: args.reason,
+      type: 'Fine',
+      createdAt: now,
+      updatedAt: now,
+    });
+    
+    return {
+      success: true,
+      fineId: fineRecord,
+      message: `Fine of $${args.amount} added to ${args.address}`,
+    };
+  },
+});
+
+// Get all fees from database (excluding fines)
+export const getAllFeesFromDatabase = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db
+      .query("fees")
+      .filter((q) => 
+        q.or(
+          q.eq(q.field("type"), "Fee"),
+          q.neq(q.field("type"), "Fine")
+        )
+      )
+      .order("desc")
+      .collect();
+  },
+});
+
+// Get all fines for admin view
+export const getAllFines = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db
+      .query("fees")
+      .filter((q) => q.eq(q.field("type"), "Fine"))
+      .order("desc")
+      .collect();
+  },
+});
+
+// Get fees for a specific homeowner from database
+export const getFeesForHomeownerFromDatabase = query({
+  args: { homeownerId: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("fees")
+      .withIndex("by_user", (q) => q.eq("userId", args.homeownerId))
+      .filter((q) => 
+        q.and(
+          q.eq(q.field("userId"), args.homeownerId),
+          q.or(
+            q.eq(q.field("type"), "Fee"),
+            q.neq(q.field("type"), "Fine")
+          )
+        )
+      )
+      .order("desc")
+      .collect();
+  },
+});
+
+// Get fines for a specific homeowner
+export const getFinesForHomeowner = query({
+  args: { homeownerId: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("fees")
+      .filter((q) => 
+        q.and(
+          q.eq(q.field("userId"), args.homeownerId),
+          q.eq(q.field("type"), "Fine")
+        )
+      )
+      .order("desc")
+      .collect();
+  },
+});
+
+// Update fine status (mark as paid, etc.)
+export const updateFineStatus = mutation({
+  args: {
+    fineId: v.id("fees"),
+    status: v.union(v.literal("Paid"), v.literal("Pending"), v.literal("Overdue")),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.fineId, { 
+      status: args.status,
+      updatedAt: Date.now(),
+    });
+    
+    return {
+      success: true,
+      message: `Fine status updated to ${args.status}`,
+    };
+  },
+});
+
 
 
 

@@ -42,9 +42,19 @@ export default defineSchema({
     dueDate: v.string(),
     description: v.string(),
     isLate: v.boolean(),
+    userId: v.optional(v.string()), // Link to homeowner
+    year: v.optional(v.number()), // For annual fees
+    address: v.optional(v.string()), // Property address for fines
+    reason: v.optional(v.string()), // Reason for fine
+    type: v.optional(v.string()), // 'Fee' or 'Fine'
+    status: v.optional(v.union(
+      v.literal("Pending"),
+      v.literal("Paid"),
+      v.literal("Overdue")
+    )),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }),
+  }).index("by_user", ["userId"]).index("by_type", ["type"]),
 
   fines: defineTable({
     violation: v.string(),
