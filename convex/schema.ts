@@ -60,7 +60,6 @@ export default defineSchema({
     violation: v.string(),
     amount: v.number(),
     dateIssued: v.string(),
-    dueDate: v.string(),
     status: v.union(
       v.literal("Pending"),
       v.literal("Paid"),

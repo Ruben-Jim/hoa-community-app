@@ -192,12 +192,14 @@ const BoardScreen = () => {
               <View style={styles.headerLeft}>
                 <View style={styles.titleContainer}>
                   <Text style={styles.headerTitle}>Board of Directors</Text>
-                  <DeveloperIndicator />
-                  <BoardMemberIndicator />
                 </View>
                 <Text style={styles.headerSubtitle}>
                   Your elected representatives serving the community
                 </Text>
+                <View style={styles.indicatorsContainer}>
+                  <DeveloperIndicator />
+                  <BoardMemberIndicator />
+                </View>
               </View>
             </View>
           </ImageBackground>
@@ -448,8 +450,15 @@ const styles = StyleSheet.create({
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
     marginBottom: 4,
+  },
+  indicatorsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 8,
   },
   headerTitle: {
     color: '#ffffff',

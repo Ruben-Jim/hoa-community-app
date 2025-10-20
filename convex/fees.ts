@@ -156,6 +156,14 @@ export const hasPaidAnnualFee = query({
 export const getAllHomeownersPaymentStatus = query({
   args: {},
   handler: async (ctx) => {
+    // First check if there are any fees in the system
+    const allFees = await ctx.db.query("fees").collect();
+    
+    // If no fees exist, return empty array
+    if (allFees.length === 0) {
+      return [];
+    }
+    
     const residents = await ctx.db.query("residents").collect();
     const currentYear = new Date().getFullYear();
     
@@ -249,24 +257,18 @@ export const addFineToProperty = mutation({
     amount: v.number(),
     reason: v.string(),
     description: v.optional(v.string()),
-    dueDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const currentDate = new Date();
     
-    // Create the fine record
-    const fineRecord = await ctx.db.insert("fees", {
-      name: `Fine - ${args.reason}`,
+    // Create the fine record in the fines table
+    const fineRecord = await ctx.db.insert("fines", {
+      violation: args.reason,
       amount: args.amount,
-      frequency: "One-time",
-      dueDate: args.dueDate || new Date(currentDate.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
+      dateIssued: new Date().toISOString().split('T')[0],
+      status: "Pending",
       description: args.description || `Fine for ${args.reason} at ${args.address}`,
-      isLate: false, // Initially not late
-      userId: args.homeownerId,
-      address: args.address,
-      reason: args.reason,
-      type: 'Fine',
+      residentId: args.homeownerId,
       createdAt: now,
       updatedAt: now,
     });
@@ -279,51 +281,12 @@ export const addFineToProperty = mutation({
   },
 });
 
-// Get all fees from database (excluding fines)
-export const getAllFeesFromDatabase = query({
-  args: {},
-  handler: async (ctx) => {
-    return await ctx.db
-      .query("fees")
-      .filter((q) => 
-        q.or(
-          q.eq(q.field("type"), "Fee"),
-          q.neq(q.field("type"), "Fine")
-        )
-      )
-      .order("desc")
-      .collect();
-  },
-});
-
 // Get all fines for admin view
 export const getAllFines = query({
   args: {},
   handler: async (ctx) => {
     return await ctx.db
-      .query("fees")
-      .filter((q) => q.eq(q.field("type"), "Fine"))
-      .order("desc")
-      .collect();
-  },
-});
-
-// Get fees for a specific homeowner from database
-export const getFeesForHomeownerFromDatabase = query({
-  args: { homeownerId: v.string() },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("fees")
-      .withIndex("by_user", (q) => q.eq("userId", args.homeownerId))
-      .filter((q) => 
-        q.and(
-          q.eq(q.field("userId"), args.homeownerId),
-          q.or(
-            q.eq(q.field("type"), "Fee"),
-            q.neq(q.field("type"), "Fine")
-          )
-        )
-      )
+      .query("fines")
       .order("desc")
       .collect();
   },
@@ -334,13 +297,8 @@ export const getFinesForHomeowner = query({
   args: { homeownerId: v.string() },
   handler: async (ctx, args) => {
     return await ctx.db
-      .query("fees")
-      .filter((q) => 
-        q.and(
-          q.eq(q.field("userId"), args.homeownerId),
-          q.eq(q.field("type"), "Fine")
-        )
-      )
+      .query("fines")
+      .filter((q) => q.eq(q.field("residentId"), args.homeownerId))
       .order("desc")
       .collect();
   },
@@ -349,7 +307,7 @@ export const getFinesForHomeowner = query({
 // Update fine status (mark as paid, etc.)
 export const updateFineStatus = mutation({
   args: {
-    fineId: v.id("fees"),
+    fineId: v.id("fines"),
     status: v.union(v.literal("Paid"), v.literal("Pending"), v.literal("Overdue")),
   },
   handler: async (ctx, args) => {

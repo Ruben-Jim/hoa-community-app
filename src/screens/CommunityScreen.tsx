@@ -365,12 +365,14 @@ const CommunityScreen = () => {
             <View style={styles.headerLeft}>
               <View style={styles.titleContainer}>
                 <Text style={styles.headerTitle}>Community Forum</Text>
-                <DeveloperIndicator />
-                <BoardMemberIndicator />
               </View>
               <Text style={styles.headerSubtitle}>
                 Connect with your neighbors and stay informed
               </Text>
+              <View style={styles.indicatorsContainer}>
+                <DeveloperIndicator />
+                <BoardMemberIndicator />
+              </View>
             </View>
           </View>
         </ImageBackground>
@@ -864,8 +866,15 @@ const styles = StyleSheet.create({
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
     marginBottom: 4,
+  },
+  indicatorsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 8,
   },
   headerTitle: {
     color: '#ffffff',

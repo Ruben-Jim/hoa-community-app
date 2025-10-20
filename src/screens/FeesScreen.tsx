@@ -154,6 +154,7 @@ const FeesScreen = () => {
 
   // Convex mutations
   const recordPayment = useMutation(api.fees.recordPayment);
+  const updateFineStatus = useMutation(api.fees.updateFineStatus);
 
   const handlePayment = async (item: any, type: 'fee' | 'fine') => {
     Alert.alert(
@@ -178,6 +179,14 @@ const FeesScreen = () => {
                 setHasPaidAnnualFee(true);
                 
                 Alert.alert('Success', 'Payment recorded successfully!');
+              } else if (type === 'fine') {
+                // Update fine status to paid
+                await updateFineStatus({
+                  fineId: item._id,
+                  status: 'Paid',
+                });
+                
+                Alert.alert('Success', 'Fine payment recorded successfully!');
               } else {
                 Alert.alert('Payment', 'Payment processing would be integrated here.');
               }
@@ -199,18 +208,20 @@ const FeesScreen = () => {
     return 'guest';
   };
 
-  // Get fees from database only
-  const fees = useQuery(
-    api.fees.getFeesForHomeownerFromDatabase,
-    user ? { homeownerId: user._id } : "skip"
-  ) ?? [];
+  // Get all fees from database and filter for current user
+  const allFeesFromDatabase = useQuery(api.fees.getAll) ?? [];
+  
+  // Filter fees for the current user if they are a homeowner
+  const fees = user && (user.isResident && !user.isRenter) 
+    ? allFeesFromDatabase.filter((fee: any) => fee.userId === user._id)
+    : [];
 
   // Get fines for the user (if any)
   const allFines = useQuery(api.fees.getAllFines) ?? [];
   
   // Filter fines for the current user if they are a homeowner
   const fines = user && (user.isResident && !user.isRenter) 
-    ? allFines.filter((fine: any) => fine.userId === user._id)
+    ? allFines.filter((fine: any) => fine.residentId === user._id)
     : [];
   const totalFees = fees.reduce((sum: number, fee: any) => sum + fee.amount, 0);
   const totalFines = fines.reduce((sum: number, fine: any) => sum + fine.amount, 0);
@@ -251,12 +262,14 @@ const FeesScreen = () => {
               <View style={styles.headerLeft}>
                 <View style={styles.titleContainer}>
                   <Text style={styles.headerTitle}>Fees & Fines</Text>
-                  <DeveloperIndicator />
-                  <BoardMemberIndicator />
                 </View>
                 <Text style={styles.headerSubtitle}>
                   Manage your HOA payments and violations
                 </Text>
+                <View style={styles.indicatorsContainer}>
+                  <DeveloperIndicator />
+                  <BoardMemberIndicator />
+                </View>
               </View>
             </View>
           </ImageBackground>
@@ -340,22 +353,39 @@ const FeesScreen = () => {
                      user.isResident ? 'Homeowner' : 'Resident'}
                   </Text>
                 </View>
-                <View style={[
-                  styles.compactStatusBadge,
-                  hasPaidAnnualFee ? styles.compactPaidBadge : styles.compactPendingBadge
-                ]}>
-                  <Ionicons 
-                    name={hasPaidAnnualFee ? "checkmark-circle" : "time"} 
-                    size={14} 
-                    color={hasPaidAnnualFee ? "#10b981" : "#f59e0b"} 
-                  />
-                  <Text style={[
-                    styles.compactStatusText,
-                    { color: hasPaidAnnualFee ? "#10b981" : "#f59e0b" }
+                {/* Show status only if there are fees, otherwise show no fees message */}
+                {fees.length > 0 || fines.length > 0 ? (
+                  <View style={[
+                    styles.compactStatusBadge,
+                    hasPaidAnnualFee ? styles.compactPaidBadge : styles.compactPendingBadge
                   ]}>
-                    {hasPaidAnnualFee ? 'Paid' : 'Pending'}
-                  </Text>
-                </View>
+                    <Ionicons 
+                      name={hasPaidAnnualFee ? "checkmark-circle" : "time"} 
+                      size={14} 
+                      color={hasPaidAnnualFee ? "#10b981" : "#f59e0b"} 
+                    />
+                    <Text style={[
+                      styles.compactStatusText,
+                      { color: hasPaidAnnualFee ? "#10b981" : "#f59e0b" }
+                    ]}>
+                      {hasPaidAnnualFee ? 'Paid' : 'Pending'}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={[styles.compactStatusBadge, styles.compactNoFeesBadge]}>
+                    <Ionicons 
+                      name="calendar-outline" 
+                      size={14} 
+                      color="#6b7280" 
+                    />
+                    <Text style={[
+                      styles.compactStatusText,
+                      { color: "#6b7280" }
+                    ]}>
+                      No fees yet
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
           </Animated.View>
@@ -457,43 +487,51 @@ const FeesScreen = () => {
           {activeTab === 'fees' ? (
             <View>
               <Text style={styles.sectionTitle}>HOA Fees</Text>
-              {fees.map((fee: any) => (
-                <View key={fee._id} style={styles.itemCard}>
-                  <View style={styles.itemHeader}>
-                    <View style={styles.itemInfo}>
-                      <Text style={styles.itemTitle}>{fee.name}</Text>
-                      <Text style={styles.itemDescription}>{fee.description}</Text>
-                      <Text style={styles.itemFrequency}>{fee.frequency}</Text>
-                    </View>
-                    <View style={styles.itemAmount}>
-                      <Text style={styles.amountText}>{formatCurrency(fee.amount)}</Text>
-                      <Text style={styles.dueDate}>Due: {formatDate(fee.dueDate)}</Text>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.itemFooter}>
-                    <View style={styles.statusContainer}>
-                      <Ionicons 
-                        name={fee.status === 'Paid' ? "checkmark-circle" : fee.isLate ? "warning" : "time"} 
-                        size={16} 
-                        color={fee.status === 'Paid' ? "#10b981" : fee.isLate ? "#ef4444" : "#f59e0b"} 
-                      />
-                      <Text style={[styles.compactStatusText, { 
-                        color: fee.status === 'Paid' ? "#10b981" : fee.isLate ? "#ef4444" : "#f59e0b"
-                      }]}>
-                        {fee.status === 'Paid' ? 'Paid' : fee.isLate ? 'Late' : 'Pending'}
-                      </Text>
+              {fees.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="card" size={48} color="#10b981" />
+                  <Text style={styles.emptyStateText}>No fees found</Text>
+                  <Text style={styles.emptyStateSubtext}>All fees are up to date!</Text>
+                </View>
+              ) : (
+                fees.map((fee: any) => (
+                  <View key={fee._id} style={styles.itemCard}>
+                    <View style={styles.itemHeader}>
+                      <View style={styles.itemInfo}>
+                        <Text style={styles.itemTitle}>{fee.name}</Text>
+                        <Text style={styles.itemDescription}>{fee.description}</Text>
+                        <Text style={styles.itemFrequency}>{fee.frequency}</Text>
+                      </View>
+                      <View style={styles.itemAmount}>
+                        <Text style={styles.amountText}>{formatCurrency(fee.amount)}</Text>
+                        <Text style={styles.dueDate}>Due: {formatDate(fee.dueDate)}</Text>
+                      </View>
                     </View>
                     
-                    <TouchableOpacity
-                      style={styles.payButton}
-                      onPress={() => handlePayment(fee, 'fee')}
-                    >
-                      <Text style={styles.payButtonText}>Pay Now</Text>
-                    </TouchableOpacity>
+                    <View style={styles.itemFooter}>
+                      <View style={styles.statusContainer}>
+                        <Ionicons 
+                          name={fee.status === 'Paid' ? "checkmark-circle" : fee.isLate ? "warning" : "time"} 
+                          size={16} 
+                          color={fee.status === 'Paid' ? "#10b981" : fee.isLate ? "#ef4444" : "#f59e0b"} 
+                        />
+                        <Text style={[styles.compactStatusText, { 
+                          color: fee.status === 'Paid' ? "#10b981" : fee.isLate ? "#ef4444" : "#f59e0b"
+                        }]}>
+                          {fee.status === 'Paid' ? 'Paid' : fee.isLate ? 'Late' : 'Pending'}
+                        </Text>
+                      </View>
+                      
+                      <TouchableOpacity
+                        style={styles.payButton}
+                        onPress={() => handlePayment(fee, 'fee')}
+                      >
+                        <Text style={styles.payButtonText}>Pay Now</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
-              ))}
+                ))
+              )}
             </View>
           ) : (
             <View>
@@ -509,14 +547,12 @@ const FeesScreen = () => {
                   <View key={fine._id} style={styles.itemCard}>
                     <View style={styles.itemHeader}>
                       <View style={styles.itemInfo}>
-                        <Text style={styles.itemTitle}>{fine.name}</Text>
+                        <Text style={styles.itemTitle}>{fine.violation}</Text>
                         <Text style={styles.itemDescription}>{fine.description}</Text>
-                        <Text style={styles.itemDate}>Reason: {fine.reason}</Text>
-                        <Text style={styles.itemDate}>Address: {fine.address}</Text>
+                        <Text style={styles.itemDate}>Issued: {fine.dateIssued}</Text>
                       </View>
                       <View style={styles.itemAmount}>
                         <Text style={styles.amountText}>{formatCurrency(fine.amount)}</Text>
-                        <Text style={styles.dueDate}>Due: {formatDate(fine.dueDate)}</Text>
                       </View>
                     </View>
                     
@@ -664,9 +700,15 @@ const styles = StyleSheet.create({
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
     marginBottom: 4,
-    flexWrap: 'wrap',
+  },
+  indicatorsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 8,
   },
   headerTitle: {
     color: '#ffffff',
@@ -944,6 +986,9 @@ const styles = StyleSheet.create({
   },
   compactPendingBadge: {
     backgroundColor: '#fef3c7',
+  },
+  compactNoFeesBadge: {
+    backgroundColor: '#f3f4f6',
   },
   compactStatusText: {
     fontSize: 11,
