@@ -44,6 +44,13 @@ export const update = mutation({
     dueDate: v.optional(v.string()),
     description: v.optional(v.string()),
     isLate: v.optional(v.boolean()),
+    status: v.optional(
+      v.union(
+        v.literal("Pending"),
+        v.literal("Paid"),
+        v.literal("Overdue")
+      )
+    ),
   },
   handler: async (ctx, args) => {
     const { id, ...updates } = args;
@@ -110,6 +117,8 @@ export const recordPayment = mutation({
       amount: args.amount,
       paymentDate: args.paymentDate,
       status: 'Paid',
+      paymentMethod: 'Stripe', // Default to Stripe for now
+      transactionId: `legacy-${now}`, // Legacy payment without Stripe transaction
       createdAt: now,
       updatedAt: now,
     });
@@ -189,6 +198,13 @@ export const getAllHomeownersPaymentStatus = query({
           return paymentYear === currentYear;
         });
         
+        // Find the annual fee for this homeowner
+        const homeownerFee = allFees.find(fee => 
+          fee.userId === homeowner._id && 
+          fee.year === currentYear &&
+          fee.frequency === "Annually"
+        );
+        
         // Determine user type
         let userType = 'homeowner';
         if (homeowner.isBoardMember) userType = 'board-member';
@@ -198,7 +214,7 @@ export const getAllHomeownersPaymentStatus = query({
           userType,
           hasPaidAnnualFee: hasPaid,
           paymentStatus: hasPaid ? 'Paid' : 'Pending',
-          annualFeeAmount: 300, // $300 for all homeowners
+          annualFeeAmount: homeownerFee?.amount || 300, // Use actual fee amount or default to 300
         };
       })
     );

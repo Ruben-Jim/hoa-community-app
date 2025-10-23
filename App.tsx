@@ -9,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import AuthNavigator from './src/navigation/AuthNavigator';
 import enhancedUnifiedNotificationManager from './src/services/EnhancedUnifiedNotificationManager';
+import { StripeWrapper } from './src/context/StripeProvider';
 
 import HomeScreen from './src/screens/HomeScreen';
 import BoardScreen from './src/screens/BoardScreen';
@@ -90,12 +91,14 @@ export default function App() {
 
   const content = (
     <SafeAreaProvider>
-      <AuthProvider>
-        <NavigationContainer>
-          <MainApp />
-          <StatusBar style="auto" />
-        </NavigationContainer>
-      </AuthProvider>
+      <StripeWrapper>
+        <AuthProvider>
+          <NavigationContainer>
+            <MainApp />
+            <StatusBar style="auto" />
+          </NavigationContainer>
+        </AuthProvider>
+      </StripeWrapper>
     </SafeAreaProvider>
   );
 

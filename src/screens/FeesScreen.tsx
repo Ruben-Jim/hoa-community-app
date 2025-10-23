@@ -21,12 +21,16 @@ import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import DeveloperIndicator from '../components/DeveloperIndicator';
 import CustomTabBar from '../components/CustomTabBar';
 import MobileTabBar from '../components/MobileTabBar';
+import PaymentModal from '../components/PaymentModal';
 
 const FeesScreen = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'fees' | 'fines'>('fees');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [hasPaidAnnualFee, setHasPaidAnnualFee] = useState(false);
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [selectedPaymentItem, setSelectedPaymentItem] = useState<any>(null);
+  const [selectedPaymentType, setSelectedPaymentType] = useState<'fee' | 'fine'>('fee');
 
   // State for dynamic responsive behavior (only for web/desktop)
   const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
@@ -155,48 +159,40 @@ const FeesScreen = () => {
   // Convex mutations
   const recordPayment = useMutation(api.fees.recordPayment);
   const updateFineStatus = useMutation(api.fees.updateFineStatus);
+  const updateFee = useMutation(api.fees.update);
 
-  const handlePayment = async (item: any, type: 'fee' | 'fine') => {
-    Alert.alert(
-      `Pay ${type === 'fee' ? 'Fee' : 'Fine'}`,
-      `Would you like to pay ${formatCurrency(item.amount)} for ${type === 'fee' ? item.name : item.violation}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Pay Now', 
-          onPress: async () => {
-            try {
-              if (type === 'fee' && user) {
-                // Record the payment
-                await recordPayment({
-                  userId: user._id,
-                  feeType: item.name,
-                  amount: item.amount,
-                  paymentDate: new Date().toISOString().split('T')[0],
-                });
-                
-                // Update local state
-                setHasPaidAnnualFee(true);
-                
-                Alert.alert('Success', 'Payment recorded successfully!');
-              } else if (type === 'fine') {
-                // Update fine status to paid
-                await updateFineStatus({
-                  fineId: item._id,
-                  status: 'Paid',
-                });
-                
-                Alert.alert('Success', 'Fine payment recorded successfully!');
-              } else {
-                Alert.alert('Payment', 'Payment processing would be integrated here.');
-              }
-            } catch (error) {
-              Alert.alert('Error', 'Failed to record payment. Please try again.');
-            }
-          }
-        }
-      ]
-    );
+  const handlePayment = (item: any, type: 'fee' | 'fine') => {
+    setSelectedPaymentItem(item);
+    setSelectedPaymentType(type);
+    setPaymentModalVisible(true);
+  };
+
+  const handlePaymentSuccess = async () => {
+    try {
+      // Update the fee/fine status in the database
+      if (selectedPaymentType === 'fee' && selectedPaymentItem) {
+        // Update fee status to Paid
+        await updateFee({
+          id: selectedPaymentItem._id,
+          status: 'Paid',
+        });
+        setHasPaidAnnualFee(true);
+      } else if (selectedPaymentType === 'fine' && selectedPaymentItem) {
+        // Update fine status to Paid
+        await updateFineStatus({
+          fineId: selectedPaymentItem._id,
+          status: 'Paid',
+        });
+      }
+      
+      setPaymentModalVisible(false);
+      setSelectedPaymentItem(null);
+      
+      Alert.alert('Success', 'Payment completed successfully!');
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+      Alert.alert('Warning', 'Payment was successful but status update failed. Please refresh the page.');
+    }
   };
 
   // Dynamic fee generation based on user status
@@ -522,12 +518,14 @@ const FeesScreen = () => {
                         </Text>
                       </View>
                       
-                      <TouchableOpacity
-                        style={styles.payButton}
-                        onPress={() => handlePayment(fee, 'fee')}
-                      >
-                        <Text style={styles.payButtonText}>Pay Now</Text>
-                      </TouchableOpacity>
+                      {fee.status !== 'Paid' && (
+                        <TouchableOpacity
+                          style={styles.payButton}
+                          onPress={() => handlePayment(fee, 'fee')}
+                        >
+                          <Text style={styles.payButtonText}>Pay Now</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
                 ))
@@ -615,6 +613,21 @@ const FeesScreen = () => {
         {/* Additional content to ensure scrollable content */}
         <View style={styles.spacer} />
         </ScrollView>
+
+        {/* Payment Modal */}
+        {selectedPaymentItem && user && (
+          <PaymentModal
+            visible={paymentModalVisible}
+            onClose={() => setPaymentModalVisible(false)}
+            amount={selectedPaymentItem.amount}
+            feeType={selectedPaymentType === 'fee' ? selectedPaymentItem.name : selectedPaymentItem.violation}
+            description={selectedPaymentItem.description}
+            userId={user._id}
+            feeId={selectedPaymentType === 'fee' ? selectedPaymentItem._id : undefined}
+            fineId={selectedPaymentType === 'fine' ? selectedPaymentItem._id : undefined}
+            onSuccess={handlePaymentSuccess}
+          />
+        )}
       </View>
     </SafeAreaView>
   );

@@ -162,7 +162,18 @@ export default defineSchema({
       v.literal("Paid"),
       v.literal("Overdue")
     ),
+    paymentMethod: v.union(
+      v.literal("Stripe"),
+      v.literal("PayPal"),      // Future
+      v.literal("ApplePay"),    // Future
+      v.literal("GooglePay")    // Future
+    ),
+    transactionId: v.string(),             // Stripe payment_intent ID
+    paymentIntentId: v.optional(v.string()), // Stripe-specific
+    feeId: v.optional(v.id("fees")),
+    fineId: v.optional(v.id("fines")),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_user", ["userId"]),
+  }).index("by_user", ["userId"])
+    .index("by_transaction", ["transactionId"]),
 }); 

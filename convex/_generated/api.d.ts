@@ -20,6 +20,8 @@ import type * as emergencyNotifications from "../emergencyNotifications.js";
 import type * as fees from "../fees.js";
 import type * as fines from "../fines.js";
 import type * as hoaInfo from "../hoaInfo.js";
+import type * as http from "../http.js";
+import type * as payments from "../payments.js";
 import type * as residents from "../residents.js";
 import type * as storage from "../storage.js";
 
@@ -39,6 +41,8 @@ declare const fullApi: ApiFromModules<{
   fees: typeof fees;
   fines: typeof fines;
   hoaInfo: typeof hoaInfo;
+  http: typeof http;
+  payments: typeof payments;
   residents: typeof residents;
   storage: typeof storage;
 }>;
