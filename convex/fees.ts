@@ -142,22 +142,50 @@ export const hasPaidAnnualFee = query({
   args: { userId: v.string() },
   handler: async (ctx, args) => {
     const currentYear = new Date().getFullYear();
-    const payments = await ctx.db
-      .query("payments")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .filter((q) => 
+    // If there are any unpaid fines, the user is not fully paid
+    const unpaidFines = await ctx.db
+      .query("fines")
+      .filter((q) =>
         q.and(
-          q.eq(q.field("feeType"), "Annual HOA Fee"),
-          q.eq(q.field("status"), "Paid")
+          q.eq(q.field("residentId"), args.userId),
+          q.neq(q.field("status"), "Paid")
         )
       )
       .collect();
-    
-    // Check if any payment was made in the current year
-    return payments.some(payment => {
+    if (unpaidFines.length > 0) return false;
+
+    // Prefer explicit fee records when present
+    const userAnnualFees = await ctx.db
+      .query("fees")
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("userId"), args.userId),
+          q.eq(q.field("frequency"), "Annually"),
+          q.eq(q.field("year"), currentYear)
+        )
+      )
+      .collect();
+
+    if (userAnnualFees.length > 0) {
+      // User is fully paid only if all annual fees for the year are Paid
+      const allAnnualFeesPaid = userAnnualFees.every((fee) => fee.status === "Paid");
+      return allAnnualFeesPaid;
+    }
+
+    // Fallback to payment records (supports names like "Annual HOA Fee 2025")
+    const payments = await ctx.db
+      .query("payments")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .filter((q) => q.eq(q.field("status"), "Paid"))
+      .collect();
+
+    const hasPaidViaPaymentRecord = payments.some((payment) => {
       const paymentYear = new Date(payment.paymentDate).getFullYear();
-      return paymentYear === currentYear;
+      const isAnnualFee = typeof payment.feeType === "string" && payment.feeType.startsWith("Annual HOA Fee");
+      return paymentYear === currentYear && isAnnualFee;
     });
+
+    return hasPaidViaPaymentRecord;
   },
 });
 
@@ -181,22 +209,43 @@ export const getAllHomeownersPaymentStatus = query({
     
     const homeownersWithPaymentStatus = await Promise.all(
       homeowners.map(async (homeowner) => {
-        // Check if homeowner has paid annual fee
-        const payments = await ctx.db
-          .query("payments")
-          .withIndex("by_user", (q) => q.eq("userId", homeowner._id))
-          .filter((q) => 
+        // Determine paid status based on unpaid items (fees + fines)
+        const unpaidFines = await ctx.db
+          .query("fines")
+          .filter((q) =>
             q.and(
-              q.eq(q.field("feeType"), "Annual HOA Fee"),
-              q.eq(q.field("status"), "Paid")
+              q.eq(q.field("residentId"), homeowner._id),
+              q.neq(q.field("status"), "Paid")
             )
           )
           .collect();
-        
-        const hasPaid = payments.some(payment => {
-          const paymentYear = new Date(payment.paymentDate).getFullYear();
-          return paymentYear === currentYear;
-        });
+
+        const userAnnualFees = allFees.filter(
+          (fee) =>
+            fee.userId === homeowner._id &&
+            fee.year === currentYear &&
+            fee.frequency === "Annually"
+        );
+
+        // If there are explicit annual fee records, require all to be Paid
+        let hasPaid = false;
+        if (userAnnualFees.length > 0) {
+          const allAnnualFeesPaid = userAnnualFees.every((fee) => fee.status === "Paid");
+          hasPaid = allAnnualFeesPaid && unpaidFines.length === 0;
+        } else {
+          // Fallback to payment records
+          const payments = await ctx.db
+            .query("payments")
+            .withIndex("by_user", (q) => q.eq("userId", homeowner._id))
+            .filter((q) => q.eq(q.field("status"), "Paid"))
+            .collect();
+          const hasPaidViaPaymentRecord = payments.some((payment) => {
+            const paymentYear = new Date(payment.paymentDate).getFullYear();
+            const isAnnualFee = typeof payment.feeType === "string" && payment.feeType.startsWith("Annual HOA Fee");
+            return paymentYear === currentYear && isAnnualFee;
+          });
+          hasPaid = hasPaidViaPaymentRecord && unpaidFines.length === 0;
+        }
         
         // Find the annual fee for this homeowner
         const homeownerFee = allFees.find(fee => 
