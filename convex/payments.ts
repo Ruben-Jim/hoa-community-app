@@ -111,3 +111,90 @@ export const getPaymentByTransactionId = query({
   },
 });
 
+// Create a PayPal order record in the database
+export const createPayPalOrder = mutation({
+  args: {
+    userId: v.string(),
+    feeType: v.string(),
+    amount: v.number(),
+    orderId: v.string(),
+    feeId: v.optional(v.id("fees")),
+    fineId: v.optional(v.id("fines")),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    
+    const paymentId = await ctx.db.insert("payments", {
+      userId: args.userId,
+      feeType: args.feeType,
+      amount: args.amount,
+      paymentDate: new Date().toISOString().split('T')[0],
+      status: "Pending",
+      paymentMethod: "PayPal",
+      transactionId: args.orderId,
+      paymentIntentId: args.orderId, // Using orderId as paymentIntentId for consistency
+      feeId: args.feeId,
+      fineId: args.fineId,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return paymentId;
+  },
+});
+
+// Update PayPal order status after payment completion
+export const updatePayPalOrderStatus = mutation({
+  args: {
+    orderId: v.string(),
+    status: v.union(v.literal("COMPLETED"), v.literal("PENDING"), v.literal("CANCELLED")),
+    transactionId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // Find the payment by transaction ID (orderId)
+    const payment = await ctx.db
+      .query("payments")
+      .withIndex("by_transaction", (q) => q.eq("transactionId", args.orderId))
+      .first();
+
+    if (!payment) {
+      throw new Error(`PayPal order with ID ${args.orderId} not found`);
+    }
+
+    // Map PayPal status to our payment status
+    let paymentStatus: "Paid" | "Pending" | "Overdue";
+    if (args.status === "COMPLETED") {
+      paymentStatus = "Paid";
+    } else if (args.status === "PENDING") {
+      paymentStatus = "Pending";
+    } else {
+      paymentStatus = "Overdue";
+    }
+
+    // Update payment status
+    await ctx.db.patch(payment._id, {
+      status: paymentStatus,
+      updatedAt: Date.now(),
+    });
+
+    // If payment is successful, update the associated fee or fine
+    if (paymentStatus === "Paid") {
+      if (payment.feeId) {
+        await ctx.db.patch(payment.feeId, {
+          status: "Paid",
+          updatedAt: Date.now(),
+        });
+      }
+      
+      if (payment.fineId) {
+        await ctx.db.patch(payment.fineId, {
+          status: "Paid",
+          updatedAt: Date.now(),
+        });
+      }
+    }
+
+    return payment._id;
+  },
+});
+

@@ -15,6 +15,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation } from 'convex/react';
@@ -39,6 +40,13 @@ const CommunityScreen = () => {
     content: '',
     category: 'General' as any,
   });
+
+  // Poll voting state
+  const [selectedPollVotes, setSelectedPollVotes] = useState<{[pollId: string]: number[]}>({});
+  
+  // Image upload state
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
 
   // State for dynamic responsive behavior (only for web/desktop)
   const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
@@ -100,11 +108,14 @@ const CommunityScreen = () => {
 
   // Convex queries
   const posts = useQuery(api.communityPosts.getAll) ?? [];
+  const polls = useQuery(api.polls.getActive) ?? [];
 
   // Convex mutations
   const createPost = useMutation(api.communityPosts.create);
   const addComment = useMutation(api.communityPosts.addComment);
   const likePost = useMutation(api.communityPosts.like);
+  const voteOnPoll = useMutation(api.polls.vote);
+  const generateUploadUrl = useMutation(api.storage.generateUploadUrl);
 
   const categories = ['General', 'Event', 'Complaint', 'Suggestion', 'Lost & Found'];
   const COMMENTS_PREVIEW_LIMIT = 2; // Show only 2 comments initially
@@ -196,6 +207,12 @@ const CommunityScreen = () => {
     !selectedCategory || post.category === selectedCategory
   );
 
+  // Combine posts and polls for display
+  const allContent = [
+    ...filteredPosts.map(post => ({ ...post, type: 'post' })),
+    ...polls.map(poll => ({ ...poll, type: 'poll' }))
+  ].sort((a, b) => b.createdAt - a.createdAt);
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -286,14 +303,19 @@ const CommunityScreen = () => {
     }
 
     try {
+      // Upload images first
+      const uploadedImageUrls = await uploadImages();
+
       await createPost({
         title: newPost.title,
         content: newPost.content,
         category: newPost.category,
         author: `${user.firstName} ${user.lastName}`,
+        images: uploadedImageUrls.length > 0 ? uploadedImageUrls : undefined,
       });
 
       setNewPost({ title: '', content: '', category: 'General' });
+      setSelectedImages([]);
       animateOut('post', () => {
         setShowNewPostModal(false);
       });
@@ -301,6 +323,139 @@ const CommunityScreen = () => {
       // Silently handle post creation errors
       Alert.alert('Error', 'Failed to create post');
     }
+  };
+
+  const handleVoteOnPoll = async (pollId: string, optionIndex: number) => {
+    if (!user) {
+      Alert.alert('Error', 'Please sign in to vote');
+      return;
+    }
+
+    try {
+      const currentVotes = selectedPollVotes[pollId] || [];
+      let newVotes: number[];
+
+      if (currentVotes.includes(optionIndex)) {
+        // Remove vote if already selected
+        newVotes = currentVotes.filter(vote => vote !== optionIndex);
+      } else {
+        // Add vote
+        const poll = polls.find(p => p._id === pollId);
+        if (poll && !poll.allowMultipleVotes) {
+          // Single vote only - replace current vote
+          newVotes = [optionIndex];
+        } else {
+          // Multiple votes allowed - add to existing votes
+          newVotes = [...currentVotes, optionIndex];
+        }
+      }
+
+      setSelectedPollVotes(prev => ({
+        ...prev,
+        [pollId]: newVotes
+      }));
+
+      await voteOnPoll({
+        pollId: pollId as any,
+        userId: user._id,
+        selectedOptions: newVotes,
+      });
+    } catch (error) {
+      console.error('Error voting on poll:', error);
+      Alert.alert('Error', 'Failed to vote. Please try again.');
+    }
+  };
+
+  const pickImage = async () => {
+    if (selectedImages.length >= 5) {
+      Alert.alert('Limit Reached', 'You can only add up to 5 images per post.');
+      return;
+    }
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+        setSelectedImages(prev => [...prev, imageUri]);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setSelectedImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadImages = async (): Promise<string[]> => {
+    if (selectedImages.length === 0) return [];
+
+    setUploadingImages(true);
+    const uploadedUrls: string[] = [];
+
+    try {
+      for (const imageUri of selectedImages) {
+        const uploadUrl = await generateUploadUrl();
+        
+        const response = await fetch(imageUri);
+        const blob = await response.blob();
+        
+        const uploadResponse = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': blob.type },
+          body: blob,
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error('Upload failed');
+        }
+
+        const { storageId } = await uploadResponse.json();
+        uploadedUrls.push(storageId);
+      }
+
+      return uploadedUrls;
+    } catch (error) {
+      console.error('Error uploading images:', error);
+      Alert.alert('Error', 'Failed to upload images. Please try again.');
+      return [];
+    } finally {
+      setUploadingImages(false);
+    }
+  };
+
+  // Helper component for displaying images with URL resolution
+  const PostImage = ({ storageId, index }: { storageId: string; index: number }) => {
+    const imageUrl = useQuery(api.storage.getUrl, { storageId: storageId as any });
+
+    if (imageUrl === undefined) {
+      return (
+        <View style={[styles.postImageWrapper, styles.imageLoading]}>
+          <Ionicons name="image" size={24} color="#9ca3af" />
+        </View>
+      );
+    }
+
+    if (!imageUrl) {
+      return null;
+    }
+
+    return (
+      <View style={styles.postImageWrapper}>
+        <Image 
+          source={{ uri: imageUrl }} 
+          style={styles.postImage}
+          resizeMode="cover"
+        />
+      </View>
+    );
   };
 
   const getCategoryIcon = (category: string) => {
@@ -481,7 +636,7 @@ const CommunityScreen = () => {
           },
         })}
       >
-        {filteredPosts.length === 0 ? (
+        {allContent.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="chatbubbles-outline" size={48} color="#9ca3af" />
             <Text style={styles.emptyStateText}>No posts found</Text>
@@ -490,9 +645,9 @@ const CommunityScreen = () => {
             </Text>
           </View>
         ) : (
-          filteredPosts.map((post: any, index: number) => (
+          allContent.map((item: any, index: number) => (
             <Animated.View 
-              key={post._id} 
+              key={item._id} 
               style={[
                 styles.postCard,
                 {
@@ -506,149 +661,243 @@ const CommunityScreen = () => {
                 }
               ]}
             >
-              <View style={styles.postHeader}>
-                <View style={styles.postAuthor}>
-                  <View style={styles.avatar}>
-                    {post.authorProfileImage ? (
-                      <Image 
-                        source={{ uri: post.authorProfileImage }} 
-                        style={styles.avatarImage}
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <Ionicons name="person" size={20} color="#6b7280" />
-                    )}
-                  </View>
-                  <View>
-                    <Text style={styles.authorName}>{post.author}</Text>
-                    <Text style={styles.postTime}>{formatDate(new Date(post.createdAt).toISOString())}</Text>
-                  </View>
-                </View>
-                <View style={styles.categoryBadge}>
-                  <Ionicons 
-                    name={getCategoryIcon(post.category) as any} 
-                    size={12} 
-                    color={getCategoryColor(post.category)} 
-                  />
-                  <Text style={[styles.categoryText, { color: getCategoryColor(post.category) }]}>
-                    {post.category}
-                  </Text>
-                </View>
-              </View>
-              
-              <Text style={styles.postTitle}>{post.title}</Text>
-              <Text style={styles.postContent}>{post.content}</Text>
-              
-              <View style={styles.postFooter}>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => handleLike(post._id)}
-                >
-                  <Ionicons name="heart" size={16} color="#6b7280" />
-                  <Text style={styles.actionText}>{post.likes ?? 0}</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.actionButton}
-                  onPress={() => handleCommentPress(post)}
-                >
-                  <Ionicons name="chatbubble" size={16} color="#6b7280" />
-                  <Text style={styles.actionText}>{post.comments?.length ?? 0}</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity style={styles.actionButton}>
-                  <Ionicons name="share" size={16} color="#6b7280" />
-                  <Text style={styles.actionText}>Share</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Comments */}
-              {post.comments && post.comments.length > 0 && (
-                <View style={styles.commentsSection}>
-                  <View style={styles.commentsHeader}>
-                    <Text style={styles.commentsTitle}>
-                      Comments ({post.comments.length})
-                    </Text>
-                    {post.comments.length > COMMENTS_PREVIEW_LIMIT && (
-                      <TouchableOpacity
-                        style={styles.viewAllButton}
-                        onPress={() => toggleComments(post._id)}
-                      >
-                        <Text style={styles.viewAllButtonText}>
-                          {expandedComments.has(post._id) ? 'Show Less' : 'View All'}
-                        </Text>
-                        <Ionicons 
-                          name={expandedComments.has(post._id) ? 'chevron-up' : 'chevron-down'} 
-                          size={16} 
-                          color="#2563eb" 
-                        />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                  
-                  {/* Preview Comments (always visible) */}
-                  {post.comments.slice(0, COMMENTS_PREVIEW_LIMIT).map((comment: any, index: number) => (
-                    <View key={comment._id ?? index} style={styles.commentItem}>
-                      <View style={styles.commentHeader}>
-                        <View style={styles.commentAuthorInfo}>
-                          <View style={styles.commentAvatar}>
-                            {comment.authorProfileImage ? (
-                              <Image 
-                                source={{ uri: comment.authorProfileImage }} 
-                                style={styles.commentAvatarImage}
-                                resizeMode="cover"
-                              />
-                            ) : (
-                              <Ionicons name="person" size={16} color="#6b7280" />
-                            )}
-                          </View>
-                          <Text style={styles.commentAuthor}>{comment.author}</Text>
-                        </View>
-                        <Text style={styles.commentTime}>
-                          {formatDate(comment.createdAt ? new Date(comment.createdAt).toISOString() : comment.timestamp || new Date().toISOString())}
-                        </Text>
+              {item.type === 'post' ? (
+                // Render post
+                <>
+                  <View style={styles.postHeader}>
+                    <View style={styles.postAuthor}>
+                      <View style={styles.avatar}>
+                        {item.authorProfileImage ? (
+                          <Image 
+                            source={{ uri: item.authorProfileImage }} 
+                            style={styles.avatarImage}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <Ionicons name="person" size={20} color="#6b7280" />
+                        )}
                       </View>
-                      <Text style={styles.commentContent}>{comment.content}</Text>
+                      <View>
+                        <Text style={styles.authorName}>{item.author}</Text>
+                        <Text style={styles.postTime}>{formatDate(new Date(item.createdAt).toISOString())}</Text>
+                      </View>
                     </View>
-                  ))}
+                    <View style={styles.categoryBadge}>
+                      <Ionicons 
+                        name={getCategoryIcon(item.category) as any} 
+                        size={12} 
+                        color={getCategoryColor(item.category)} 
+                      />
+                      <Text style={[styles.categoryText, { color: getCategoryColor(item.category) }]}>
+                        {item.category}
+                      </Text>
+                    </View>
+                  </View>
                   
-                  {/* Expanded Comments (when toggled) */}
-                  {expandedComments.has(post._id) && post.comments.length > COMMENTS_PREVIEW_LIMIT && (
-                    <View style={styles.expandedComments}>
-                      <View style={styles.commentsDivider} />
-                      <ScrollView 
-                        style={styles.expandedCommentsScroll}
-                        showsVerticalScrollIndicator={false}
-                        nestedScrollEnabled={true}
-                      >
-                        {post.comments.slice(COMMENTS_PREVIEW_LIMIT).map((comment: any, index: number) => (
-                          <View key={comment._id ?? `expanded-${index}`} style={styles.commentItem}>
-                            <View style={styles.commentHeader}>
-                              <View style={styles.commentAuthorInfo}>
-                                <View style={styles.commentAvatar}>
-                                  {comment.authorProfileImage ? (
-                                    <Image 
-                                      source={{ uri: comment.authorProfileImage }} 
-                                      style={styles.commentAvatarImage}
-                                      resizeMode="cover"
-                                    />
-                                  ) : (
-                                    <Ionicons name="person" size={16} color="#6b7280" />
-                                  )}
-                                </View>
-                                <Text style={styles.commentAuthor}>{comment.author}</Text>
-                              </View>
-                              <Text style={styles.commentTime}>
-                                {formatDate(comment.createdAt ? new Date(comment.createdAt).toISOString() : comment.timestamp || new Date().toISOString())}
-                              </Text>
-                            </View>
-                            <Text style={styles.commentContent}>{comment.content}</Text>
-                          </View>
-                        ))}
-                      </ScrollView>
+                  <Text style={styles.postTitle}>{item.title}</Text>
+                  <Text style={styles.postContent}>{item.content}</Text>
+                  
+                  {/* Post Images */}
+                  {item.images && item.images.length > 0 && (
+                    <View style={styles.postImagesContainer}>
+                      {item.images.map((imageStorageId: string, index: number) => (
+                        <PostImage 
+                          key={index}
+                          storageId={imageStorageId} 
+                          index={index} 
+                        />
+                      ))}
                     </View>
                   )}
-                </View>
+                  
+                  <View style={styles.postFooter}>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => handleLike(item._id)}
+                    >
+                      <Ionicons name="heart" size={16} color="#6b7280" />
+                      <Text style={styles.actionText}>{item.likes ?? 0}</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={styles.actionButton}
+                      onPress={() => handleCommentPress(item)}
+                    >
+                      <Ionicons name="chatbubble" size={16} color="#6b7280" />
+                      <Text style={styles.actionText}>{item.comments?.length ?? 0}</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity style={styles.actionButton}>
+                      <Ionicons name="share" size={16} color="#6b7280" />
+                      <Text style={styles.actionText}>Share</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Comments */}
+                  {item.comments && item.comments.length > 0 && (
+                    <View style={styles.commentsSection}>
+                      <View style={styles.commentsHeader}>
+                        <Text style={styles.commentsTitle}>
+                          Comments ({item.comments.length})
+                        </Text>
+                        {item.comments.length > COMMENTS_PREVIEW_LIMIT && (
+                          <TouchableOpacity
+                            style={styles.viewAllButton}
+                            onPress={() => toggleComments(item._id)}
+                          >
+                            <Text style={styles.viewAllButtonText}>
+                              {expandedComments.has(item._id) ? 'Show Less' : 'View All'}
+                            </Text>
+                            <Ionicons 
+                              name={expandedComments.has(item._id) ? 'chevron-up' : 'chevron-down'} 
+                              size={16} 
+                              color="#2563eb" 
+                            />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                      
+                      {/* Preview Comments (always visible) */}
+                      {item.comments.slice(0, COMMENTS_PREVIEW_LIMIT).map((comment: any, index: number) => (
+                        <View key={comment._id ?? index} style={styles.commentItem}>
+                          <View style={styles.commentHeader}>
+                            <View style={styles.commentAuthorInfo}>
+                              <View style={styles.commentAvatar}>
+                                {comment.authorProfileImage ? (
+                                  <Image 
+                                    source={{ uri: comment.authorProfileImage }} 
+                                    style={styles.commentAvatarImage}
+                                    resizeMode="cover"
+                                  />
+                                ) : (
+                                  <Ionicons name="person" size={16} color="#6b7280" />
+                                )}
+                              </View>
+                              <Text style={styles.commentAuthor}>{comment.author}</Text>
+                            </View>
+                            <Text style={styles.commentTime}>
+                              {formatDate(comment.createdAt ? new Date(comment.createdAt).toISOString() : comment.timestamp || new Date().toISOString())}
+                            </Text>
+                          </View>
+                          <Text style={styles.commentContent}>{comment.content}</Text>
+                        </View>
+                      ))}
+                      
+                      {/* Expanded Comments (when toggled) */}
+                      {expandedComments.has(item._id) && item.comments.length > COMMENTS_PREVIEW_LIMIT && (
+                        <View style={styles.expandedComments}>
+                          <View style={styles.commentsDivider} />
+                          <ScrollView 
+                            style={styles.expandedCommentsScroll}
+                            showsVerticalScrollIndicator={false}
+                            nestedScrollEnabled={true}
+                          >
+                            {item.comments.slice(COMMENTS_PREVIEW_LIMIT).map((comment: any, index: number) => (
+                              <View key={comment._id ?? `expanded-${index}`} style={styles.commentItem}>
+                                <View style={styles.commentHeader}>
+                                  <View style={styles.commentAuthorInfo}>
+                                    <View style={styles.commentAvatar}>
+                                      {comment.authorProfileImage ? (
+                                        <Image 
+                                          source={{ uri: comment.authorProfileImage }} 
+                                          style={styles.commentAvatarImage}
+                                          resizeMode="cover"
+                                        />
+                                      ) : (
+                                        <Ionicons name="person" size={16} color="#6b7280" />
+                                      )}
+                                    </View>
+                                    <Text style={styles.commentAuthor}>{comment.author}</Text>
+                                  </View>
+                                  <Text style={styles.commentTime}>
+                                    {formatDate(comment.createdAt ? new Date(comment.createdAt).toISOString() : comment.timestamp || new Date().toISOString())}
+                                  </Text>
+                                </View>
+                                <Text style={styles.commentContent}>{comment.content}</Text>
+                              </View>
+                            ))}
+                          </ScrollView>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </>
+              ) : (
+                // Render poll
+                <>
+                  <View style={styles.postHeader}>
+                    <View style={styles.postAuthor}>
+                      <View style={styles.avatar}>
+                        <Ionicons name="bar-chart" size={20} color="#2563eb" />
+                      </View>
+                      <View>
+                        <Text style={styles.authorName}>Community Poll</Text>
+                        <Text style={styles.postTime}>{formatDate(new Date(item.createdAt).toISOString())}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.categoryBadge}>
+                      <Ionicons name="checkmark-circle" size={12} color="#10b981" />
+                      <Text style={[styles.categoryText, { color: '#10b981' }]}>
+                        Poll
+                      </Text>
+                    </View>
+                  </View>
+                  
+                  <Text style={styles.postTitle}>{item.title}</Text>
+                  {item.description && (
+                    <Text style={styles.postContent}>{item.description}</Text>
+                  )}
+                  
+                  {/* Poll Options */}
+                  <View style={styles.pollOptionsContainer}>
+                    {item.options.map((option: string, optionIndex: number) => {
+                      const isSelected = selectedPollVotes[item._id]?.includes(optionIndex) || false;
+                      const voteCount = item.optionVotes?.[optionIndex] || 0;
+                      const totalVotes = item.totalVotes || 0;
+                      const percentage = totalVotes > 0 ? (voteCount / totalVotes) * 100 : 0;
+                      
+                      return (
+                        <TouchableOpacity
+                          key={optionIndex}
+                          style={[
+                            styles.pollOption,
+                            isSelected && styles.pollOptionSelected
+                          ]}
+                          onPress={() => handleVoteOnPoll(item._id, optionIndex)}
+                        >
+                          <View style={styles.pollOptionContent}>
+                            <Text style={[
+                              styles.pollOptionText,
+                              isSelected && styles.pollOptionTextSelected
+                            ]}>
+                              {option}
+                            </Text>
+                            <Text style={styles.pollVoteCount}>
+                              {voteCount} votes ({percentage.toFixed(1)}%)
+                            </Text>
+                          </View>
+                          {isSelected && (
+                            <Ionicons name="checkmark-circle" size={20} color="#2563eb" />
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                  
+                  <View style={styles.postFooter}>
+                    <View style={styles.actionButton}>
+                      <Ionicons name="people" size={16} color="#6b7280" />
+                      <Text style={styles.actionText}>{item.totalVotes || 0} total votes</Text>
+                    </View>
+                    
+                    {item.allowMultipleVotes && (
+                      <View style={styles.actionButton}>
+                        <Ionicons name="checkmark-done" size={16} color="#6b7280" />
+                        <Text style={styles.actionText}>Multiple votes allowed</Text>
+                      </View>
+                    )}
+                  </View>
+                </>
               )}
             </Animated.View>
           ))
@@ -732,6 +981,48 @@ const CommunityScreen = () => {
               multiline
               textAlignVertical="top"
             />
+
+            {/* Image Upload Section */}
+            <Text style={styles.inputLabel}>Images (Optional)</Text>
+            <View style={styles.imageUploadContainer}>
+              {selectedImages.map((imageUri, index) => (
+                <View key={index} style={styles.imagePreview}>
+                  <Image source={{ uri: imageUri }} style={styles.previewImage} />
+                  <TouchableOpacity
+                    style={styles.removeImageButton}
+                    onPress={() => removeImage(index)}
+                  >
+                    <Ionicons name="close-circle" size={20} color="#ef4444" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+              
+              {selectedImages.length < 5 && (
+                <TouchableOpacity
+                  style={styles.addImageButton}
+                  onPress={pickImage}
+                  disabled={uploadingImages}
+                >
+                  <Ionicons 
+                    name="camera" 
+                    size={24} 
+                    color={uploadingImages ? "#9ca3af" : "#2563eb"} 
+                  />
+                  <Text style={[
+                    styles.addImageText,
+                    uploadingImages && styles.addImageTextDisabled
+                  ]}>
+                    {uploadingImages ? 'Uploading...' : 'Add Image'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            
+            {selectedImages.length > 0 && (
+              <Text style={styles.imageLimitText}>
+                {selectedImages.length}/5 images selected
+              </Text>
+            )}
           </ScrollView>
 
           <View style={styles.modalFooter}>
@@ -1382,6 +1673,119 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
     marginTop: 20,
+  },
+  // Poll styles
+  pollOptionsContainer: {
+    marginVertical: 12,
+  },
+  pollOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+  },
+  pollOptionSelected: {
+    backgroundColor: '#e0e7ff',
+    borderColor: '#2563eb',
+  },
+  pollOptionContent: {
+    flex: 1,
+  },
+  pollOptionText: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  pollOptionTextSelected: {
+    color: '#2563eb',
+    fontWeight: '600',
+  },
+  pollVoteCount: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '600',
+  },
+  // Image upload styles
+  imageUploadContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 12,
+  },
+  imagePreview: {
+    position: 'relative',
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  previewImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#ffffff',
+    borderRadius: 10,
+  },
+  addImageButton: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#d1d5db',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f9fafb',
+  },
+  addImageText: {
+    fontSize: 12,
+    color: '#2563eb',
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  addImageTextDisabled: {
+    color: '#9ca3af',
+  },
+  imageLimitText: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontStyle: 'italic',
+    marginBottom: 8,
+  },
+  // Post image display styles
+  postImagesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginVertical: 12,
+    gap: 8,
+  },
+  postImageWrapper: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  postImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 8,
+  },
+  imageLoading: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
   },
 });
 

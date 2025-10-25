@@ -143,6 +143,7 @@ export const create = mutation({
       v.literal("Suggestion"),
       v.literal("Lost & Found")
     ),
+    images: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -168,6 +169,7 @@ export const update = mutation({
       v.literal("Suggestion"),
       v.literal("Lost & Found")
     )),
+    images: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const { id, ...updates } = args;

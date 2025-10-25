@@ -10,6 +10,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import StripeCheckout from './StripeCheckout';
+import PayPalCheckout from './PayPalCheckout';
+import ApplePayCheckout from './ApplePayCheckout';
+import GooglePayCheckout from './GooglePayCheckout';
 
 interface PaymentModalProps {
   visible: boolean;
@@ -36,6 +39,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 }) => {
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = React.useState<'stripe' | 'paypal' | 'applepay' | 'googlepay'>('stripe');
 
   const handleSuccess = () => {
     setSuccess(true);
@@ -55,6 +59,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   const handleClose = () => {
     setError(null);
     setSuccess(false);
+    setSelectedPaymentMethod('stripe');
     onClose();
   };
 
@@ -107,8 +112,86 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
               </View>
             )}
 
-            {/* Stripe Checkout Form */}
+            {/* Payment Method Selection */}
             {!success && (
+              <View style={styles.paymentMethodCard}>
+                <Text style={styles.paymentMethodLabel}>Choose Payment Method</Text>
+                <View style={styles.paymentMethodGrid}>
+                  <TouchableOpacity
+                    style={[
+                      styles.paymentMethodOption,
+                      selectedPaymentMethod === 'stripe' && styles.paymentMethodOptionSelected,
+                    ]}
+                    onPress={() => setSelectedPaymentMethod('stripe')}
+                  >
+                    <Ionicons 
+                      name="card" 
+                      size={20} 
+                      color={selectedPaymentMethod === 'stripe' ? '#2563eb' : '#6b7280'} 
+                    />
+                    <Text style={[
+                      styles.paymentMethodText,
+                      selectedPaymentMethod === 'stripe' && styles.paymentMethodTextSelected,
+                    ]}>
+                      Card
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={[
+                      styles.paymentMethodOption,
+                      selectedPaymentMethod === 'paypal' && styles.paymentMethodOptionSelected,
+                    ]}
+                    onPress={() => setSelectedPaymentMethod('paypal')}
+                  >
+                    <View style={styles.paypalBrandContainer}>
+                      <Text style={styles.paypalBrandText}>PayPal</Text>
+                    </View>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={[
+                      styles.paymentMethodOption,
+                      selectedPaymentMethod === 'applepay' && styles.paymentMethodOptionSelected,
+                    ]}
+                    onPress={() => setSelectedPaymentMethod('applepay')}
+                  >
+                    <View style={styles.applePayBrandContainer}>
+                      <Text style={styles.applePayBrandText}>🍎</Text>
+                      <Text style={[
+                        styles.paymentMethodText,
+                        selectedPaymentMethod === 'applepay' && styles.paymentMethodTextSelected,
+                      ]}>
+                        Apple Pay
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={[
+                      styles.paymentMethodOption,
+                      selectedPaymentMethod === 'googlepay' && styles.paymentMethodOptionSelected,
+                    ]}
+                    onPress={() => setSelectedPaymentMethod('googlepay')}
+                  >
+                    <View style={styles.googlePayBrandContainer}>
+                      <View style={styles.googlePayLogo}>
+                        <Text style={styles.googlePayLogoText}>G</Text>
+                      </View>
+                      <Text style={[
+                        styles.paymentMethodText,
+                        selectedPaymentMethod === 'googlepay' && styles.paymentMethodTextSelected,
+                      ]}>
+                        Google Pay
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* Stripe Checkout Form */}
+            {!success && selectedPaymentMethod === 'stripe' && (
               <StripeCheckout
                 amount={amount}
                 feeType={feeType}
@@ -120,8 +203,47 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
               />
             )}
 
+            {/* PayPal Checkout Form */}
+            {!success && selectedPaymentMethod === 'paypal' && (
+              <PayPalCheckout
+                amount={amount}
+                feeType={feeType}
+                userId={userId}
+                feeId={feeId}
+                fineId={fineId}
+                onSuccess={handleSuccess}
+                onError={handleError}
+              />
+            )}
+
+            {/* Apple Pay Checkout Form */}
+            {!success && selectedPaymentMethod === 'applepay' && (
+              <ApplePayCheckout
+                amount={amount}
+                feeType={feeType}
+                userId={userId}
+                feeId={feeId}
+                fineId={fineId}
+                onSuccess={handleSuccess}
+                onError={handleError}
+              />
+            )}
+
+            {/* Google Pay Checkout Form */}
+            {!success && selectedPaymentMethod === 'googlepay' && (
+              <GooglePayCheckout
+                amount={amount}
+                feeType={feeType}
+                userId={userId}
+                feeId={feeId}
+                fineId={fineId}
+                onSuccess={handleSuccess}
+                onError={handleError}
+              />
+            )}
+
             {/* Test Card Info (for development) */}
-            {!success && __DEV__ && (
+            {!success && __DEV__ && selectedPaymentMethod === 'stripe' && (
               <View style={styles.testCard}>
                 <Text style={styles.testCardTitle}>Test Card:</Text>
                 <Text style={styles.testCardNumber}>4242 4242 4242 4242</Text>
@@ -267,6 +389,96 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#92400e',
     marginTop: 2,
+  },
+  paymentMethodCard: {
+    margin: 20,
+    marginTop: 0,
+    padding: 16,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  paymentMethodLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginBottom: 12,
+  },
+  paymentMethodOptions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  paymentMethodGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  paymentMethodOption: {
+    width: '48%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#ffffff',
+  },
+  paymentMethodOptionSelected: {
+    borderColor: '#2563eb',
+    backgroundColor: '#eff6ff',
+  },
+  paymentMethodText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6b7280',
+    marginLeft: 8,
+  },
+  paymentMethodTextSelected: {
+    color: '#2563eb',
+  },
+  paypalBrandContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paypalBrandText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0070ba',
+    letterSpacing: 0.5,
+  },
+  applePayBrandContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  applePayBrandText: {
+    fontSize: 16,
+    marginRight: 6,
+  },
+  googlePayBrandContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googlePayLogo: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  googlePayLogoText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#4285f4',
   },
 });
 

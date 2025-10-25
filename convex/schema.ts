@@ -82,6 +82,7 @@ export default defineSchema({
       v.literal("Suggestion"),
       v.literal("Lost & Found")
     ),
+    images: v.optional(v.array(v.string())), // Array of image URLs
     likes: v.number(),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -176,4 +177,23 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_user", ["userId"])
     .index("by_transaction", ["transactionId"]),
+
+  polls: defineTable({
+    title: v.string(),
+    description: v.optional(v.string()),
+    options: v.array(v.string()), // Array of poll options
+    isActive: v.boolean(),
+    allowMultipleVotes: v.boolean(),
+    expiresAt: v.optional(v.number()), // Optional expiration timestamp
+    createdBy: v.string(), // Admin/board member who created the poll
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_active", ["isActive"]),
+
+  pollVotes: defineTable({
+    pollId: v.id("polls"),
+    userId: v.string(), // Resident ID who voted
+    selectedOptions: v.array(v.number()), // Array of option indices
+    createdAt: v.number(),
+  }).index("by_poll", ["pollId"]).index("by_user", ["userId"]),
 }); 

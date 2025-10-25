@@ -63,6 +63,7 @@ const AdminScreen = () => {
   const homeownersPaymentStatus = useQuery(api.fees.getAllHomeownersPaymentStatus) ?? [];
   const allFeesFromDatabase = useQuery(api.fees.getAll) ?? [];
   const allFinesFromDatabase = useQuery(api.fees.getAllFines) ?? [];
+  const polls = useQuery(api.polls.getAll) ?? [];
   
   // Mutations
   const setBlockStatus = useMutation(api.residents.setBlockStatus);
@@ -85,9 +86,15 @@ const AdminScreen = () => {
   const createCovenant = useMutation(api.covenants.create);
   const updateCovenant = useMutation(api.covenants.update);
   
+  // Poll management mutations
+  const createPoll = useMutation(api.polls.create);
+  const updatePoll = useMutation(api.polls.update);
+  const deletePoll = useMutation(api.polls.remove);
+  const togglePollActive = useMutation(api.polls.toggleActive);
+  
   // State
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'residents' | 'board' | 'covenants' | 'posts' | 'comments' | 'emergency' | 'fees'>('residents');
+  const [activeTab, setActiveTab] = useState<'residents' | 'board' | 'covenants' | 'posts' | 'comments' | 'emergency' | 'fees' | 'polls'>('residents');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const [showBlockModal, setShowBlockModal] = useState(false);
@@ -147,6 +154,17 @@ const AdminScreen = () => {
     pdfUrl: '',
   });
 
+  // Poll modal state
+  const [showPollModal, setShowPollModal] = useState(false);
+  const [isEditingPoll, setIsEditingPoll] = useState(false);
+  const [pollForm, setPollForm] = useState({
+    title: '',
+    description: '',
+    options: ['', ''],
+    allowMultipleVotes: false,
+    expiresAt: '',
+  });
+
   // Animation values
   const blockModalOpacity = useRef(new Animated.Value(0)).current;
   const blockModalTranslateY = useRef(new Animated.Value(300)).current;
@@ -162,6 +180,8 @@ const AdminScreen = () => {
   const addFineModalTranslateY = useRef(new Animated.Value(300)).current;
   const covenantModalOpacity = useRef(new Animated.Value(0)).current;
   const covenantModalTranslateY = useRef(new Animated.Value(300)).current;
+  const pollModalOpacity = useRef(new Animated.Value(0)).current;
+  const pollModalTranslateY = useRef(new Animated.Value(300)).current;
   const categoryDropdownOpacity = useRef(new Animated.Value(0)).current;
   const categoryDropdownScale = useRef(new Animated.Value(0.95)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
@@ -172,21 +192,25 @@ const AdminScreen = () => {
   const isBoardMember = user?.isBoardMember && user?.isActive;
 
   // Modern animation functions
-  const animateIn = (modalType: 'block' | 'delete' | 'boardMember' | 'emergency' | 'yearFee' | 'addFine' | 'covenant') => {
+  const animateIn = (modalType: 'block' | 'delete' | 'boardMember' | 'emergency' | 'yearFee' | 'addFine' | 'covenant' | 'poll') => {
     const opacity = modalType === 'block' ? blockModalOpacity : 
                    modalType === 'delete' ? deleteModalOpacity :
                    modalType === 'boardMember' ? boardMemberModalOpacity : 
                    modalType === 'emergency' ? emergencyModalOpacity :
                    modalType === 'yearFee' ? yearFeeModalOpacity : 
                    modalType === 'addFine' ? addFineModalOpacity :
-                   covenantModalOpacity;
+                   modalType === 'covenant' ? covenantModalOpacity :
+                   pollModalOpacity;
+                   pollModalOpacity;
     const translateY = modalType === 'block' ? blockModalTranslateY : 
                       modalType === 'delete' ? deleteModalTranslateY:
                       modalType === 'boardMember' ? boardMemberModalTranslateY : 
                       modalType === 'emergency' ? emergencyModalTranslateY :
                       modalType === 'yearFee' ? yearFeeModalTranslateY : 
                       modalType === 'addFine' ? addFineModalTranslateY :
-                      covenantModalTranslateY;
+                      modalType === 'covenant' ? covenantModalTranslateY :
+                      pollModalTranslateY;
+                      pollModalTranslateY;
     
     Animated.parallel([
       Animated.timing(overlayOpacity, {
@@ -208,7 +232,7 @@ const AdminScreen = () => {
     ]).start();
   };
 
-  const animateOut = (modalType: 'block' | 'delete' | 'boardMember' | 'emergency' | 'yearFee' | 'addFine' | 'covenant', callback: () => void) => {
+  const animateOut = (modalType: 'block' | 'delete' | 'boardMember' | 'emergency' | 'yearFee' | 'addFine' | 'covenant' | 'poll', callback: () => void) => {
     const opacity = modalType === 'block' ? blockModalOpacity : 
                    modalType === 'delete' ? deleteModalOpacity :
                    modalType === 'boardMember' ? boardMemberModalOpacity : 
@@ -763,6 +787,150 @@ const AdminScreen = () => {
       pdfUrl: '',
     });
     animateOut('covenant', () => {});
+  };
+
+  // Poll management handlers
+  const handleCreatePoll = async () => {
+    try {
+      if (!pollForm.title || pollForm.options.filter(opt => opt.trim()).length < 2) {
+        Alert.alert('Error', 'Please provide a title and at least 2 options.');
+        return;
+      }
+
+      const validOptions = pollForm.options.filter(opt => opt.trim());
+      
+      await createPoll({
+        title: pollForm.title,
+        description: pollForm.description || undefined,
+        options: validOptions,
+        allowMultipleVotes: pollForm.allowMultipleVotes,
+        expiresAt: pollForm.expiresAt ? new Date(pollForm.expiresAt).getTime() : undefined,
+        createdBy: user ? `${user.firstName} ${user.lastName}` : 'Admin',
+      });
+
+      Alert.alert('Success', 'Poll created successfully!');
+      
+      setShowPollModal(false);
+      setIsEditingPoll(false);
+      setSelectedItem(null);
+      setPollForm({
+        title: '',
+        description: '',
+        options: ['', ''],
+        allowMultipleVotes: false,
+        expiresAt: '',
+      });
+      animateOut('poll', () => {});
+    } catch (error) {
+      console.error('Error creating poll:', error);
+      Alert.alert('Error', 'Failed to create poll. Please try again.');
+    }
+  };
+
+  const handleEditPoll = (poll: any) => {
+    setSelectedItem(poll);
+    setIsEditingPoll(true);
+    setPollForm({
+      title: poll.title,
+      description: poll.description || '',
+      options: poll.options,
+      allowMultipleVotes: poll.allowMultipleVotes,
+      expiresAt: poll.expiresAt ? new Date(poll.expiresAt).toISOString().split('T')[0] : '',
+    });
+    setShowPollModal(true);
+    animateIn('poll');
+  };
+
+  const handleUpdatePoll = async () => {
+    try {
+      if (!pollForm.title || pollForm.options.filter(opt => opt.trim()).length < 2) {
+        Alert.alert('Error', 'Please provide a title and at least 2 options.');
+        return;
+      }
+
+      const validOptions = pollForm.options.filter(opt => opt.trim());
+      
+      await updatePoll({
+        id: selectedItem._id,
+        title: pollForm.title,
+        description: pollForm.description || undefined,
+        options: validOptions,
+        allowMultipleVotes: pollForm.allowMultipleVotes,
+        expiresAt: pollForm.expiresAt ? new Date(pollForm.expiresAt).getTime() : undefined,
+      });
+
+      Alert.alert('Success', 'Poll updated successfully!');
+      
+      setShowPollModal(false);
+      setIsEditingPoll(false);
+      setSelectedItem(null);
+      setPollForm({
+        title: '',
+        description: '',
+        options: ['', ''],
+        allowMultipleVotes: false,
+        expiresAt: '',
+      });
+      animateOut('poll', () => {});
+    } catch (error) {
+      console.error('Error updating poll:', error);
+      Alert.alert('Error', 'Failed to update poll. Please try again.');
+    }
+  };
+
+  const handleDeletePoll = (poll: any) => {
+    setSelectedItem(poll);
+    setShowDeleteModal(true);
+    animateIn('delete');
+  };
+
+  const handleTogglePollActive = async (poll: any) => {
+    try {
+      await togglePollActive({ id: poll._id });
+      Alert.alert('Success', `Poll ${poll.isActive ? 'deactivated' : 'activated'} successfully!`);
+    } catch (error) {
+      console.error('Error toggling poll status:', error);
+      Alert.alert('Error', 'Failed to update poll status. Please try again.');
+    }
+  };
+
+  const handleCancelPoll = () => {
+    setShowPollModal(false);
+    setIsEditingPoll(false);
+    setSelectedItem(null);
+    setPollForm({
+      title: '',
+      description: '',
+      options: ['', ''],
+      allowMultipleVotes: false,
+      expiresAt: '',
+    });
+    animateOut('poll', () => {});
+  };
+
+  const addPollOption = () => {
+    if (pollForm.options.length < 10) {
+      setPollForm(prev => ({
+        ...prev,
+        options: [...prev.options, '']
+      }));
+    }
+  };
+
+  const removePollOption = (index: number) => {
+    if (pollForm.options.length > 2) {
+      setPollForm(prev => ({
+        ...prev,
+        options: prev.options.filter((_, i) => i !== index)
+      }));
+    }
+  };
+
+  const updatePollOption = (index: number, value: string) => {
+    setPollForm(prev => ({
+      ...prev,
+      options: prev.options.map((opt, i) => i === index ? value : opt)
+    }));
   };
 
   // Category dropdown animation functions
@@ -1918,6 +2086,159 @@ const AdminScreen = () => {
           </ScrollView>
         );
       
+      case 'polls':
+        return (
+          <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={true} persistentScrollbar={true}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Community Polls</Text>
+              <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+                <TouchableOpacity
+                  style={styles.adminFeeButton}
+                  onPress={() => {
+                    animateButtonPress();
+                    setShowPollModal(true);
+                    animateIn('poll');
+                  }}
+                >
+                  <Ionicons name="add" size={16} color="#ffffff" />
+                  <Text style={styles.adminFeeButtonText}>Create Poll</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            </View>
+            
+            {/* Poll Statistics */}
+            <View style={styles.feeStatsContainer}>
+              <View style={styles.feeStatsSection}>
+                <View style={styles.feeStatsRow}>
+                  <View style={styles.feeStatCard}>
+                    <Text style={styles.feeStatLabel}>Total Polls</Text>
+                    <Text style={styles.feeStatValue}>{polls.length}</Text>
+                  </View>
+                  <View style={styles.feeStatCard}>
+                    <Text style={styles.feeStatLabel}>Active Polls</Text>
+                    <Text style={[styles.feeStatValue, { color: '#10b981' }]}>
+                      {polls.filter((poll: any) => poll.isActive).length}
+                    </Text>
+                  </View>
+                  <View style={styles.feeStatCard}>
+                    <Text style={styles.feeStatLabel}>Total Votes</Text>
+                    <Text style={[styles.feeStatValue, { color: '#3b82f6' }]}>
+                      {polls.reduce((total: number, poll: any) => total + (poll.totalVotes || 0), 0)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* Polls List */}
+            <FlatList
+              data={polls}
+              keyExtractor={(item) => item._id}
+              refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+              }
+              renderItem={({ item }) => {
+                const poll = item as any;
+                return (
+                  <Animated.View 
+                    key={poll._id} 
+                    style={[
+                      styles.postCard,
+                      {
+                        opacity: fadeAnim,
+                        transform: [{
+                          translateY: fadeAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [50, 0],
+                          })
+                        }]
+                      }
+                    ]}
+                  >
+                    <View style={styles.postHeader}>
+                      <View style={styles.postAuthor}>
+                        <View style={styles.avatar}>
+                          <Ionicons name="bar-chart" size={20} color="#2563eb" />
+                        </View>
+                        <View>
+                          <Text style={styles.authorName}>{poll.title}</Text>
+                          <Text style={styles.postTime}>
+                            {new Date(poll.createdAt).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.categoryBadge}>
+                        <Ionicons 
+                          name={poll.isActive ? "checkmark-circle" : "close-circle"} 
+                          size={12} 
+                          color={poll.isActive ? "#10b981" : "#ef4444"} 
+                        />
+                        <Text style={[styles.categoryText, { color: poll.isActive ? "#10b981" : "#ef4444" }]}>
+                          {poll.isActive ? "Active" : "Inactive"}
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    {poll.description && (
+                      <Text style={styles.postContent}>{poll.description}</Text>
+                    )}
+                    
+                    {/* Poll Options */}
+                    <View style={styles.pollOptionsContainer}>
+                      {poll.options.map((option: string, index: number) => (
+                        <View key={index} style={styles.pollOption}>
+                          <Text style={styles.pollOptionText}>{option}</Text>
+                          <Text style={styles.pollVoteCount}>
+                            {poll.optionVotes?.[index] || 0} votes
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                    
+                    <View style={styles.postFooter}>
+                      <TouchableOpacity
+                        style={styles.actionButton}
+                        onPress={() => handleTogglePollActive(poll)}
+                      >
+                        <Ionicons 
+                          name={poll.isActive ? "pause-circle" : "play-circle"} 
+                          size={16} 
+                          color="#6b7280" 
+                        />
+                        <Text style={styles.actionText}>
+                          {poll.isActive ? "Deactivate" : "Activate"}
+                        </Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={styles.actionButton}
+                        onPress={() => handleEditPoll(poll)}
+                      >
+                        <Ionicons name="create" size={16} color="#6b7280" />
+                        <Text style={styles.actionText}>Edit</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={styles.actionButton}
+                        onPress={() => handleDeletePoll(poll)}
+                      >
+                        <Ionicons name="trash" size={16} color="#ef4444" />
+                        <Text style={[styles.actionText, { color: '#ef4444' }]}>Delete</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </Animated.View>
+                );
+              }}
+            />
+          </ScrollView>
+        );
+      
       default:
         return null;
     }
@@ -2024,6 +2345,16 @@ const AdminScreen = () => {
             <Ionicons name="chatbubbles" size={20} color={activeTab === 'posts' ? '#2563eb' : '#6b7280'} />
             <Text style={[styles.folderTabText, activeTab === 'posts' && styles.activeFolderTabText]}>
               Posts ({communityPosts.length})
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.folderTab, activeTab === 'polls' && styles.activeFolderTab]}
+            onPress={() => setActiveTab('polls')}
+          >
+            <Ionicons name="bar-chart" size={20} color={activeTab === 'polls' ? '#2563eb' : '#6b7280'} />
+            <Text style={[styles.folderTabText, activeTab === 'polls' && styles.activeFolderTabText]}>
+              Polls ({polls.length})
             </Text>
           </TouchableOpacity>
           
@@ -2817,6 +3148,138 @@ const AdminScreen = () => {
           </Animated.View>
         </Modal>
 
+        {/* Poll Modal */}
+        <Modal
+          visible={showPollModal}
+          transparent={true}
+          animationType="none"
+          onRequestClose={handleCancelPoll}
+        >
+          <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
+            <Animated.View style={[
+              styles.boardMemberModalContent,
+              {
+                opacity: pollModalOpacity,
+                transform: [{ translateY: pollModalTranslateY }],
+              }
+            ]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>
+                  {isEditingPoll ? 'Edit Poll' : 'Create Poll'}
+                </Text>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={handleCancelPoll}
+                >
+                  <Ionicons name="close" size={24} color="#6b7280" />
+                </TouchableOpacity>
+              </View>
+              
+              <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Poll Title *</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Enter poll title"
+                    value={pollForm.title}
+                    onChangeText={(text) => setPollForm(prev => ({ ...prev, title: text }))}
+                    autoCapitalize="words"
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Description</Text>
+                  <TextInput
+                    style={[styles.textInput, styles.textArea]}
+                    placeholder="Enter poll description (optional)"
+                    value={pollForm.description}
+                    onChangeText={(text) => setPollForm(prev => ({ ...prev, description: text }))}
+                    multiline
+                    numberOfLines={3}
+                    textAlignVertical="top"
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Poll Options *</Text>
+                  {pollForm.options.map((option, index) => (
+                    <View key={index} style={styles.pollOptionInput}>
+                      <TextInput
+                        style={[styles.textInput, styles.pollOptionTextInput]}
+                        placeholder={`Option ${index + 1}`}
+                        value={option}
+                        onChangeText={(text) => updatePollOption(index, text)}
+                      />
+                      {pollForm.options.length > 2 && (
+                        <TouchableOpacity
+                          style={styles.removeOptionButton}
+                          onPress={() => removePollOption(index)}
+                        >
+                          <Ionicons name="close-circle" size={20} color="#ef4444" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ))}
+                  
+                  {pollForm.options.length < 10 && (
+                    <TouchableOpacity
+                      style={styles.addOptionButton}
+                      onPress={addPollOption}
+                    >
+                      <Ionicons name="add-circle" size={20} color="#2563eb" />
+                      <Text style={styles.addOptionText}>Add Option</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Settings</Text>
+                  
+                  <TouchableOpacity
+                    style={styles.checkboxContainer}
+                    onPress={() => setPollForm(prev => ({ ...prev, allowMultipleVotes: !prev.allowMultipleVotes }))}
+                  >
+                    <View style={[styles.checkbox, pollForm.allowMultipleVotes && styles.checkboxChecked]}>
+                      {pollForm.allowMultipleVotes && (
+                        <Ionicons name="checkmark" size={16} color="#ffffff" />
+                      )}
+                    </View>
+                    <Text style={styles.checkboxLabel}>Allow multiple votes</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Expiration Date (Optional)</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="YYYY-MM-DD"
+                    value={pollForm.expiresAt}
+                    onChangeText={(text) => setPollForm(prev => ({ ...prev, expiresAt: text }))}
+                  />
+                </View>
+              </ScrollView>
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={handleCancelPoll}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={styles.confirmButton}
+                  onPress={isEditingPoll ? handleUpdatePoll : handleCreatePoll}
+                >
+                  <Text style={styles.confirmButtonText}>
+                    {isEditingPoll ? 'Update Poll' : 'Create Poll'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+          </Animated.View>
+        </Modal>
+
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -3064,6 +3527,7 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 6,
     backgroundColor: '#f8fafc',
+    marginRight: 12,
   },
   modalOverlay: {
     flex: 1,
@@ -4240,6 +4704,156 @@ const styles = StyleSheet.create({
   emergencyIndicatorText: {
     fontSize: 8,
     fontWeight: '600',
+  },
+  // Poll styles
+  pollOptionsContainer: {
+    marginVertical: 12,
+  },
+  pollOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
+    marginBottom: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#e5e7eb',
+  },
+  pollOptionText: {
+    fontSize: 14,
+    color: '#374151',
+    flex: 1,
+  },
+  pollVoteCount: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '600',
+  },
+  pollOptionInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  pollOptionTextInput: {
+    flex: 1,
+    marginRight: 8,
+  },
+  removeOptionButton: {
+    padding: 4,
+  },
+  addOptionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#e0e7ff',
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  addOptionText: {
+    fontSize: 14,
+    color: '#2563eb',
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#d1d5db',
+    marginRight: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: '#2563eb',
+    borderColor: '#2563eb',
+  },
+  checkboxLabel: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  // Post card styles (for poll display)
+  postCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+    borderLeftWidth: 4,
+    borderLeftColor: '#2563eb',
+  },
+  postHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  postAuthor: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  avatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  authorName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  postTime: {
+    fontSize: 12,
+    color: '#9ca3af',
+  },
+  categoryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  categoryText: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginLeft: 4,
+    textTransform: 'uppercase',
+  },
+  postContent: {
+    fontSize: 14,
+    color: '#6b7280',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  postFooter: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    paddingTop: 12,
+  },
+  actionText: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginLeft: 4,
   },
 });
 

@@ -508,10 +508,10 @@ const HomeScreen = () => {
             <Ionicons name="time" size={20} color="#6b7280" />
             <Text style={styles.infoText}>{hoaInfo?.officeHours ?? ''}</Text>
           </View>
-          <View style={styles.infoRow}>
+          {/* <View style={styles.infoRow}>
             <Ionicons name="call" size={20} color="#6b7280" />
             <Text style={styles.infoText}>{hoaInfo?.phone ?? ''}</Text>
-          </View>
+          </View> */}
           <View style={styles.infoRow}>
             <Ionicons name="mail" size={20} color="#6b7280" />
             <Text style={styles.infoText}>{hoaInfo?.email ?? ''}</Text>

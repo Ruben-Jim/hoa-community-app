@@ -10,6 +10,7 @@ import { AuthProvider, useAuth } from './src/context/AuthContext';
 import AuthNavigator from './src/navigation/AuthNavigator';
 import enhancedUnifiedNotificationManager from './src/services/EnhancedUnifiedNotificationManager';
 import { StripeWrapper } from './src/context/StripeProvider';
+import { PayPalProvider } from './src/context/PayPalProvider';
 
 import HomeScreen from './src/screens/HomeScreen';
 import BoardScreen from './src/screens/BoardScreen';
@@ -92,12 +93,17 @@ export default function App() {
   const content = (
     <SafeAreaProvider>
       <StripeWrapper>
-        <AuthProvider>
-          <NavigationContainer>
-            <MainApp />
-            <StatusBar style="auto" />
-          </NavigationContainer>
-        </AuthProvider>
+        <PayPalProvider 
+          clientId={process.env.EXPO_PUBLIC_PAYPAL_CLIENT_ID}
+          mode={process.env.EXPO_PUBLIC_PAYPAL_MODE as 'sandbox' | 'live' || 'sandbox'}
+        >
+          <AuthProvider>
+            <NavigationContainer>
+              <MainApp />
+              <StatusBar style="auto" />
+            </NavigationContainer>
+          </AuthProvider>
+        </PayPalProvider>
       </StripeWrapper>
     </SafeAreaProvider>
   );
