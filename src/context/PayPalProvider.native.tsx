@@ -1,5 +1,5 @@
 // PayPal Provider for Mobile (Native)
-import React, { createContext, useContext, ReactNode } from 'react-native';
+import React, { createContext, useContext, ReactNode } from 'react';
 
 interface PayPalContextType {
   clientId?: string;

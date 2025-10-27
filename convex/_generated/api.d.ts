@@ -23,6 +23,7 @@ import type * as hoaInfo from "../hoaInfo.js";
 import type * as http from "../http.js";
 import type * as payments from "../payments.js";
 import type * as polls from "../polls.js";
+import type * as residentNotifications from "../residentNotifications.js";
 import type * as residents from "../residents.js";
 import type * as storage from "../storage.js";
 
@@ -45,6 +46,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   payments: typeof payments;
   polls: typeof polls;
+  residentNotifications: typeof residentNotifications;
   residents: typeof residents;
   storage: typeof storage;
 }>;

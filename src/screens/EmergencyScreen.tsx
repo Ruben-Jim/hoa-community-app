@@ -29,7 +29,6 @@ const EmergencyScreen = () => {
   const { user } = useAuth();
   const notifications = useQuery(api.emergencyNotifications.getAll) ?? [];
   const createNotification = useMutation(api.emergencyNotifications.create);
-  const deactivateNotification = useMutation(api.emergencyNotifications.deactivate);
   const { sendEmergencyAlert, sendAlert, sendInfo, isEnabled: notificationsEnabled } = useNotifications();
   const [selectedPriority, setSelectedPriority] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -319,15 +318,6 @@ const EmergencyScreen = () => {
     }
   };
 
-  const handleDeactivate = async (id: string) => {
-    // Check if user is a board member
-    if (!isBoardMember) {
-      Alert.alert('Access Denied', 'Only board members can deactivate emergency alerts.');
-      return;
-    }
-    
-    await deactivateNotification({ id: id as any });
-  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -415,7 +405,7 @@ const EmergencyScreen = () => {
           )}
 
         {/* Priority Filter */}
-        <SafeAreaView style={styles.filterContainer}>
+        <View style={styles.filterContainer}>
           <View style={styles.filterRow}>
             <ScrollView
               horizontal
@@ -460,11 +450,11 @@ const EmergencyScreen = () => {
               ))}
             </ScrollView>
           </View>
-        </SafeAreaView>
+        </View>
 
 
         {/* Category Filter with New Alert Button */}
-        <SafeAreaView style={styles.filterContainer}>
+        <View style={styles.filterContainer}>
           <View style={styles.filterRow}>
             <ScrollView
               horizontal
@@ -524,7 +514,7 @@ const EmergencyScreen = () => {
               </Animated.View>
             )}
           </View>
-        </SafeAreaView>
+        </View>
 
 
         {/* Active Alerts Summary */}
@@ -538,7 +528,7 @@ const EmergencyScreen = () => {
         )}
 
         {/* Notifications List */}
-        <ScrollView style={styles.notificationsContainer}>
+        <View style={styles.notificationsContainer}>
           {filteredNotifications.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="checkmark-circle" size={48} color="#10b981" />
@@ -634,20 +624,12 @@ const EmergencyScreen = () => {
                   <Text style={styles.notificationTime}>
                     {formatDate(new Date(notification.createdAt).toISOString())}
                   </Text>
-
-                  {notification.isActive && isBoardMember && (
-                    <TouchableOpacity
-                      style={styles.deactivateButton}
-                      onPress={() => handleDeactivate(notification._id)}
-                    >
-                      <Text style={styles.deactivateButtonText}>Deactivate</Text>
-                    </TouchableOpacity>
-                  )}
                 </View>
               </Animated.View>
               );
             })
           )}
+        </View>
 
           {/* Additional content to ensure scrollable content */}
           <View style={styles.spacer} />
@@ -791,7 +773,6 @@ const EmergencyScreen = () => {
             </Animated.View>
           </Animated.View>
         </Modal>
-        </ScrollView>
       </View>
     </SafeAreaView>
   );
@@ -922,12 +903,12 @@ const styles = StyleSheet.create({
   },
   floatingActionButton: {
     position: 'absolute',
-    top: 655,
+    bottom: 100,
     right: 20,
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#dc2626',
+    backgroundColor: '#6366f1',
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 8,
@@ -1114,17 +1095,6 @@ const styles = StyleSheet.create({
   notificationTime: {
     fontSize: 12,
     color: '#9ca3af',
-  },
-  deactivateButton: {
-    backgroundColor: '#6b7280',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  deactivateButtonText: {
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,

@@ -62,13 +62,6 @@
         }
       ],
       [
-        "@stripe/stripe-react-native",
-        {
-          "merchantIdentifier": "merchant.com.hoacommunityapp",
-          "publishableKey": "${EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY}"
-        }
-      ],
-      [
         "expo-notifications",
         {
           "icon": "./assets/icon.png",

@@ -32,6 +32,7 @@ const CustomTabBar = () => {
     { name: 'Home', icon: 'home', label: 'Home', color: '#6b7280' },
     { name: 'Board', icon: 'people', label: 'Board', color: '#6b7280' },
     { name: 'Community', icon: 'chatbubbles', label: 'Community', color: '#6b7280' },
+    { name: 'ResidentNotifications', icon: 'home', label: 'Residents', color: '#6b7280' },
     { name: 'Covenants', icon: 'document-text', label: 'Covenants', color: '#6b7280' },
     { name: 'Emergency', icon: 'warning', label: 'Emergency', color: '#6b7280' },
     // Hide fees tab for renters and regular residents (only show for board members and dev users)

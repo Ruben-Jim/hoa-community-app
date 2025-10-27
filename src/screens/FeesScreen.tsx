@@ -157,9 +157,7 @@ const FeesScreen = () => {
   };
 
   // Convex mutations
-  const recordPayment = useMutation(api.fees.recordPayment);
-  const updateFineStatus = useMutation(api.fees.updateFineStatus);
-  const updateFee = useMutation(api.fees.update);
+  // Note: Not updating fee/fine status here - will remain "Pending" until admin verifies
 
   const handlePayment = (item: any, type: 'fee' | 'fine') => {
     setSelectedPaymentItem(item);
@@ -169,29 +167,19 @@ const FeesScreen = () => {
 
   const handlePaymentSuccess = async () => {
     try {
-      // Update the fee/fine status in the database
-      if (selectedPaymentType === 'fee' && selectedPaymentItem) {
-        // Update fee status to Paid
-        await updateFee({
-          id: selectedPaymentItem._id,
-          status: 'Paid',
-        });
-        setHasPaidAnnualFee(true);
-      } else if (selectedPaymentType === 'fine' && selectedPaymentItem) {
-        // Update fine status to Paid
-        await updateFineStatus({
-          fineId: selectedPaymentItem._id,
-          status: 'Paid',
-        });
-      }
-      
+      // For Venmo manual tracking: Just close modal and show success message
+      // Payment status remains "Pending" until admin verifies in AdminScreen
       setPaymentModalVisible(false);
       setSelectedPaymentItem(null);
       
-      Alert.alert('Success', 'Payment completed successfully!');
+      // Show success message but note verification is required
+      Alert.alert(
+        'Payment Submitted', 
+        'Your payment information has been submitted and is pending verification by HOA staff. You will be notified once it is verified.'
+      );
     } catch (error) {
-      console.error('Error updating payment status:', error);
-      Alert.alert('Warning', 'Payment was successful but status update failed. Please refresh the page.');
+      console.error('Error submitting payment:', error);
+      Alert.alert('Error', 'Failed to submit payment information.');
     }
   };
 

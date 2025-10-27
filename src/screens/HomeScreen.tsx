@@ -15,7 +15,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery } from 'convex/react';
+import { useNavigation } from '@react-navigation/native';
+import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
@@ -28,10 +29,15 @@ import { useCustomAlert } from '../hooks/useCustomAlert';
 
 const HomeScreen = () => {
   const { user, signOut } = useAuth();
+  const navigation = useNavigation();
   const hoaInfo = useQuery(api.hoaInfo.get);
   const emergencyNotifications = useQuery(api.emergencyNotifications.getActive);
   const communityPosts = useQuery(api.communityPosts.getAll);
+  const polls = useQuery(api.polls.getAll);
+  const userVotes = useQuery(api.polls.getAllUserVotes, user ? { userId: user._id } : "skip");
+  const voteOnPoll = useMutation(api.polls.vote);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [selectedPollVotes, setSelectedPollVotes] = useState<{[pollId: string]: number[]}>({});
   const { alertState, showAlert, hideAlert } = useCustomAlert();
   
   // State for dynamic responsive behavior (only for web/desktop)
@@ -118,6 +124,13 @@ const HomeScreen = () => {
     }
   }, [screenWidth, showMobileNav, showDesktopNav]);
 
+  // Update selectedPollVotes when userVotes data is available
+  useEffect(() => {
+    if (userVotes) {
+      setSelectedPollVotes(userVotes);
+    }
+  }, [userVotes]);
+
   const handleContact = (type: 'phone' | 'email') => {
     if (type === 'phone') {
       if (hoaInfo?.phone) Linking.openURL(`tel:${hoaInfo.phone}`);
@@ -138,6 +151,76 @@ const HomeScreen = () => {
         }
       ]
     });
+  };
+
+  const handleVoteOnPoll = async (pollId: string, optionIndex: number) => {
+    if (!user) {
+      showAlert({
+        title: 'Error',
+        message: 'You must be logged in to vote',
+        type: 'error'
+      });
+      
+      // Auto-dismiss error alert after 3 seconds
+      setTimeout(() => {
+        hideAlert();
+      }, 3000);
+      return;
+    }
+
+    try {
+      const currentVotes = selectedPollVotes[pollId] || [];
+      let newVotes: number[];
+
+      if (currentVotes.includes(optionIndex)) {
+        // Remove vote if already selected
+        newVotes = currentVotes.filter(vote => vote !== optionIndex);
+      } else {
+        // Add vote
+        const poll = polls?.find(p => p._id === pollId);
+        if (poll && !poll.allowMultipleVotes) {
+          // Single vote only - replace current vote
+          newVotes = [optionIndex];
+        } else {
+          // Multiple votes allowed - add to existing votes
+          newVotes = [...currentVotes, optionIndex];
+        }
+      }
+
+      setSelectedPollVotes(prev => ({
+        ...prev,
+        [pollId]: newVotes
+      }));
+
+      await voteOnPoll({
+        userId: user._id,
+        pollId: pollId as any,
+        selectedOptions: newVotes
+      });
+      
+      showAlert({
+        title: 'Success',
+        message: 'Your vote has been recorded!',
+        type: 'success'
+      });
+      
+      // Auto-dismiss success alert after 2 seconds
+      setTimeout(() => {
+        hideAlert();
+      }, 2000);
+    } catch (error) {
+      console.error('Error voting on poll:', error);
+      showAlert({
+        title: 'Error',
+        message: 'Failed to record your vote. Please try again.',
+        type: 'error'
+      });
+      
+      // Auto-dismiss error alert after 3 seconds
+      setTimeout(() => {
+        hideAlert();
+      }, 3000);
+    }
   };
 
   const handleSignOut = () => {
@@ -381,6 +464,7 @@ const HomeScreen = () => {
         <Animated.View style={[
           styles.section, 
         styles.emergencySection,
+        { borderLeftColor: '#ef4444' }, // Red
         {
           opacity: quickActionsAnim,
           transform: [{
@@ -418,6 +502,7 @@ const HomeScreen = () => {
       {/* Recent Community Posts */}
       <Animated.View style={[
         styles.section,
+        { borderLeftColor: '#f97316' }, // Orange
         {
           opacity: postsAnim,
           transform: [{
@@ -482,9 +567,145 @@ const HomeScreen = () => {
         ))}
       </Animated.View>
 
+      {/* Recent Polls */}
+      {polls && polls.length > 0 && (
+        <Animated.View style={[
+          styles.section,
+          { borderLeftColor: '#eab308' }, // Yellow
+          {
+            opacity: postsAnim,
+            transform: [{
+              translateY: postsAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [50, 0],
+              })
+            }]
+          }
+        ]}>
+          <View style={styles.communityHeader}>
+            <Ionicons name="bar-chart" size={24} color="#64748b" />
+            <Text style={[styles.sectionTitle, { marginLeft: 8, marginBottom: 0 }]}>Recent Polls</Text>
+          </View>
+          {polls.slice(0, 1).map((poll: any, index: number) => (
+            <Animated.View 
+              key={poll._id} 
+              style={[
+                styles.postCard,
+                {
+                  opacity: postsAnim,
+                  transform: [{
+                    translateY: postsAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [30 + (index * 20), 0],
+                    })
+                  }]
+                }
+              ]}
+            >
+              <View style={styles.postHeader}>
+                <View style={styles.postAuthorInfo}>
+                  <View style={styles.postAvatar}>
+                    <Ionicons name="bar-chart" size={20} color="#6b7280" />
+                  </View>
+                  <Text style={styles.postAuthor}>Community Poll</Text>
+                </View>
+                <Text style={styles.postTime}>
+                  {new Date(poll.createdAt).toLocaleDateString()}
+                </Text>
+              </View>
+              
+              <Text style={styles.postTitle}>{poll.title}</Text>
+              {poll.description && (
+                <Text style={styles.postContent}>{poll.description}</Text>
+              )}
+              
+              {/* Poll Options */}
+              <View style={styles.pollOptionsContainer}>
+                {poll.options.map((option: string, optionIndex: number) => {
+                  const isSelected = selectedPollVotes[poll._id]?.includes(optionIndex) || false;
+                  const voteCount = poll.optionVotes?.[optionIndex] || 0;
+                  const totalVotes = poll.totalVotes || 0;
+                  const percentage = totalVotes > 0 ? (voteCount / totalVotes) * 100 : 0;
+                  const isWinningOption = !poll.isActive && poll.winningOption && poll.winningOption.tiedIndices?.includes(optionIndex);
+                  const isTied = isWinningOption && poll.winningOption?.isTied;
+                  
+                  return (
+                    <TouchableOpacity
+                      key={optionIndex}
+                      style={[
+                        styles.pollOption,
+                        isSelected && styles.pollOptionSelected,
+                        !poll.isActive && styles.pollOptionDisabled,
+                        isWinningOption && styles.pollWinningOption
+                      ]}
+                      onPress={() => poll.isActive ? handleVoteOnPoll(poll._id, optionIndex) : null}
+                      disabled={!poll.isActive}
+                    >
+                      <View style={styles.pollOptionContent}>
+                        <Text style={[
+                          styles.pollOptionText,
+                          isSelected && styles.pollOptionTextSelected,
+                          isWinningOption && styles.pollWinningOptionText
+                        ]}>
+                          {option}
+                        </Text>
+                        <Text style={[
+                          styles.pollVoteCount,
+                          isWinningOption && styles.pollWinningVoteCount
+                        ]}>
+                          {voteCount} votes ({percentage.toFixed(1)}%)
+                        </Text>
+                      </View>
+                      <View style={styles.pollOptionActions}>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={20} color="#2563eb" />
+                        )}
+                        {isWinningOption && (
+                          <View style={styles.winningBadge}>
+                            <Ionicons name="trophy" size={16} color="#ffffff" />
+                            <Text style={styles.winningBadgeText}>
+                              {isTied ? 'Tied' : 'Most Voted'}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              
+              <View style={styles.postFooter}>
+                <View style={styles.actionButton}>
+                  <Ionicons name="people" size={16} color="#6b7280" />
+                  <Text style={styles.actionText}>{poll.totalVotes || 0} total votes</Text>
+                </View>
+                
+                {poll.allowMultipleVotes && (
+                  <View style={styles.actionButton}>
+                    <Ionicons name="checkmark-done" size={16} color="#6b7280" />
+                    <Text style={styles.actionText}>Multiple votes allowed</Text>
+                  </View>
+                )}
+                
+                <TouchableOpacity 
+                  style={styles.viewMoreButton}
+                  onPress={() => {
+                    navigation.navigate('Community' as never);
+                  }}
+                >
+                  <Text style={styles.viewMoreText}>View Poll</Text>
+                  <Ionicons name="arrow-forward" size={16} color="#3b82f6" />
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+          ))}
+        </Animated.View>
+      )}
+
       {/* Office Information */}
       <Animated.View style={[
         styles.section,
+        { borderLeftColor: '#22c55e' }, // Green
         {
           opacity: officeAnim,
           transform: [{
@@ -519,9 +740,10 @@ const HomeScreen = () => {
         </View>
       </Animated.View>
       
-      {/* Additional sections for more content */}
+      {/* Additional sections for more content - Community Guidelines */}
       <Animated.View style={[
         styles.section,
+        { borderLeftColor: '#3b82f6' }, // Blue
         {
           opacity: officeAnim,
           transform: [{
@@ -552,8 +774,10 @@ const HomeScreen = () => {
         </View>
       </Animated.View>
       
+      {/* Upcoming Events */}
       <Animated.View style={[
         styles.section,
+        { borderLeftColor: '#6366f1' }, // Indigo
         {
           opacity: officeAnim,
           transform: [{
@@ -593,8 +817,9 @@ const HomeScreen = () => {
         title={alertState.title}
         message={alertState.message}
         buttons={alertState.buttons}
+        type={alertState.type}
         onClose={hideAlert}
-        type="warning"
+        
       />
 
       {/* iOS Install Prompt Modal */}
@@ -847,6 +1072,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderWidth: 1,
     borderColor: '#f1f5f9',
+    borderLeftWidth: 4,
   },
   sectionTitle: {
     fontSize: 18,
@@ -995,6 +1221,90 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginLeft: 4,
     marginRight: 12,
+  },
+  pollOptionsContainer: {
+    marginVertical: 12,
+  },
+  pollOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+  },
+  pollOptionSelected: {
+    backgroundColor: '#e0e7ff',
+    borderColor: '#2563eb',
+  },
+  pollOptionContent: {
+    flex: 1,
+  },
+  pollOptionText: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  pollOptionTextSelected: {
+    color: '#2563eb',
+    fontWeight: '600',
+  },
+  pollVoteCount: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '600',
+  },
+  pollOptionDisabled: {
+    backgroundColor: '#f3f4f6',
+    borderColor: '#d1d5db',
+    opacity: 0.6,
+  },
+  pollWinningOption: {
+    backgroundColor: '#fef3c7',
+    borderLeftColor: '#f59e0b',
+    borderWidth: 2,
+    borderColor: '#f59e0b',
+  },
+  pollWinningOptionText: {
+    color: '#92400e',
+    fontWeight: '700',
+  },
+  pollWinningVoteCount: {
+    color: '#92400e',
+    fontWeight: '700',
+  },
+  pollOptionActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  winningBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f59e0b',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  winningBadgeText: {
+    fontSize: 10,
+    color: '#ffffff',
+    fontWeight: '700',
+    marginLeft: 4,
+  },
+  viewMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  viewMoreText: {
+    fontSize: 12,
+    color: '#3b82f6',
+    marginRight: 4,
   },
   infoCard: {
     backgroundColor: '#ffffff',

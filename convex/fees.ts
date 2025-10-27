@@ -54,6 +54,12 @@ export const update = mutation({
   },
   handler: async (ctx, args) => {
     const { id, ...updates } = args;
+    const fee = await ctx.db.get(id);
+    
+    if (!fee) {
+      throw new Error(`Fee with ID ${id} not found`);
+    }
+    
     await ctx.db.patch(id, { ...updates, updatedAt: Date.now() });
   },
 });
@@ -117,8 +123,8 @@ export const recordPayment = mutation({
       amount: args.amount,
       paymentDate: args.paymentDate,
       status: 'Paid',
-      paymentMethod: 'Stripe', // Default to Stripe for now
-      transactionId: `legacy-${now}`, // Legacy payment without Stripe transaction
+      paymentMethod: 'Venmo', // Default to Venmo for legacy payments
+      transactionId: `legacy-${now}`, // Legacy payment without Venmo transaction
       createdAt: now,
       updatedAt: now,
     });
@@ -172,20 +178,43 @@ export const hasPaidAnnualFee = query({
       return allAnnualFeesPaid;
     }
 
-    // Fallback to payment records (supports names like "Annual HOA Fee 2025")
+    // Fallback to payment records
+    // Check if user has any verified paid payments for this year that cover their fees
     const payments = await ctx.db
       .query("payments")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .filter((q) => q.eq(q.field("status"), "Paid"))
       .collect();
 
-    const hasPaidViaPaymentRecord = payments.some((payment) => {
-      const paymentYear = new Date(payment.paymentDate).getFullYear();
-      const isAnnualFee = typeof payment.feeType === "string" && payment.feeType.startsWith("Annual HOA Fee");
-      return paymentYear === currentYear && isAnnualFee;
+    const verifiedPaidPayments = payments.filter((payment) => {
+      // Payment must have status "Paid" AND verificationStatus "Verified"
+      const isPaid = payment.status === "Paid";
+      const isVerified = payment.verificationStatus === "Verified";
+      return isPaid && isVerified;
     });
 
-    return hasPaidViaPaymentRecord;
+    // Check if all fees for the user are covered by verified payments
+    const userFees = await ctx.db
+      .query("fees")
+      .filter((q) => q.eq(q.field("userId"), args.userId))
+      .collect();
+
+    // If user has fees, check if all are paid via verified payments
+    if (userFees.length > 0) {
+      const allFeesCovered = userFees.every((fee) => 
+        verifiedPaidPayments.some((payment) => 
+          payment.feeId === fee._id && payment.status === "Paid" && payment.verificationStatus === "Verified"
+        )
+      );
+      return allFeesCovered;
+    }
+
+    // If no fees exist, check if there's any verified payment for the current year
+    const hasAnyVerifiedPayment = verifiedPaidPayments.some((payment) => {
+      const paymentYear = new Date(payment.paymentDate).getFullYear();
+      return paymentYear === currentYear;
+    });
+
+    return hasAnyVerifiedPayment;
   },
 });
 
@@ -234,12 +263,21 @@ export const getAllHomeownersPaymentStatus = query({
           hasPaid = allAnnualFeesPaid && unpaidFines.length === 0;
         } else {
           // Fallback to payment records
+          // Only count payments that are verified AND paid
           const payments = await ctx.db
             .query("payments")
             .withIndex("by_user", (q) => q.eq("userId", homeowner._id))
-            .filter((q) => q.eq(q.field("status"), "Paid"))
             .collect();
-          const hasPaidViaPaymentRecord = payments.some((payment) => {
+          const verifiedPaidPayments = payments.filter((payment) => {
+            // Payment must have status "Paid" AND verificationStatus "Verified"
+            // Do NOT count rejected or pending payments
+            const isPaid = payment.status === "Paid";
+            const isVerified = payment.verificationStatus === "Verified";
+            // Exclude payments that are rejected
+            const isNotRejected = payment.verificationStatus !== "Rejected";
+            return isPaid && isVerified && isNotRejected;
+          });
+          const hasPaidViaPaymentRecord = verifiedPaidPayments.some((payment) => {
             const paymentYear = new Date(payment.paymentDate).getFullYear();
             const isAnnualFee = typeof payment.feeType === "string" && payment.feeType.startsWith("Annual HOA Fee");
             return paymentYear === currentYear && isAnnualFee;
@@ -332,7 +370,7 @@ export const addFineToProperty = mutation({
       amount: args.amount,
       dateIssued: new Date().toISOString().split('T')[0],
       status: "Pending",
-      description: args.description || `Fine for ${args.reason} at ${args.address}`,
+      description: args.description || `Fine for ${args.reason}`,
       residentId: args.homeownerId,
       createdAt: now,
       updatedAt: now,
@@ -376,6 +414,12 @@ export const updateFineStatus = mutation({
     status: v.union(v.literal("Paid"), v.literal("Pending"), v.literal("Overdue")),
   },
   handler: async (ctx, args) => {
+    const fine = await ctx.db.get(args.fineId);
+    
+    if (!fine) {
+      throw new Error(`Fine with ID ${args.fineId} not found`);
+    }
+    
     await ctx.db.patch(args.fineId, { 
       status: args.status,
       updatedAt: Date.now(),

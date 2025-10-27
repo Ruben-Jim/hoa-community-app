@@ -25,9 +25,12 @@ import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import DeveloperIndicator from '../components/DeveloperIndicator';
 import CustomTabBar from '../components/CustomTabBar';
 import MobileTabBar from '../components/MobileTabBar';
+import CustomAlert from '../components/CustomAlert';
+import { useCustomAlert } from '../hooks/useCustomAlert';
 
 const CommunityScreen = () => {
   const { user } = useAuth();
+  const { alertState, showAlert, hideAlert } = useCustomAlert();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showNewPostModal, setShowNewPostModal] = useState(false);
   const [showCommentModal, setShowCommentModal] = useState(false);
@@ -47,6 +50,17 @@ const CommunityScreen = () => {
   // Image upload state
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [uploadingImages, setUploadingImages] = useState(false);
+  
+  // Rainbow colors for posts and polls
+  const borderColors = [
+    '#ef4444', // Red
+    '#f97316', // Orange
+    '#eab308', // Yellow
+    '#22c55e', // Green
+    '#3b82f6', // Blue
+    '#6366f1', // Indigo
+    '#8b5cf6', // Violet
+  ];
 
   // State for dynamic responsive behavior (only for web/desktop)
   const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
@@ -104,11 +118,12 @@ const CommunityScreen = () => {
   }, [screenWidth, showMobileNav, showDesktopNav]);
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current; // Start at 0 for individual post animations
+  const fadeAnim = useRef(new Animated.Value(1)).current; // Start at 1 to avoid flash on tab click
 
   // Convex queries
   const posts = useQuery(api.communityPosts.getAll) ?? [];
-  const polls = useQuery(api.polls.getActive) ?? [];
+  const polls = useQuery(api.polls.getAll) ?? [];
+  const userVotes = useQuery(api.polls.getAllUserVotes, user ? { userId: user._id } : "skip");
 
   // Convex mutations
   const createPost = useMutation(api.communityPosts.create);
@@ -185,23 +200,31 @@ const CommunityScreen = () => {
     ]).start();
   };
 
-  const animateFadeIn = () => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 600,
-      useNativeDriver: Platform.OS !== 'web',
-    }).start();
-  };
+  // fadeAnim starts at 1, no fade-in animation needed
+  // const animateFadeIn = () => {
+  //   Animated.timing(fadeAnim, {
+  //     toValue: 1,
+  //     duration: 600,
+  //     useNativeDriver: Platform.OS !== 'web',
+  //   }).start();
+  // };
 
   // Initialize animations on component mount
+  // fadeAnim is already at 1, no need to animate
+  // useEffect(() => {
+  //   Animated.timing(fadeAnim, {
+  //     toValue: 1,
+  //     duration: 600,
+  //     useNativeDriver: Platform.OS !== 'web',
+  //   }).start();
+  // }, []);
+
+  // Update selectedPollVotes when userVotes data is available
   useEffect(() => {
-    // Animate individual posts
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 600,
-      useNativeDriver: Platform.OS !== 'web',
-    }).start();
-  }, []);
+    if (userVotes) {
+      setSelectedPollVotes(userVotes);
+    }
+  }, [userVotes]);
 
   const filteredPosts = posts.filter((post: any) =>
     !selectedCategory || post.category === selectedCategory
@@ -327,7 +350,32 @@ const CommunityScreen = () => {
 
   const handleVoteOnPoll = async (pollId: string, optionIndex: number) => {
     if (!user) {
-      Alert.alert('Error', 'Please sign in to vote');
+      showAlert({
+        title: 'Error',
+        message: 'You must be logged in to vote',
+        type: 'error'
+      });
+      
+      // Auto-dismiss error alert after 3 seconds
+      setTimeout(() => {
+        hideAlert();
+      }, 3000);
+      return;
+    }
+
+    // Check if poll is active
+    const poll = polls.find(p => p._id === pollId);
+    if (!poll || !poll.isActive) {
+      showAlert({
+        title: 'Error',
+        message: 'This poll is no longer active',
+        type: 'error'
+      });
+      
+      // Auto-dismiss error alert after 3 seconds
+      setTimeout(() => {
+        hideAlert();
+      }, 3000);
       return;
     }
 
@@ -360,9 +408,29 @@ const CommunityScreen = () => {
         userId: user._id,
         selectedOptions: newVotes,
       });
+      
+      showAlert({
+        title: 'Success',
+        message: 'Your vote has been recorded!',
+        type: 'success'
+      });
+      
+      // Auto-dismiss success alert after 2 seconds
+      setTimeout(() => {
+        hideAlert();
+      }, 2000);
     } catch (error) {
       console.error('Error voting on poll:', error);
-      Alert.alert('Error', 'Failed to vote. Please try again.');
+      showAlert({
+        title: 'Error',
+        message: 'Failed to record your vote. Please try again.',
+        type: 'error'
+      });
+      
+      // Auto-dismiss error alert after 3 seconds
+      setTimeout(() => {
+        hideAlert();
+      }, 3000);
     }
   };
 
@@ -499,106 +567,6 @@ const CommunityScreen = () => {
         />
       )}
       
-      {/* Header with New Post Button */}
-      <ImageBackground
-        source={require('../../assets/hoa-4k.jpg')}
-        style={styles.header}
-        imageStyle={styles.headerImage}
-      >
-          <View style={styles.headerOverlay} />
-          <View style={styles.headerTop}>
-            {/* Hamburger Menu - Only when mobile nav is shown */}
-            {showMobileNav && (
-              <TouchableOpacity 
-                style={styles.menuButton}
-                onPress={() => setIsMenuOpen(true)}
-              >
-                <Ionicons name="menu" size={24} color="#ffffff" />
-              </TouchableOpacity>
-            )}
-            
-            <View style={styles.headerLeft}>
-              <View style={styles.titleContainer}>
-                <Text style={styles.headerTitle}>Community Forum</Text>
-              </View>
-              <Text style={styles.headerSubtitle}>
-                Connect with your neighbors and stay informed
-              </Text>
-              <View style={styles.indicatorsContainer}>
-                <DeveloperIndicator />
-                <BoardMemberIndicator />
-              </View>
-            </View>
-          </View>
-        </ImageBackground>
-
-      {/* Custom Tab Bar - Only when screen is wide enough */}
-      {showDesktopNav && (
-        <CustomTabBar />
-      )}
-
-      {/* Category Filter with New Post Button */}
-      <SafeAreaView style={styles.categoryContainer}>
-        <View style={styles.filterRow}>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryContent}
-            style={styles.categoryScrollView}
-          >
-            <TouchableOpacity
-              style={[
-                styles.categoryButton,
-                !selectedCategory && styles.categoryButtonActive
-              ]}
-              onPress={() => setSelectedCategory(null)}
-            >
-              <Text style={[
-                styles.categoryButtonText,
-                !selectedCategory && styles.categoryButtonTextActive
-              ]}>
-                All
-              </Text>
-            </TouchableOpacity>
-            
-            {categories.map((category) => (
-              <TouchableOpacity
-                key={category}
-                style={[
-                  styles.categoryButton,
-                  selectedCategory === category && styles.categoryButtonActive
-                ]}
-                onPress={() => setSelectedCategory(category)}
-              >
-                <Text style={[
-                  styles.categoryButtonText,
-                  selectedCategory === category && styles.categoryButtonTextActive
-                ]}>
-                  {category}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-          
-          {/* New Post Button - Desktop Only */}
-          {showDesktopNav && (
-            <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-              <TouchableOpacity
-                style={styles.newPostButton}
-                onPress={() => {
-                  animateButtonPress();
-                  setShowNewPostModal(true);
-                  animateIn('post');
-                }}
-              >
-                <Ionicons name="add" size={20} color="#ffffff" />
-                <Text style={styles.newPostButtonText}>New Post</Text>
-              </TouchableOpacity>
-            </Animated.View>
-          )}
-        </View>
-      </SafeAreaView>
-
       {/* Posts List */}
       <ScrollView 
         ref={scrollViewRef}
@@ -636,21 +604,137 @@ const CommunityScreen = () => {
           },
         })}
       >
-        {allContent.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="chatbubbles-outline" size={48} color="#9ca3af" />
-            <Text style={styles.emptyStateText}>No posts found</Text>
-            <Text style={styles.emptyStateSubtext}>
-              Be the first to start a conversation!
-            </Text>
+        {/* Header */}
+        <Animated.View style={{
+          opacity: fadeAnim,
+        }}>
+          <ImageBackground
+            source={require('../../assets/hoa-4k.jpg')}
+            style={styles.header}
+            imageStyle={styles.headerImage}
+          >
+            <View style={styles.headerOverlay} />
+            <View style={styles.headerTop}>
+              {/* Hamburger Menu - Only when mobile nav is shown */}
+              {showMobileNav && (
+                <TouchableOpacity 
+                  style={styles.menuButton}
+                  onPress={() => setIsMenuOpen(true)}
+                >
+                  <Ionicons name="menu" size={24} color="#ffffff" />
+                </TouchableOpacity>
+              )}
+              
+              <View style={styles.headerLeft}>
+                <View style={styles.titleContainer}>
+                  <Text style={styles.headerTitle}>Community Forum</Text>
+                </View>
+                <Text style={styles.headerSubtitle}>
+                  Connect with your neighbors and stay informed
+                </Text>
+                <View style={styles.indicatorsContainer}>
+                  <DeveloperIndicator />
+                  <BoardMemberIndicator />
+                </View>
+              </View>
+            </View>
+          </ImageBackground>
+        </Animated.View>
+
+        {/* Custom Tab Bar - Only when screen is wide enough */}
+        {showDesktopNav && (
+          <Animated.View style={{
+            opacity: fadeAnim,
+          }}>
+            <CustomTabBar />
+          </Animated.View>
+        )}
+
+        {/* Category Filter with New Post Button */}
+        <Animated.View style={[
+          styles.categoryContainer,
+          {
+            opacity: fadeAnim,
+          }
+        ]}>
+          <View style={styles.filterRow}>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoryContent}
+              style={styles.categoryScrollView}
+            >
+              <TouchableOpacity
+                style={[
+                  styles.categoryButton,
+                  !selectedCategory && styles.categoryButtonActive
+                ]}
+                onPress={() => setSelectedCategory(null)}
+              >
+                <Text style={[
+                  styles.categoryButtonText,
+                  !selectedCategory && styles.categoryButtonTextActive
+                ]}>
+                  All
+                </Text>
+              </TouchableOpacity>
+              
+              {categories.map((category) => (
+                <TouchableOpacity
+                  key={category}
+                  style={[
+                    styles.categoryButton,
+                    selectedCategory === category && styles.categoryButtonActive
+                  ]}
+                  onPress={() => setSelectedCategory(category)}
+                >
+                  <Text style={[
+                    styles.categoryButtonText,
+                    selectedCategory === category && styles.categoryButtonTextActive
+                  ]}>
+                    {category}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            
+            {/* New Post Button - Desktop Only */}
+            {showDesktopNav && (
+              <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+                <TouchableOpacity
+                  style={styles.newPostButton}
+                  onPress={() => {
+                    animateButtonPress();
+                    setShowNewPostModal(true);
+                    animateIn('post');
+                  }}
+                >
+                  <Ionicons name="add" size={20} color="#ffffff" />
+                  <Text style={styles.newPostButtonText}>New Post</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            )}
           </View>
-        ) : (
-          allContent.map((item: any, index: number) => (
+        </Animated.View>
+        
+        {/* Content with padding */}
+        <View style={styles.contentWrapper}>
+          {allContent.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="chatbubbles-outline" size={48} color="#9ca3af" />
+              <Text style={styles.emptyStateText}>No posts found</Text>
+              <Text style={styles.emptyStateSubtext}>
+                Be the first to start a conversation!
+              </Text>
+            </View>
+          ) : (
+            allContent.map((item: any, index: number) => (
             <Animated.View 
               key={item._id} 
               style={[
                 styles.postCard,
                 {
+                  borderLeftColor: borderColors[index % borderColors.length],
                   opacity: fadeAnim,
                   transform: [{
                     translateY: fadeAnim.interpolate({
@@ -836,9 +920,9 @@ const CommunityScreen = () => {
                       </View>
                     </View>
                     <View style={styles.categoryBadge}>
-                      <Ionicons name="checkmark-circle" size={12} color="#10b981" />
-                      <Text style={[styles.categoryText, { color: '#10b981' }]}>
-                        Poll
+                      <Ionicons name="checkmark-circle" size={12} color={item.isActive ? '#10b981' : '#ef4444'} />
+                      <Text style={[styles.categoryText, { color: item.isActive ? '#10b981' : '#ef4444' }]}>
+                        {item.isActive ? 'Active' : 'inActive'}
                       </Text>
                     </View>
                   </View>
@@ -855,30 +939,49 @@ const CommunityScreen = () => {
                       const voteCount = item.optionVotes?.[optionIndex] || 0;
                       const totalVotes = item.totalVotes || 0;
                       const percentage = totalVotes > 0 ? (voteCount / totalVotes) * 100 : 0;
+                      const isWinningOption = !item.isActive && item.winningOption && item.winningOption.tiedIndices?.includes(optionIndex);
+                      const isTied = isWinningOption && item.winningOption?.isTied;
                       
                       return (
                         <TouchableOpacity
                           key={optionIndex}
                           style={[
                             styles.pollOption,
-                            isSelected && styles.pollOptionSelected
+                            isSelected && styles.pollOptionSelected,
+                            !item.isActive && styles.pollOptionDisabled,
+                            isWinningOption && styles.pollWinningOption
                           ]}
-                          onPress={() => handleVoteOnPoll(item._id, optionIndex)}
+                          onPress={() => item.isActive ? handleVoteOnPoll(item._id, optionIndex) : null}
+                          disabled={!item.isActive}
                         >
                           <View style={styles.pollOptionContent}>
                             <Text style={[
                               styles.pollOptionText,
-                              isSelected && styles.pollOptionTextSelected
+                              isSelected && styles.pollOptionTextSelected,
+                              isWinningOption && styles.pollWinningOptionText
                             ]}>
                               {option}
                             </Text>
-                            <Text style={styles.pollVoteCount}>
+                            <Text style={[
+                              styles.pollVoteCount,
+                              isWinningOption && styles.pollWinningVoteCount
+                            ]}>
                               {voteCount} votes ({percentage.toFixed(1)}%)
                             </Text>
                           </View>
-                          {isSelected && (
-                            <Ionicons name="checkmark-circle" size={20} color="#2563eb" />
-                          )}
+                          <View style={styles.pollOptionActions}>
+                            {isSelected && (
+                              <Ionicons name="checkmark-circle" size={20} color="#2563eb" />
+                            )}
+                            {isWinningOption && (
+                              <View style={styles.winningBadge}>
+                                <Ionicons name="trophy" size={16} color="#ffffff" />
+                                <Text style={styles.winningBadgeText}>
+                                  {isTied ? 'Tied' : 'Most Voted'}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
                         </TouchableOpacity>
                       );
                     })}
@@ -900,8 +1003,9 @@ const CommunityScreen = () => {
                 </>
               )}
             </Animated.View>
-          ))
-        )}
+            ))
+          )}
+        </View>
         
         {/* Additional content to ensure scrollable content */}
         <View style={styles.spacer} />
@@ -1103,6 +1207,16 @@ const CommunityScreen = () => {
         </Animated.View>
       </Modal>
       </View>
+      
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertState.visible}
+        title={alertState.title}
+        message={alertState.message}
+        buttons={alertState.buttons}
+        type={alertState.type}
+        onClose={hideAlert}
+      />
     </SafeAreaView>
   );
 };
@@ -1208,7 +1322,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#2563eb',
+    backgroundColor: '#eab308',
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 8,
@@ -1256,6 +1370,8 @@ const styles = StyleSheet.create({
   },
   postsContainer: {
     flex: 1,
+  },
+  contentWrapper: {
     padding: 15,
   },
   webScrollContainer: {
@@ -1265,6 +1381,10 @@ const styles = StyleSheet.create({
       WebkitUserSelect: 'none' as any,
       MozUserSelect: 'none' as any,
       msUserSelect: 'none' as any,
+      overflow: 'auto' as any,
+      height: '100vh' as any,
+      maxHeight: '100vh' as any,
+      position: 'relative' as any,
     }),
   },
   scrollContent: {
@@ -1272,6 +1392,8 @@ const styles = StyleSheet.create({
   },
   webScrollContent: {
     ...(Platform.OS === 'web' && {
+      minHeight: '100vh' as any,
+      flexGrow: 1,
       paddingBottom: 100 as any,
     }),
   },
@@ -1305,7 +1427,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
     borderLeftWidth: 4,
-    borderLeftColor: '#2563eb',
+    // borderLeftColor is set dynamically per card
   },
   postHeader: {
     flexDirection: 'row',
@@ -1694,6 +1816,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#e0e7ff',
     borderColor: '#2563eb',
   },
+  pollOptionDisabled: {
+    backgroundColor: '#f3f4f6',
+    borderColor: '#d1d5db',
+    opacity: 0.6,
+  },
   pollOptionContent: {
     flex: 1,
   },
@@ -1711,6 +1838,39 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
     fontWeight: '600',
+  },
+  pollWinningOption: {
+    backgroundColor: '#fef3c7',
+    borderLeftColor: '#f59e0b',
+    borderWidth: 2,
+    borderColor: '#f59e0b',
+  },
+  pollWinningOptionText: {
+    color: '#92400e',
+    fontWeight: '700',
+  },
+  pollWinningVoteCount: {
+    color: '#92400e',
+    fontWeight: '700',
+  },
+  pollOptionActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  winningBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f59e0b',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  winningBadgeText: {
+    fontSize: 10,
+    color: '#ffffff',
+    fontWeight: '700',
+    marginLeft: 4,
   },
   // Image upload styles
   imageUploadContainer: {

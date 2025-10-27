@@ -58,10 +58,23 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
     }
   }, [externalIsMenuOpen]);
 
+  // Rainbow colors for tabs
+  const borderColors = [
+    '#ef4444', // Red
+    '#f97316', // Orange
+    '#eab308', // Yellow
+    '#22c55e', // Green
+    '#3b82f6', // Blue
+    '#6366f1', // Indigo
+    '#8b5cf6', // Violet
+    '#ec4899', // Pink
+  ];
+
   const tabs: TabItem[] = [
     { name: 'Home', icon: 'home', label: 'Home', color: '#6b7280' },
     { name: 'Board', icon: 'people', label: 'Board', color: '#6b7280' },
     { name: 'Community', icon: 'chatbubbles', label: 'Community', color: '#6b7280' },
+    { name: 'ResidentNotifications', icon: 'home', label: 'Residents', color: '#6b7280' },
     { name: 'Covenants', icon: 'document-text', label: 'Covenants', color: '#6b7280' },
     { name: 'Emergency', icon: 'warning', label: 'Emergency', color: '#6b7280' },
     // Hide fees tab for renters and regular residents (only show for board members and dev users)
@@ -131,7 +144,14 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
           <Animated.View style={[styles.sideMenu, { transform: [{ translateX: slideAnim }] }]}>
             {/* Menu Header */}
             <View style={styles.menuHeader}>
-              <Text style={styles.menuTitle}>Shelton Springs</Text>
+              <View style={styles.menuHeaderLeft}>
+                <Image 
+                  source={require('../../assets/favicon.jpg')} 
+                  style={styles.favicon}
+                  resizeMode="cover"
+                />
+                <Text style={styles.menuTitle}>Shelton Springs</Text>
+              </View>
               <TouchableOpacity onPress={closeMenu}>
                 <Ionicons name="close" size={24} color="#374151" />
               </TouchableOpacity>
@@ -139,26 +159,36 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
 
             {/* Menu Items */}
             <View style={styles.menuItems}>
-              {tabs.map((tab) => {
+              {tabs.map((tab, index) => {
                 const isActive = route.name === tab.name;
                 return (
                   <TouchableOpacity
                     key={tab.name}
-                    style={[styles.menuItem, isActive && styles.activeMenuItem]}
+                    style={[
+                      styles.menuItem, 
+                      isActive && styles.activeMenuItem,
+                      {
+                        borderLeftColor: borderColors[index % borderColors.length],
+                        borderLeftWidth: 4,
+                      }
+                    ]}
                     onPress={() => handleTabPress(tab.name)}
                   >
                     <View style={styles.menuItemContent}>
                       <Ionicons
                         name={tab.icon as any}
                         size={24}
-                        color={isActive ? '#2563eb' : tab.color}
+                        color={isActive ? borderColors[index % borderColors.length] : tab.color}
                       />
-                      <Text style={[styles.menuItemText, isActive && styles.activeMenuItemText]}>
+                      <Text style={[
+                        styles.menuItemText, 
+                        isActive && [styles.activeMenuItemText, { color: borderColors[index % borderColors.length] }]
+                      ]}>
                         {tab.label}
                       </Text>
                     </View>
                     {isActive && (
-                      <View style={styles.activeIndicator} />
+                      <View style={[styles.activeIndicator, { backgroundColor: borderColors[index % borderColors.length] }]} />
                     )}
                   </TouchableOpacity>
                 );
@@ -228,6 +258,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
+  menuHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  favicon: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+  },
   menuTitle: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -247,7 +287,7 @@ const styles = StyleSheet.create({
   activeMenuItem: {
     backgroundColor: '#f0f9ff',
     borderLeftWidth: 4,
-    borderLeftColor: '#2563eb',
+    borderLeftColor: '#ef4444',
   },
   menuItemContent: {
     flexDirection: 'row',

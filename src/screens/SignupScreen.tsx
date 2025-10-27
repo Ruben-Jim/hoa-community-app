@@ -53,6 +53,25 @@ const SignupScreen = () => {
   // ScrollView ref for better control
   const scrollViewRef = useRef<ScrollView>(null);
 
+  // Format phone number: +1 (123) 456-7890
+  const formatPhoneNumber = (text: string): string => {
+    // Remove any non-numeric characters
+    const numbers = text.replace(/\D/g, '');
+    
+    // Format as +1 (123) 456-7890
+    if (numbers.length === 0) {
+      return '';
+    } else if (numbers.length <= 1) {
+      return `+${numbers}`;
+    } else if (numbers.length <= 4) {
+      return `+1 (${numbers.slice(1)}`;
+    } else if (numbers.length <= 7) {
+      return `+1 (${numbers.slice(1, 4)}) ${numbers.slice(4)}`;
+    } else {
+      return `+1 (${numbers.slice(1, 4)}) ${numbers.slice(4, 7)}-${numbers.slice(7, 11)}`;
+    }
+  };
+
   // Set initial cursor and cleanup on unmount (web only)
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -399,8 +418,12 @@ const SignupScreen = () => {
               style={[styles.input, errors.phone ? styles.inputError : null]}
               placeholder="Enter phone number"
               value={formData.phone}
-              onChangeText={(text) => updateFormData('phone', text)}
+              onChangeText={(text) => {
+                const formatted = formatPhoneNumber(text);
+                updateFormData('phone', formatted);
+              }}
               keyboardType="phone-pad"
+              maxLength={17}
             />
             {errors.phone ? <Text style={styles.errorText}>{errors.phone}</Text> : null}
 
@@ -447,7 +470,7 @@ const SignupScreen = () => {
                   styles.roleButtonText,
                   formData.isResident && !formData.isRenter && styles.roleButtonTextActive
                 ]}>
-                  Resident
+                  Homeowner
                 </Text>
               </TouchableOpacity>
 

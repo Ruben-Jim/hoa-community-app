@@ -62,6 +62,17 @@ const BoardScreen = () => {
   };
 
   const members = useQuery(api.boardMembers.getAll) ?? [];
+  
+  // Rainbow colors for board member cards
+  const borderColors = [
+    '#ef4444', // Red
+    '#f97316', // Orange
+    '#eab308', // Yellow
+    '#22c55e', // Green
+    '#3b82f6', // Blue
+    '#6366f1', // Indigo
+    '#8b5cf6', // Violet
+  ];
 
   // Animation functions
   const animateStaggeredContent = () => {
@@ -217,8 +228,19 @@ const BoardScreen = () => {
       <Animated.View style={{
         opacity: membersAnim,
       }}>
-        {members.map((member: any) => (
-          <View key={member._id} style={styles.memberCard}>
+        {members.map((member: any, index: number) => {
+          if (index === members.length - 1) {
+            const lastColor = borderColors[index % borderColors.length];
+            console.log(`Last board member (${member.name}) has border color: ${lastColor} (index ${index})`);
+          }
+          
+          return (
+          <View key={member._id} style={[
+            styles.memberCard,
+            {
+              borderLeftColor: borderColors[index % borderColors.length],
+            }
+          ]}>
             {/* Member Header with Avatar and Basic Info */}
             <View style={styles.memberHeader}>
               <View style={styles.avatarContainer}>
@@ -258,7 +280,7 @@ const BoardScreen = () => {
             {/* Contact Section */}
             <View style={styles.contactSection}>
               <View style={styles.contactHeader}>
-                <Ionicons name="call" size={16} color="#6b7280" />
+                <Ionicons name="information-circle" size={16} color="#6b7280" />
                 <Text style={styles.contactLabel}>Contact Information</Text>
               </View>
               <View style={styles.contactButtons}>
@@ -282,14 +304,24 @@ const BoardScreen = () => {
               </View>
             </View>
           </View>
-        ))}
+        );
+        })}
       </Animated.View>
 
       <Animated.View style={{
         opacity: infoAnim,
       }}>
         {/* Board Meetings Section */}
-        <View style={styles.infoSection}>
+        <View style={[styles.infoSection, {
+          borderLeftColor: borderColors[(members.length) % borderColors.length], // Next color after last member
+        }]}>
+          {(() => {
+            console.log(`Total members: ${members.length}`);
+            console.log(`Board Meetings: border color = ${borderColors[(members.length) % borderColors.length]} (index ${members.length})`);
+            console.log(`Contact the Board: border color = ${borderColors[(members.length + 1) % borderColors.length]} (index ${members.length + 1})`);
+            console.log(`Resources: border color = ${borderColors[(members.length + 2) % borderColors.length]} (index ${members.length + 2})`);
+            return null;
+          })()}
           <View style={styles.infoHeader}>
             <View style={styles.infoIconContainer}>
               <Ionicons name="calendar" size={24} color="#2563eb" />
@@ -319,7 +351,9 @@ const BoardScreen = () => {
         </View>
 
         {/* Contact Information Section */}
-        <View style={styles.infoSection}>
+        <View style={[styles.infoSection, {
+          borderLeftColor: borderColors[(members.length + 1) % borderColors.length], // Second color after last member
+        }]}>
           <View style={styles.infoHeader}>
             <View style={styles.infoIconContainer}>
               <Ionicons name="mail" size={24} color="#2563eb" />
@@ -343,7 +377,9 @@ const BoardScreen = () => {
         </View>
 
         {/* Additional Resources Section */}
-        <View style={styles.infoSection}>
+        <View style={[styles.infoSection, {
+          borderLeftColor: borderColors[(members.length + 2) % borderColors.length], // Third color after last member
+        }]}>
           <View style={styles.infoHeader}>
             <View style={styles.infoIconContainer}>
               <Ionicons name="document-text" size={24} color="#2563eb" />
@@ -491,7 +527,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
     borderLeftWidth: 4,
-    borderLeftColor: '#2563eb',
+    // borderLeftColor is now set dynamically in the component
   },
   memberHeader: {
     flexDirection: 'row',
@@ -603,6 +639,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
     borderLeftWidth: 4,
+    // borderLeftColor is now set dynamically in the component
     borderLeftColor: '#2563eb',
   },
   infoHeader: {

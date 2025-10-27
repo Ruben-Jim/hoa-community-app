@@ -164,13 +164,16 @@ export default defineSchema({
       v.literal("Overdue")
     ),
     paymentMethod: v.union(
-      v.literal("Stripe"),
-      v.literal("PayPal"),      // Future
-      v.literal("ApplePay"),    // Future
-      v.literal("GooglePay")    // Future
+      v.literal("Venmo")
     ),
-    transactionId: v.string(),             // Stripe payment_intent ID
-    paymentIntentId: v.optional(v.string()), // Stripe-specific
+      transactionId: v.string(),             // Venmo transaction ID
+    venmoUsername: v.optional(v.string()), // User's Venmo username
+    venmoTransactionId: v.optional(v.string()), // User-provided Venmo transaction ID
+    verificationStatus: v.optional(v.union(
+      v.literal("Pending"),
+      v.literal("Verified"),
+      v.literal("Rejected")
+    )),
     feeId: v.optional(v.id("fees")),
     fineId: v.optional(v.id("fines")),
     createdAt: v.number(),
@@ -189,6 +192,24 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_active", ["isActive"]),
+
+  residentNotifications: defineTable({
+    residentId: v.id("residents"),
+    type: v.union(
+      v.literal("Selling"),
+      v.literal("Moving")
+    ),
+    listingDate: v.optional(v.string()),
+    closingDate: v.optional(v.string()),
+    realtorInfo: v.optional(v.string()),
+    newResidentName: v.optional(v.string()),
+    isRental: v.optional(v.boolean()),
+    additionalInfo: v.optional(v.string()),
+    houseImage: v.optional(v.string()), // Storage ID for house image
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_resident", ["residentId"]),
 
   pollVotes: defineTable({
     pollId: v.id("polls"),

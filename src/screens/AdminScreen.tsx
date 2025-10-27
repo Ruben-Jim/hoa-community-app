@@ -64,6 +64,7 @@ const AdminScreen = () => {
   const allFeesFromDatabase = useQuery(api.fees.getAll) ?? [];
   const allFinesFromDatabase = useQuery(api.fees.getAllFines) ?? [];
   const polls = useQuery(api.polls.getAll) ?? [];
+  const pendingVenmoPayments = useQuery(api.payments.getPendingVenmoPayments) ?? [];
   
   // Mutations
   const setBlockStatus = useMutation(api.residents.setBlockStatus);
@@ -92,9 +93,13 @@ const AdminScreen = () => {
   const deletePoll = useMutation(api.polls.remove);
   const togglePollActive = useMutation(api.polls.toggleActive);
   
+  // Payment management mutations
+  const verifyVenmoPayment = useMutation(api.payments.verifyVenmoPayment);
+  
   // State
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'residents' | 'board' | 'covenants' | 'posts' | 'comments' | 'emergency' | 'fees' | 'polls'>('residents');
+  const [activeTab, setActiveTab] = useState<'residents' | 'board' | 'covenants' | 'Community' | 'emergency' | 'fees'>('residents');
+  const [postsSubTab, setPostsSubTab] = useState<'posts' | 'comments' | 'polls'>('posts');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const [showBlockModal, setShowBlockModal] = useState(false);
@@ -187,6 +192,7 @@ const AdminScreen = () => {
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current; // Start at 0 for individual item animations
+  const scrollViewRef = useRef<ScrollView>(null);
 
   // Check if current user is a board member
   const isBoardMember = user?.isBoardMember && user?.isActive;
@@ -521,7 +527,7 @@ const AdminScreen = () => {
       type: alert.type || 'Alert',
       priority: alert.priority || 'Medium',
       category: alert.category || 'Other',
-      isActive: alert.isActive !== undefined ? alert.isActive : true,
+      isActive: true, // Always true for editing, toggle handled separately
     });
     setIsEditingEmergency(true);
     setSelectedItem(alert);
@@ -577,6 +583,19 @@ const AdminScreen = () => {
       });
       setSelectedItem(null);
     });
+  };
+
+  const handleToggleEmergencyActive = async (alert: any) => {
+    try {
+      await updateEmergencyAlert({
+        id: alert._id,
+        isActive: !alert.isActive,
+      });
+      Alert.alert('Success', `Emergency alert ${alert.isActive ? 'deactivated' : 'activated'} successfully!`);
+    } catch (error) {
+      console.error('Error toggling emergency alert status:', error);
+      Alert.alert('Error', 'Failed to update emergency alert status. Please try again.');
+    }
   };
 
   // Fee management handlers
@@ -1113,7 +1132,7 @@ const AdminScreen = () => {
             <FlatList
               data={residents}
               keyExtractor={(item) => item._id}
-              numColumns={3}
+              numColumns={2}
               refreshControl={
                 <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
               }
@@ -1331,7 +1350,7 @@ const AdminScreen = () => {
                           </View>
                           
                           {/* Email */}
-                          <Text style={styles.residentGridEmail} numberOfLines={1}>
+                          <Text style={styles.residentGridEmail} numberOfLines={2}>
                             {item.email}
                           </Text>
                           
@@ -1520,12 +1539,48 @@ const AdminScreen = () => {
           </View>
         );
       
-      case 'posts':
+      case 'Community':
         return (
           <View style={styles.tabContent}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Community Posts</Text>
-            </View>
+            {/* Posts Sub-tabs */}
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={styles.subTabsContainer}
+              contentContainerStyle={styles.subTabsContent}
+            >
+              <TouchableOpacity
+                style={[styles.subTab, postsSubTab === 'posts' && styles.activeSubTab]}
+                onPress={() => setPostsSubTab('posts')}
+              >
+                <Ionicons name="chatbubbles" size={18} color={postsSubTab === 'posts' ? '#2563eb' : '#6b7280'} />
+                <Text style={[styles.subTabText, postsSubTab === 'posts' && styles.activeSubTabText]}>
+                  Posts ({communityPosts.length})
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.subTab, postsSubTab === 'comments' && styles.activeSubTab]}
+                onPress={() => setPostsSubTab('comments')}
+              >
+                <Ionicons name="chatbox" size={18} color={postsSubTab === 'comments' ? '#2563eb' : '#6b7280'} />
+                <Text style={[styles.subTabText, postsSubTab === 'comments' && styles.activeSubTabText]}>
+                  Comments ({comments.length})
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.subTab, postsSubTab === 'polls' && styles.activeSubTab]}
+                onPress={() => setPostsSubTab('polls')}
+              >
+                <Ionicons name="bar-chart" size={18} color={postsSubTab === 'polls' ? '#2563eb' : '#6b7280'} />
+                <Text style={[styles.subTabText, postsSubTab === 'polls' && styles.activeSubTabText]}>
+                  Polls ({polls.length})
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+            
+            {postsSubTab === 'posts' && (
             <FlatList
               data={communityPosts}
               keyExtractor={(item) => item._id}
@@ -1600,89 +1655,240 @@ const AdminScreen = () => {
                 </View>
               }
             />
-          </View>
-        );
-      
-      case 'comments':
-        return (
-          <View style={styles.tabContent}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Comments</Text>
-            </View>
-            <FlatList
-              data={comments}
-              keyExtractor={(item) => item._id}
-              numColumns={2}
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-              }
-              renderItem={({ item }) => (
-                <Animated.View 
-                  style={[
-                    styles.residentGridCard,
-                    {
-                      opacity: fadeAnim,
-                      transform: [{
-                        translateY: fadeAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [50, 0],
-                        })
-                      }]
-                    }
-                  ]}
-                >
-                  <View style={styles.residentGridCardContent}>
-                    {/* Main Info Row - Icon Left, Details Right */}
-                    <View style={styles.residentGridMainInfo}>
-                      <View style={styles.residentGridAvatar}>
-                        <View style={styles.postAvatarPlaceholder}>
-                          <Ionicons name="chatbubble" size={24} color="#6b7280" />
+            )}
+            
+            {postsSubTab === 'comments' && (
+              <FlatList
+                data={comments}
+                keyExtractor={(item) => item._id}
+                numColumns={2}
+                refreshControl={
+                  <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+                }
+                renderItem={({ item }) => (
+                  <Animated.View 
+                    style={[
+                      styles.residentGridCard,
+                      {
+                        opacity: fadeAnim,
+                        transform: [{
+                          translateY: fadeAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [50, 0],
+                          })
+                        }]
+                      }
+                    ]}
+                  >
+                    <View style={styles.residentGridCardContent}>
+                      {/* Main Info Row - Icon Left, Details Right */}
+                      <View style={styles.residentGridMainInfo}>
+                        <View style={styles.residentGridAvatar}>
+                          <View style={styles.postAvatarPlaceholder}>
+                            <Ionicons name="chatbubble" size={24} color="#6b7280" />
+                          </View>
+                        </View>
+                        
+                        <View style={styles.residentGridDetails}>
+                          {/* Author and Date Row */}
+                          <View style={styles.residentGridNameRow}>
+                            <Text style={styles.residentGridName} numberOfLines={1}>
+                              {item.author}
+                            </Text>
+                            <Text style={styles.residentGridRoleText} numberOfLines={1}>
+                              {formatDate(item.createdAt)}
+                            </Text>
+                          </View>
+                          
+                          {/* Post Title */}
+                          <Text style={styles.residentGridEmail} numberOfLines={1}>
+                            On: {item.postTitle}
+                          </Text>
+                          
+                          {/* Comment Content */}
+                          <Text style={styles.residentGridAddress} numberOfLines={3}>
+                            {item.content}
+                          </Text>
                         </View>
                       </View>
                       
-                      <View style={styles.residentGridDetails}>
-                        {/* Author and Date Row */}
-                        <View style={styles.residentGridNameRow}>
-                          <Text style={styles.residentGridName} numberOfLines={1}>
-                            {item.author}
-                          </Text>
-                          <Text style={styles.residentGridRoleText} numberOfLines={1}>
-                            {formatDate(item.createdAt)}
-                          </Text>
-                        </View>
-                        
-                        {/* Post Title */}
-                        <Text style={styles.residentGridEmail} numberOfLines={1}>
-                          On: {item.postTitle}
-                        </Text>
-                        
-                        {/* Comment Content */}
-                        <Text style={styles.residentGridAddress} numberOfLines={3}>
-                          {item.content}
-                        </Text>
+                      {/* Action Button */}
+                      <View style={styles.residentGridActions}>
+                        <TouchableOpacity
+                          style={[styles.residentGridActionButton, styles.blockButton]}
+                          onPress={() => handleDeleteItem(item, 'comment')}
+                        >
+                          <Ionicons name="trash" size={16} color="#ef4444" />
+                          <Text style={styles.residentGridActionText}>Delete</Text>
+                        </TouchableOpacity>
                       </View>
                     </View>
-                    
-                    {/* Action Button */}
-                    <View style={styles.residentGridActions}>
-                      <TouchableOpacity
-                        style={[styles.residentGridActionButton, styles.blockButton]}
-                        onPress={() => handleDeleteItem(item, 'comment')}
-                      >
-                        <Ionicons name="trash" size={16} color="#ef4444" />
-                        <Text style={styles.residentGridActionText}>Delete</Text>
-                      </TouchableOpacity>
-                    </View>
+                  </Animated.View>
+                )}
+                ListEmptyComponent={
+                  <View style={styles.emptyState}>
+                    <Ionicons name="chatbubble" size={48} color="#9ca3af" />
+                    <Text style={styles.emptyStateText}>No comments found</Text>
                   </View>
-                </Animated.View>
-              )}
-              ListEmptyComponent={
-                <View style={styles.emptyState}>
-                  <Ionicons name="chatbubble" size={48} color="#9ca3af" />
-                  <Text style={styles.emptyStateText}>No comments found</Text>
+                }
+              />
+            )}
+            
+            {postsSubTab === 'polls' && (
+              <>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Community Polls</Text>
+                  <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+                    <TouchableOpacity
+                      style={styles.adminFeeButton}
+                      onPress={() => {
+                        animateButtonPress();
+                        setShowPollModal(true);
+                        animateIn('poll');
+                      }}
+                    >
+                      <Ionicons name="add" size={16} color="#ffffff" />
+                      <Text style={styles.adminFeeButtonText}>Create Poll</Text>
+                    </TouchableOpacity>
+                  </Animated.View>
                 </View>
-              }
-            />
+                
+                {/* Polls List */}
+                <FlatList
+                  data={polls}
+                  keyExtractor={(item) => item._id}
+                  refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+                  }
+                  renderItem={({ item }) => {
+                    const poll = item as any;
+                    return (
+                      <Animated.View 
+                        key={poll._id} 
+                        style={[
+                          styles.postCard,
+                          {
+                            opacity: fadeAnim,
+                            transform: [{
+                              translateY: fadeAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [50, 0],
+                              })
+                            }]
+                          }
+                        ]}
+                      >
+                        <View style={styles.postHeader}>
+                          <View style={styles.postAuthor}>
+                            <View style={styles.avatar}>
+                              <Ionicons name="bar-chart" size={20} color="#2563eb" />
+                            </View>
+                            <View>
+                              <Text style={styles.authorName}>{poll.title}</Text>
+                              <Text style={styles.postTime}>
+                                {new Date(poll.createdAt).toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </Text>
+                            </View>
+                          </View>
+                          <View style={styles.categoryBadge}>
+                            <Ionicons 
+                              name={poll.isActive ? "checkmark-circle" : "close-circle"} 
+                              size={12} 
+                              color={poll.isActive ? "#10b981" : "#ef4444"} 
+                            />
+                            <Text style={[styles.categoryText, { color: poll.isActive ? "#10b981" : "#ef4444" }]}>
+                              {poll.isActive ? "Active" : "Inactive"}
+                            </Text>
+                          </View>
+                        </View>
+                        
+                        {poll.description && (
+                          <Text style={styles.postContent}>{poll.description}</Text>
+                        )}
+                        
+                        {/* Poll Options */}
+                        <View style={styles.pollOptionsContainer}>
+                          {poll.options.map((option: string, index: number) => {
+                            const isWinningOption = !poll.isActive && poll.winningOption && poll.winningOption.tiedIndices?.includes(index);
+                            const isTied = isWinningOption && poll.winningOption?.isTied;
+                            return (
+                              <View key={index} style={[
+                                styles.pollOption,
+                                isWinningOption && styles.pollWinningOption
+                              ]}>
+                                <View style={styles.pollOptionContent}>
+                                  <Text style={[
+                                    styles.pollOptionText,
+                                    isWinningOption && styles.pollWinningOptionText
+                                  ]}>
+                                    {option}
+                                  </Text>
+                                  <Text style={[
+                                    styles.pollVoteCount,
+                                    isWinningOption && styles.pollWinningVoteCount
+                                  ]}>
+                                    {poll.optionVotes?.[index] || 0} votes
+                                    {isWinningOption && ` (${poll.winningOption.percentage.toFixed(1)}%)`}
+                                  </Text>
+                                </View>
+                                {isWinningOption && (
+                                  <View style={styles.winningBadge}>
+                                    <Ionicons name="trophy" size={16} color="#ffffff" />
+                                    <Text style={styles.winningBadgeText}>
+                                      {isTied ? 'Tied' : 'Most Voted'}
+                                    </Text>
+                                  </View>
+                                )}
+                              </View>
+                            );
+                          })}
+                        </View>
+                        
+                        <View style={styles.postFooter}>
+                          <View style={styles.boardActionButtons}>
+                            <TouchableOpacity
+                              style={[styles.boardActionButton, styles.editButton]}
+                              onPress={() => handleEditPoll(poll)}
+                            >
+                              <Ionicons name="create" size={16} color="#2563eb" />
+                              <Text style={styles.residentGridActionText}>Edit</Text>
+                            </TouchableOpacity>
+                            
+                            <TouchableOpacity
+                              style={[styles.boardActionButton, poll.isActive ? styles.deactivateButton : styles.activateButton]}
+                              onPress={() => handleTogglePollActive(poll)}
+                            >
+                              <Ionicons 
+                                name={poll.isActive ? "pause-circle" : "play-circle"} 
+                                size={16} 
+                                color={poll.isActive ? "#f59e0b" : "#10b981"} 
+                              />
+                              <Text style={[styles.residentGridActionText, { color: poll.isActive ? "#f59e0b" : "#10b981" }]}>
+                                {poll.isActive ? "Deactivate" : "Activate"}
+                              </Text>
+                            </TouchableOpacity>
+                            
+                            <TouchableOpacity 
+                              style={[styles.boardActionButton, styles.blockButton]}
+                              onPress={() => handleDeletePoll(poll)}
+                            >
+                              <Ionicons name="trash" size={16} color="#ef4444" />
+                              <Text style={styles.residentGridActionText}>Delete</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </Animated.View>
+                    );
+                  }}
+                />
+              </>
+            )}
           </View>
         );
       
@@ -1691,18 +1897,6 @@ const AdminScreen = () => {
           <View style={styles.tabContent}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Emergency Alerts</Text>
-              <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-                <TouchableOpacity
-                  style={styles.addButton}
-                  onPress={() => {
-                    animateButtonPress();
-                    handleAddEmergencyAlert();
-                  }}
-                >
-                  <Ionicons name="add" size={20} color="#ffffff" />
-                  <Text style={styles.addButtonText}>New Alert</Text>
-                </TouchableOpacity>
-              </Animated.View>
             </View>
             <FlatList
               data={emergencyAlerts}
@@ -1834,24 +2028,37 @@ const AdminScreen = () => {
                       </View>
                       
                       {/* Action Buttons */}
-                      <View style={styles.residentGridActions}>
-                        <View style={styles.boardActionButtons}>
-                          <TouchableOpacity
-                            style={[styles.boardActionButton, styles.editButton]}
-                            onPress={() => handleEditEmergencyAlert(item)}
-                          >
-                            <Ionicons name="create" size={16} color="#2563eb" />
-                            <Text style={styles.residentGridActionText}>Edit</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[styles.boardActionButton, styles.blockButton]}
-                            onPress={() => handleDeleteItem(item, 'emergency')}
-                          >
-                            <Ionicons name="trash" size={16} color="#ef4444" />
-                            <Text style={styles.residentGridActionText}>Delete</Text>
-                          </TouchableOpacity>
+                        <View style={styles.residentGridActions}>
+                          <View style={styles.boardActionButtons}>
+                           <TouchableOpacity
+                             style={[styles.boardActionButton, styles.editButton]}
+                             onPress={() => handleEditEmergencyAlert(item)}
+                           >
+                             <Ionicons name="create" size={16} color="#2563eb" />
+                             <Text style={styles.residentGridActionText}>Edit</Text>
+                           </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.boardActionButton, item.isActive ? styles.deactivateButton : styles.activateButton]}
+                              onPress={() => handleToggleEmergencyActive(item)}
+                            >
+                              <Ionicons 
+                                name={item.isActive ? "pause-circle" : "play-circle"} 
+                                size={16} 
+                                color={item.isActive ? "#f59e0b" : "#10b981"} 
+                              />
+                              <Text style={[styles.residentGridActionText, { color: item.isActive ? "#f59e0b" : "#10b981" }]}>
+                                {item.isActive ? "Deactivate" : "Activate"}
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.boardActionButton, styles.blockButton]}
+                              onPress={() => handleDeleteItem(item, 'emergency')}
+                            >
+                              <Ionicons name="trash" size={16} color="#ef4444" />
+                              <Text style={styles.residentGridActionText}>Delete</Text>
+                            </TouchableOpacity>
+                          </View>
                         </View>
-                      </View>
                     </View>
                   </Animated.View>
                 );
@@ -1946,10 +2153,94 @@ const AdminScreen = () => {
                  </View>
                </View>
 
+            {/* Pending Venmo Payments Section */}
+            {pendingVenmoPayments.length > 0 && (
+              <View style={styles.pendingPaymentsSection}>
+                <View style={styles.pendingPaymentsHeader}>
+                  <Ionicons name="cash" size={20} color="#f59e0b" />
+                  <Text style={styles.pendingPaymentsTitle}>
+                    Pending Venmo Payments ({pendingVenmoPayments.length})
+                  </Text>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {pendingVenmoPayments.map((payment: any) => {
+                    const resident = residents.find((r: any) => r._id === payment.userId);
+                    const paymentDate = new Date(payment.createdAt).toLocaleDateString();
+                    
+                    return (
+                      <View key={payment._id} style={styles.compactPaymentCard}>
+                        <View style={styles.compactPaymentHeader}>
+                          <Text style={styles.compactPaymentName}>
+                            {resident ? `${resident.firstName} ${resident.lastName}` : 'Unknown'}
+                          </Text>
+                          <Text style={styles.compactPaymentAmount}>
+                            ${payment.amount.toFixed(2)}
+                          </Text>
+                        </View>
+                        <Text style={styles.compactPaymentFee}>{payment.feeType}</Text>
+                        <Text style={styles.compactPaymentVenmo}>
+                          @{payment.venmoUsername}
+                        </Text>
+                        <Text style={styles.compactPaymentDate}>
+                          {paymentDate}
+                        </Text>
+                        <View style={styles.compactPaymentActions}>
+                          <TouchableOpacity
+                            style={styles.compactRejectButton}
+                            onPress={async () => {
+                              try {
+                                await verifyVenmoPayment({
+                                  paymentId: payment._id,
+                                  status: "Overdue",
+                                  verificationStatus: "Rejected",
+                                });
+                                Alert.alert('Success', 'Payment rejected.');
+                                // Refresh data to update homeowner grid
+                                await handleRefresh();
+                              } catch (error) {
+                                Alert.alert('Error', 'Failed to reject payment.');
+                              }
+                            }}
+                          >
+                            <Ionicons name="close-circle" size={14} color="#ef4444" />
+                            <Text style={styles.compactButtonText}>Reject</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.compactVerifyButton}
+                            onPress={async () => {
+                              try {
+                                await verifyVenmoPayment({
+                                  paymentId: payment._id,
+                                  status: "Paid",
+                                  verificationStatus: "Verified",
+                                });
+                                Alert.alert('Success', 'Payment verified successfully!');
+                                // Refresh data to update homeowner grid
+                                await handleRefresh();
+                              } catch (error) {
+                                Alert.alert('Error', 'Failed to verify payment.');
+                              }
+                            }}
+                          >
+                            <Ionicons name="checkmark-circle" size={14} color="#10b981" />
+                            <Text style={styles.compactButtonText}>Verify</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
             
             {/* Fees and Fines Status Grid */}
             <FlatList
-              data={homeownersPaymentStatus}
+              data={homeownersPaymentStatus.filter((item: any) => {
+                // Only show homeowners who have fees or fines
+                const hasFees = allFeesFromDatabase.some((fee: any) => fee.userId === item._id);
+                const hasFines = allFinesFromDatabase.some((fine: any) => fine.residentId === item._id);
+                return hasFees || hasFines;
+              })}
               keyExtractor={(item) => item._id}
               numColumns={2}
               refreshControl={
@@ -1957,7 +2248,8 @@ const AdminScreen = () => {
               }
               renderItem={({ item }) => {
                 const homeowner = item as any;
-                // Get fines for this homeowner
+                // Get fees and fines for this homeowner
+                const homeownerFees = allFeesFromDatabase.filter((fee: any) => fee.userId === homeowner._id);
                 const homeownerFines = allFinesFromDatabase.filter((fine: any) => fine.residentId === homeowner._id);
                   return (
                     <Animated.View 
@@ -2000,26 +2292,48 @@ const AdminScreen = () => {
                           </View>
                         </View>
                         
-                        <View style={styles.gridFeeSection}>
-                          <Text style={styles.gridFeeAmount}>${homeowner.annualFeeAmount}</Text>
-                          <Text style={styles.gridFeeLabel}>Annual Fee</Text>
-                          <View style={[
-                            styles.gridStatusBadge,
-                            homeowner.hasPaidAnnualFee ? styles.gridPaidBadge : styles.gridPendingBadge
-                          ]}>
-                            <Ionicons 
-                              name={homeowner.hasPaidAnnualFee ? "checkmark-circle" : "time"} 
-                              size={14} 
-                              color={homeowner.hasPaidAnnualFee ? "#10b981" : "#f59e0b"} 
-                            />
-                            <Text style={[
-                              styles.gridStatusText,
-                              { color: homeowner.hasPaidAnnualFee ? "#10b981" : "#f59e0b" }
-                            ]}>
-                              {homeowner.hasPaidAnnualFee ? 'Paid' : 'Pending'}
+                        {/* Show fees for this homeowner */}
+                        {homeownerFees.length > 0 ? (
+                          <View style={styles.gridFeeSection}>
+                            <Text style={styles.gridFeeAmount}>
+                              ${homeownerFees.reduce((sum: number, fee: any) => sum + fee.amount, 0).toFixed(2)}
                             </Text>
+                            <Text style={styles.gridFeeLabel}>
+                              {homeownerFees.length === 1 ? 'Fee' : `Fees (${homeownerFees.length})`}
+                            </Text>
+                            <View style={[
+                              styles.gridStatusBadge,
+                              homeownerFees.every((f: any) => f.status === 'Paid') 
+                                ? styles.gridPaidBadge 
+                                : styles.gridPendingBadge
+                            ]}>
+                              <Ionicons 
+                                name={homeownerFees.every((f: any) => f.status === 'Paid') ? "checkmark-circle" : "time"} 
+                                size={14} 
+                                color={homeownerFees.every((f: any) => f.status === 'Paid') ? "#10b981" : "#f59e0b"} 
+                              />
+                              <Text style={[
+                                styles.gridStatusText,
+                                { 
+                                  color: homeownerFees.every((f: any) => f.status === 'Paid') ? "#10b981" : "#f59e0b" 
+                                }
+                              ]}>
+                                {homeownerFees.every((f: any) => f.status === 'Paid') ? 'Paid' : 'Pending'}
+                              </Text>
+                            </View>
                           </View>
-                        </View>
+                        ) : (
+                          <View style={styles.gridFeeSection}>
+                            <Text style={styles.gridFeeAmount}>$0</Text>
+                            <Text style={styles.gridFeeLabel}>No Fees</Text>
+                            <View style={[styles.gridStatusBadge, styles.gridNoFeeBadge]}>
+                              <Ionicons name="card" size={14} color="#6b7280" />
+                              <Text style={[styles.gridStatusText, { color: "#6b7280" }]}>
+                                Clear
+                              </Text>
+                            </View>
+                          </View>
+                        )}
                         
                         {/* Show fines for this homeowner */}
                         {homeownerFines.length > 0 && (
@@ -2086,159 +2400,6 @@ const AdminScreen = () => {
           </ScrollView>
         );
       
-      case 'polls':
-        return (
-          <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={true} persistentScrollbar={true}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Community Polls</Text>
-              <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-                <TouchableOpacity
-                  style={styles.adminFeeButton}
-                  onPress={() => {
-                    animateButtonPress();
-                    setShowPollModal(true);
-                    animateIn('poll');
-                  }}
-                >
-                  <Ionicons name="add" size={16} color="#ffffff" />
-                  <Text style={styles.adminFeeButtonText}>Create Poll</Text>
-                </TouchableOpacity>
-              </Animated.View>
-            </View>
-            
-            {/* Poll Statistics */}
-            <View style={styles.feeStatsContainer}>
-              <View style={styles.feeStatsSection}>
-                <View style={styles.feeStatsRow}>
-                  <View style={styles.feeStatCard}>
-                    <Text style={styles.feeStatLabel}>Total Polls</Text>
-                    <Text style={styles.feeStatValue}>{polls.length}</Text>
-                  </View>
-                  <View style={styles.feeStatCard}>
-                    <Text style={styles.feeStatLabel}>Active Polls</Text>
-                    <Text style={[styles.feeStatValue, { color: '#10b981' }]}>
-                      {polls.filter((poll: any) => poll.isActive).length}
-                    </Text>
-                  </View>
-                  <View style={styles.feeStatCard}>
-                    <Text style={styles.feeStatLabel}>Total Votes</Text>
-                    <Text style={[styles.feeStatValue, { color: '#3b82f6' }]}>
-                      {polls.reduce((total: number, poll: any) => total + (poll.totalVotes || 0), 0)}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-
-            {/* Polls List */}
-            <FlatList
-              data={polls}
-              keyExtractor={(item) => item._id}
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-              }
-              renderItem={({ item }) => {
-                const poll = item as any;
-                return (
-                  <Animated.View 
-                    key={poll._id} 
-                    style={[
-                      styles.postCard,
-                      {
-                        opacity: fadeAnim,
-                        transform: [{
-                          translateY: fadeAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [50, 0],
-                          })
-                        }]
-                      }
-                    ]}
-                  >
-                    <View style={styles.postHeader}>
-                      <View style={styles.postAuthor}>
-                        <View style={styles.avatar}>
-                          <Ionicons name="bar-chart" size={20} color="#2563eb" />
-                        </View>
-                        <View>
-                          <Text style={styles.authorName}>{poll.title}</Text>
-                          <Text style={styles.postTime}>
-                            {new Date(poll.createdAt).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={styles.categoryBadge}>
-                        <Ionicons 
-                          name={poll.isActive ? "checkmark-circle" : "close-circle"} 
-                          size={12} 
-                          color={poll.isActive ? "#10b981" : "#ef4444"} 
-                        />
-                        <Text style={[styles.categoryText, { color: poll.isActive ? "#10b981" : "#ef4444" }]}>
-                          {poll.isActive ? "Active" : "Inactive"}
-                        </Text>
-                      </View>
-                    </View>
-                    
-                    {poll.description && (
-                      <Text style={styles.postContent}>{poll.description}</Text>
-                    )}
-                    
-                    {/* Poll Options */}
-                    <View style={styles.pollOptionsContainer}>
-                      {poll.options.map((option: string, index: number) => (
-                        <View key={index} style={styles.pollOption}>
-                          <Text style={styles.pollOptionText}>{option}</Text>
-                          <Text style={styles.pollVoteCount}>
-                            {poll.optionVotes?.[index] || 0} votes
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                    
-                    <View style={styles.postFooter}>
-                      <TouchableOpacity
-                        style={styles.actionButton}
-                        onPress={() => handleTogglePollActive(poll)}
-                      >
-                        <Ionicons 
-                          name={poll.isActive ? "pause-circle" : "play-circle"} 
-                          size={16} 
-                          color="#6b7280" 
-                        />
-                        <Text style={styles.actionText}>
-                          {poll.isActive ? "Deactivate" : "Activate"}
-                        </Text>
-                      </TouchableOpacity>
-                      
-                      <TouchableOpacity 
-                        style={styles.actionButton}
-                        onPress={() => handleEditPoll(poll)}
-                      >
-                        <Ionicons name="create" size={16} color="#6b7280" />
-                        <Text style={styles.actionText}>Edit</Text>
-                      </TouchableOpacity>
-                      
-                      <TouchableOpacity 
-                        style={styles.actionButton}
-                        onPress={() => handleDeletePoll(poll)}
-                      >
-                        <Ionicons name="trash" size={16} color="#ef4444" />
-                        <Text style={[styles.actionText, { color: '#ef4444' }]}>Delete</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </Animated.View>
-                );
-              }}
-            />
-          </ScrollView>
-        );
-      
       default:
         return null;
     }
@@ -2256,12 +2417,40 @@ const AdminScreen = () => {
         )}
         
         <ScrollView 
-          style={styles.scrollContainer}
+          ref={scrollViewRef}
+          style={[styles.scrollContainer, Platform.OS === 'web' && styles.webScrollContainer]}
+          contentContainerStyle={[styles.scrollContent, Platform.OS === 'web' && styles.webScrollContent]}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={true}
           bounces={true}
           scrollEnabled={true}
+          alwaysBounceVertical={false}
+          nestedScrollEnabled={true}
+          removeClippedSubviews={false}
+          scrollEventThrottle={16}
+          // Enhanced desktop scrolling
+          decelerationRate="normal"
+          directionalLockEnabled={true}
+          canCancelContentTouches={true}
+          // Web-specific enhancements
+          {...(Platform.OS === 'web' && {
+            onScrollBeginDrag: () => {
+              if (Platform.OS === 'web') {
+                document.body.style.cursor = 'grabbing';
+                document.body.style.userSelect = 'none';
+              }
+            },
+            onScrollEndDrag: () => {
+              if (Platform.OS === 'web') {
+                document.body.style.cursor = 'grab';
+                document.body.style.userSelect = 'auto';
+              }
+            },
+            onScroll: () => {
+              // Ensure scrolling is working
+            },
+          })}
         >
           {/* Header with ImageBackground */}
           <ImageBackground
@@ -2339,32 +2528,12 @@ const AdminScreen = () => {
           </TouchableOpacity>
           
           <TouchableOpacity
-            style={[styles.folderTab, activeTab === 'posts' && styles.activeFolderTab]}
-            onPress={() => setActiveTab('posts')}
+            style={[styles.folderTab, activeTab === 'Community' && styles.activeFolderTab]}
+            onPress={() => setActiveTab('Community')}
           >
-            <Ionicons name="chatbubbles" size={20} color={activeTab === 'posts' ? '#2563eb' : '#6b7280'} />
-            <Text style={[styles.folderTabText, activeTab === 'posts' && styles.activeFolderTabText]}>
-              Posts ({communityPosts.length})
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.folderTab, activeTab === 'polls' && styles.activeFolderTab]}
-            onPress={() => setActiveTab('polls')}
-          >
-            <Ionicons name="bar-chart" size={20} color={activeTab === 'polls' ? '#2563eb' : '#6b7280'} />
-            <Text style={[styles.folderTabText, activeTab === 'polls' && styles.activeFolderTabText]}>
-              Polls ({polls.length})
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.folderTab, activeTab === 'comments' && styles.activeFolderTab]}
-            onPress={() => setActiveTab('comments')}
-          >
-            <Ionicons name="chatbox" size={20} color={activeTab === 'comments' ? '#2563eb' : '#6b7280'} />
-            <Text style={[styles.folderTabText, activeTab === 'comments' && styles.activeFolderTabText]}>
-              Comments ({comments.length})
+            <Ionicons name="chatbubbles" size={20} color={activeTab === 'Community' ? '#2563eb' : '#6b7280'} />
+            <Text style={[styles.folderTabText, activeTab === 'Community' && styles.activeFolderTabText]}>
+              Community ({communityPosts.length + comments.length + polls.length})
             </Text>
           </TouchableOpacity>
           
@@ -2384,7 +2553,7 @@ const AdminScreen = () => {
           >
             <Ionicons name="card" size={20} color={activeTab === 'fees' ? '#2563eb' : '#6b7280'} />
               <Text style={[styles.folderTabText, activeTab === 'fees' && styles.activeFolderTabText]}>
-                Fees ({allFeesFromDatabase.length + allFinesFromDatabase.length})
+                Fees & Payments ({allFeesFromDatabase.length + allFinesFromDatabase.length})
               </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -2763,27 +2932,6 @@ const AdminScreen = () => {
                   </View>
                 </View>
 
-                <View style={styles.inputGroup}>
-                  <TouchableOpacity
-                    style={[
-                      styles.checkboxButton,
-                      emergencyForm.isActive && styles.checkboxButtonActive
-                    ]}
-                    onPress={() => setEmergencyForm(prev => ({ ...prev, isActive: !prev.isActive }))}
-                  >
-                    <Ionicons 
-                      name={emergencyForm.isActive ? "checkmark-circle" : "ellipse-outline"} 
-                      size={20} 
-                      color={emergencyForm.isActive ? "#2563eb" : "#6b7280"} 
-                    />
-                    <Text style={[
-                      styles.checkboxText,
-                      emergencyForm.isActive && styles.checkboxTextActive
-                    ]}>
-                      Active Alert
-                    </Text>
-                  </TouchableOpacity>
-                </View>
               </ScrollView>
 
               <View style={styles.modalActions}>
@@ -3279,7 +3427,9 @@ const AdminScreen = () => {
             </Animated.View>
           </Animated.View>
         </Modal>
-
+          
+          {/* Additional content to ensure scrollable content */}
+          <View style={styles.spacer} />
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -3296,6 +3446,29 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 20,
+  },
+  webScrollContainer: {
+    ...(Platform.OS === 'web' && {
+      cursor: 'grab' as any,
+      userSelect: 'none' as any,
+      WebkitUserSelect: 'none' as any,
+      MozUserSelect: 'none' as any,
+      msUserSelect: 'none' as any,
+      overflow: 'auto' as any,
+      height: '100vh' as any,
+      maxHeight: '100vh' as any,
+      position: 'relative' as any,
+    }),
+  },
+  webScrollContent: {
+    ...(Platform.OS === 'web' && {
+      minHeight: '100vh' as any,
+      flexGrow: 1,
+      paddingBottom: 100 as any,
+    }),
   },
   accessDeniedContainer: {
     flex: 1,
@@ -3391,21 +3564,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
-    maxHeight: 60, // Limit height to match original design
+    maxHeight: 50, // Reduced from 60
+    marginTop: -20, // Reduce space from header
+    paddingBottom: 0,
   },
   folderTabsContent: {
     flexDirection: 'row',
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 4, // Reduced from 8
     paddingRight: 40, // Extra padding to ensure last tab is fully visible
     alignItems: 'center',
-    minHeight: 60, // Ensure consistent height
+    minHeight: 45, // Reduced from 60
   },
   folderTab: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 6, // Reduced from 8
     marginRight: 8,
     borderRadius: 6,
     backgroundColor: '#f8fafc',
@@ -3424,6 +3599,44 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginLeft: 6,
   },
+  // Sub-tab styles for posts section
+  subTabsContainer: {
+    backgroundColor: '#f8fafc',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    maxHeight: 50, // Limit height
+  },
+  subTabsContent: {
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingVertical: 4, // Reduced from 8
+    alignItems: 'center',
+  },
+  subTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 6, // Reduced from 8
+    marginRight: 6,
+    borderRadius: 8,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  activeSubTab: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#2563eb',
+  },
+  subTabText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#6b7280',
+    marginLeft: 6,
+  },
+  activeSubTabText: {
+    color: '#2563eb',
+    fontWeight: '600',
+  },
   activeFolderTabText: {
     color: '#2563eb',
     fontWeight: '600',
@@ -3431,6 +3644,7 @@ const styles = StyleSheet.create({
   contentArea: {
     flex: 1,
     padding: 20,
+    paddingTop: 0, // Reduce top padding to match CommunityScreen
   },
   tableRow: {
     flexDirection: 'row',
@@ -3685,7 +3899,7 @@ const styles = StyleSheet.create({
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2563eb',
+    backgroundColor: '#6366f1',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
@@ -4024,6 +4238,12 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 4,
   },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginTop: 16,
+  },
   emptyStateSubtext: {
     fontSize: 14,
     color: '#9ca3af',
@@ -4120,6 +4340,9 @@ const styles = StyleSheet.create({
   },
   gridPaidBadge: {
     backgroundColor: '#d1fae5',
+  },
+  gridNoFeeBadge: {
+    backgroundColor: '#f3f4f6',
   },
   gridPendingBadge: {
     backgroundColor: '#fef3c7',
@@ -4290,6 +4513,78 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   // Grid fines section styles
+  gridFeesSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  gridFeesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  gridFeesLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#2563eb',
+    marginLeft: 4,
+  },
+  gridFeesList: {
+    gap: 6,
+  },
+  gridFeeItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  gridFeeItemLast: {
+    borderBottomWidth: 0,
+  },
+  gridFeeLeft: {
+    flex: 1,
+    marginRight: 8,
+  },
+  gridFeeTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 2,
+  },
+  gridFeeDue: {
+    fontSize: 11,
+    color: '#9ca3af',
+  },
+  gridFeeRight: {
+    alignItems: 'flex-end',
+  },
+  gridFeeItemAmount: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  gridFeeStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  gridFeeStatusPaid: {
+    backgroundColor: '#d1fae5',
+  },
+  gridFeeStatusPending: {
+    backgroundColor: '#fef3c7',
+  },
+  gridFeeStatusText: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginLeft: 2,
+  },
   gridFinesSection: {
     marginTop: 16,
     paddingTop: 16,
@@ -4675,6 +4970,12 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     gap: 3,
   },
+  activateButton: {
+    backgroundColor: '#dcfce7',
+  },
+  deactivateButton: {
+    backgroundColor: '#fef3c7',
+  },
   // Post/Comment/Emergency avatar placeholder
   postAvatarPlaceholder: {
     width: 44,
@@ -4730,6 +5031,38 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
     fontWeight: '600',
+  },
+  pollWinningOption: {
+    backgroundColor: '#fef3c7',
+    borderLeftColor: '#f59e0b',
+    borderWidth: 2,
+    borderColor: '#f59e0b',
+  },
+  pollWinningOptionText: {
+    color: '#92400e',
+    fontWeight: '700',
+  },
+  pollWinningVoteCount: {
+    color: '#92400e',
+    fontWeight: '700',
+  },
+  pollOptionContent: {
+    flex: 1,
+  },
+  winningBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f59e0b',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  winningBadgeText: {
+    fontSize: 10,
+    color: '#ffffff',
+    fontWeight: '700',
+    marginLeft: 4,
   },
   pollOptionInput: {
     flexDirection: 'row',
@@ -4854,6 +5187,214 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
     marginLeft: 4,
+  },
+  // Payment verification styles
+  paymentList: {
+    padding: 8,
+  },
+  paymentCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  paymentCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  paymentInfo: {
+    flex: 1,
+  },
+  paymentResidentName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  paymentFeeType: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  paymentAmount: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#10b981',
+  },
+  paymentDetails: {
+    marginBottom: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+  },
+  paymentDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  paymentDetailText: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginLeft: 8,
+    flex: 1,
+  },
+  paymentCardActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  rejectButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fee2e2',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  rejectButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ef4444',
+    marginLeft: 6,
+  },
+  verifyButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#d1fae5',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+  },
+  verifyButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#10b981',
+    marginLeft: 6,
+  },
+  // Compact payment styles for Fees tab
+  pendingPaymentsSection: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    margin: 16,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#fef3c7',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  pendingPaymentsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  pendingPaymentsTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#78350f',
+    marginLeft: 8,
+  },
+  compactPaymentCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    padding: 12,
+    marginRight: 12,
+    width: 200,
+    borderWidth: 1,
+    borderColor: '#fef3c7',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  compactPaymentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  compactPaymentName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2937',
+    flex: 1,
+  },
+  compactPaymentAmount: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#10b981',
+  },
+  compactPaymentFee: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  compactPaymentVenmo: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  compactPaymentDate: {
+    fontSize: 11,
+    color: '#9ca3af',
+    marginBottom: 8,
+  },
+  compactPaymentActions: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  compactRejectButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fee2e2',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  compactVerifyButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#d1fae5',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+  },
+  compactButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  spacer: {
+    height: 50,
   },
 });
 

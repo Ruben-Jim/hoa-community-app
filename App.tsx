@@ -1,6 +1,6 @@
 import React, { useMemo, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,8 +9,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import AuthNavigator from './src/navigation/AuthNavigator';
 import enhancedUnifiedNotificationManager from './src/services/EnhancedUnifiedNotificationManager';
-import { StripeWrapper } from './src/context/StripeProvider';
-import { PayPalProvider } from './src/context/PayPalProvider';
 
 import HomeScreen from './src/screens/HomeScreen';
 import BoardScreen from './src/screens/BoardScreen';
@@ -20,6 +18,7 @@ import EmergencyScreen from './src/screens/EmergencyScreen';
 import FeesScreen from './src/screens/FeesScreen';
 import BlockedAccountScreen from './src/screens/BlockedAccountScreen';
 import AdminScreen from './src/screens/AdminScreen';
+import ResidentNotificationsScreen from './src/screens/ResidentNotificationsScreen';
 
 const Stack = createStackNavigator();
 
@@ -58,6 +57,7 @@ const MainApp = () => {
       <Stack.Screen name="Community" component={CommunityScreen} />
       <Stack.Screen name="Emergency" component={EmergencyScreen} />
       <Stack.Screen name="Fees" component={FeesScreen} />
+      <Stack.Screen name="ResidentNotifications" component={ResidentNotificationsScreen} />
       {(isBoardMember || isDev) && (
         <Stack.Screen 
           name="Admin" 
@@ -90,21 +90,55 @@ export default function App() {
     initializeNotifications();
   }, []);
 
+  // Persistent navigation state
+  const [isReady, setIsReady] = React.useState(false);
+  const [initialState, setInitialState] = React.useState();
+
+  React.useEffect(() => {
+    const restoreState = async () => {
+      try {
+        if (Platform.OS !== 'web') {
+          return;
+        }
+
+        const savedState = localStorage.getItem('navState');
+        if (savedState !== null) {
+          setInitialState(JSON.parse(savedState));
+        }
+      } catch (e) {
+        console.error('Error restoring navigation state:', e);
+      } finally {
+        setIsReady(true);
+      }
+    };
+
+    restoreState();
+  }, []);
+
+  const onStateChange = (state: any) => {
+    if (Platform.OS === 'web') {
+      localStorage.setItem('navState', JSON.stringify(state));
+    }
+  };
+
+  if (!isReady) {
+    return (
+      <SafeAreaProvider>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </SafeAreaProvider>
+    );
+  }
+
   const content = (
     <SafeAreaProvider>
-      <StripeWrapper>
-        <PayPalProvider 
-          clientId={process.env.EXPO_PUBLIC_PAYPAL_CLIENT_ID}
-          mode={process.env.EXPO_PUBLIC_PAYPAL_MODE as 'sandbox' | 'live' || 'sandbox'}
-        >
-          <AuthProvider>
-            <NavigationContainer>
-              <MainApp />
-              <StatusBar style="auto" />
-            </NavigationContainer>
-          </AuthProvider>
-        </PayPalProvider>
-      </StripeWrapper>
+      <AuthProvider>
+        <NavigationContainer initialState={initialState} onStateChange={onStateChange}>
+          <MainApp />
+          <StatusBar style="auto" />
+        </NavigationContainer>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 

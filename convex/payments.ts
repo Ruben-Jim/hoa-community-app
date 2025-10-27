@@ -1,13 +1,14 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
-// Create a payment intent record in the database
-export const createPaymentIntent = mutation({
+// Create a Venmo payment record in the database
+export const createVenmoPayment = mutation({
   args: {
     userId: v.string(),
     feeType: v.string(),
     amount: v.number(),
-    paymentIntentId: v.string(),
+    venmoUsername: v.string(),
+    venmoTransactionId: v.string(),
     feeId: v.optional(v.id("fees")),
     fineId: v.optional(v.id("fines")),
   },
@@ -20,9 +21,11 @@ export const createPaymentIntent = mutation({
       amount: args.amount,
       paymentDate: new Date().toISOString().split('T')[0],
       status: "Pending",
-      paymentMethod: "Stripe",
-      transactionId: args.paymentIntentId,
-      paymentIntentId: args.paymentIntentId,
+      paymentMethod: "Venmo",
+      transactionId: args.venmoTransactionId,
+      venmoUsername: args.venmoUsername,
+      venmoTransactionId: args.venmoTransactionId,
+      verificationStatus: "Pending",
       feeId: args.feeId,
       fineId: args.fineId,
       createdAt: now,
@@ -33,26 +36,24 @@ export const createPaymentIntent = mutation({
   },
 });
 
-// Update payment status after webhook confirmation
-export const updatePaymentStatus = mutation({
+// Verify Venmo payment (admin only)
+export const verifyVenmoPayment = mutation({
   args: {
-    paymentIntentId: v.string(),
+    paymentId: v.id("payments"),
     status: v.union(v.literal("Paid"), v.literal("Pending"), v.literal("Overdue")),
+    verificationStatus: v.union(v.literal("Verified"), v.literal("Rejected")),
   },
   handler: async (ctx, args) => {
-    // Find the payment by transaction ID
-    const payment = await ctx.db
-      .query("payments")
-      .withIndex("by_transaction", (q) => q.eq("transactionId", args.paymentIntentId))
-      .first();
+    const payment = await ctx.db.get(args.paymentId);
 
     if (!payment) {
-      throw new Error(`Payment with ID ${args.paymentIntentId} not found`);
+      throw new Error(`Payment not found`);
     }
 
-    // Update payment status
+    // Update payment status and verification status
     await ctx.db.patch(payment._id, {
       status: args.status,
+      verificationStatus: args.verificationStatus,
       updatedAt: Date.now(),
     });
 
@@ -111,90 +112,24 @@ export const getPaymentByTransactionId = query({
   },
 });
 
-// Create a PayPal order record in the database
-export const createPayPalOrder = mutation({
-  args: {
-    userId: v.string(),
-    feeType: v.string(),
-    amount: v.number(),
-    orderId: v.string(),
-    feeId: v.optional(v.id("fees")),
-    fineId: v.optional(v.id("fines")),
-  },
-  handler: async (ctx, args) => {
-    const now = Date.now();
-    
-    const paymentId = await ctx.db.insert("payments", {
-      userId: args.userId,
-      feeType: args.feeType,
-      amount: args.amount,
-      paymentDate: new Date().toISOString().split('T')[0],
-      status: "Pending",
-      paymentMethod: "PayPal",
-      transactionId: args.orderId,
-      paymentIntentId: args.orderId, // Using orderId as paymentIntentId for consistency
-      feeId: args.feeId,
-      fineId: args.fineId,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    return paymentId;
-  },
-});
-
-// Update PayPal order status after payment completion
-export const updatePayPalOrderStatus = mutation({
-  args: {
-    orderId: v.string(),
-    status: v.union(v.literal("COMPLETED"), v.literal("PENDING"), v.literal("CANCELLED")),
-    transactionId: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    // Find the payment by transaction ID (orderId)
-    const payment = await ctx.db
+// Get pending Venmo payments (admin only) - payments awaiting verification
+export const getPendingVenmoPayments = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db
       .query("payments")
-      .withIndex("by_transaction", (q) => q.eq("transactionId", args.orderId))
-      .first();
-
-    if (!payment) {
-      throw new Error(`PayPal order with ID ${args.orderId} not found`);
-    }
-
-    // Map PayPal status to our payment status
-    let paymentStatus: "Paid" | "Pending" | "Overdue";
-    if (args.status === "COMPLETED") {
-      paymentStatus = "Paid";
-    } else if (args.status === "PENDING") {
-      paymentStatus = "Pending";
-    } else {
-      paymentStatus = "Overdue";
-    }
-
-    // Update payment status
-    await ctx.db.patch(payment._id, {
-      status: paymentStatus,
-      updatedAt: Date.now(),
-    });
-
-    // If payment is successful, update the associated fee or fine
-    if (paymentStatus === "Paid") {
-      if (payment.feeId) {
-        await ctx.db.patch(payment.feeId, {
-          status: "Paid",
-          updatedAt: Date.now(),
-        });
-      }
-      
-      if (payment.fineId) {
-        await ctx.db.patch(payment.fineId, {
-          status: "Paid",
-          updatedAt: Date.now(),
-        });
-      }
-    }
-
-    return payment._id;
+      .filter((q) => 
+        q.and(
+          q.eq(q.field("paymentMethod"), "Venmo"),
+          q.or(
+            q.eq(q.field("verificationStatus"), "Pending"),
+            q.eq(q.field("verificationStatus"), undefined)
+          )
+        )
+      )
+      .order("desc")
+      .collect();
   },
 });
+
 

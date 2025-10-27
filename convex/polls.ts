@@ -25,10 +25,35 @@ export const getAll = query({
         
         const totalVotes = votes.length;
         
+        // Calculate winning option(s) - handle ties
+        let winningOption = null;
+        let isTied = false;
+        if (totalVotes > 0) {
+          const maxVotes = Math.max(...optionVotes);
+          const winningIndices = optionVotes.map((votes, index) => votes === maxVotes ? index : -1).filter(index => index !== -1);
+          
+          if (winningIndices.length > 0) {
+            // Check if there's a tie (multiple options with same max votes)
+            isTied = winningIndices.length > 1;
+            
+            // For ties, we'll show the first winning option but mark it as tied
+            const winningIndex = winningIndices[0];
+            winningOption = {
+              index: winningIndex,
+              option: poll.options[winningIndex],
+              votes: maxVotes,
+              percentage: (maxVotes / totalVotes) * 100,
+              isTied: isTied,
+              tiedIndices: winningIndices
+            };
+          }
+        }
+        
         return {
           ...poll,
           optionVotes,
           totalVotes,
+          winningOption,
         };
       })
     );
@@ -68,10 +93,35 @@ export const getActive = query({
         
         const totalVotes = votes.length;
         
+        // Calculate winning option(s) - handle ties
+        let winningOption = null;
+        let isTied = false;
+        if (totalVotes > 0) {
+          const maxVotes = Math.max(...optionVotes);
+          const winningIndices = optionVotes.map((votes, index) => votes === maxVotes ? index : -1).filter(index => index !== -1);
+          
+          if (winningIndices.length > 0) {
+            // Check if there's a tie (multiple options with same max votes)
+            isTied = winningIndices.length > 1;
+            
+            // For ties, we'll show the first winning option but mark it as tied
+            const winningIndex = winningIndices[0];
+            winningOption = {
+              index: winningIndex,
+              option: poll.options[winningIndex],
+              votes: maxVotes,
+              percentage: (maxVotes / totalVotes) * 100,
+              isTied: isTied,
+              tiedIndices: winningIndices
+            };
+          }
+        }
+        
         return {
           ...poll,
           optionVotes,
           totalVotes,
+          winningOption,
         };
       })
     );
@@ -99,10 +149,26 @@ export const getById = query({
     
     const totalVotes = votes.length;
     
+    // Calculate winning option
+    let winningOption = null;
+    if (totalVotes > 0) {
+      const maxVotes = Math.max(...optionVotes);
+      const winningIndex = optionVotes.findIndex(votes => votes === maxVotes);
+      if (winningIndex !== -1) {
+        winningOption = {
+          index: winningIndex,
+          option: poll.options[winningIndex],
+          votes: maxVotes,
+          percentage: (maxVotes / totalVotes) * 100
+        };
+      }
+    }
+    
     return {
       ...poll,
       optionVotes,
       totalVotes,
+      winningOption,
     };
   },
 });
@@ -272,6 +338,25 @@ export const getPollVotes = query({
       .collect();
     
     return votes;
+  },
+});
+
+// Get all user votes for all polls
+export const getAllUserVotes = query({
+  args: { userId: v.string() },
+  handler: async (ctx, args) => {
+    const votes = await ctx.db
+      .query("pollVotes")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+    
+    // Convert to a map for easy lookup
+    const votesMap: { [pollId: string]: number[] } = {};
+    votes.forEach(vote => {
+      votesMap[vote.pollId] = vote.selectedOptions;
+    });
+    
+    return votesMap;
   },
 });
 
