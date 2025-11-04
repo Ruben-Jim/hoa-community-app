@@ -18,6 +18,7 @@ export const upsert = mutation({
     website: v.optional(v.string()),
     officeHours: v.string(),
     emergencyContact: v.string(),
+    eventText: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db.query("hoaInfo").first();

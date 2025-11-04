@@ -165,11 +165,7 @@ const EmergencyScreen = () => {
           // Force a layout update
           scrollViewRef.current.scrollTo({ y: 0, animated: false });
           
-          // Debug: Log scroll view properties
-          console.log('EmergencyScreen ScrollView initialized for web');
-          console.log('Screen width:', screenWidth);
-          console.log('Show mobile nav:', showMobileNav);
-          console.log('Show desktop nav:', showDesktopNav);
+          // Debug logging removed
         }
       }, 100);
       
@@ -291,13 +287,7 @@ const EmergencyScreen = () => {
             break;
         }
 
-        if (notificationSent) {
-          console.log('Notification sent successfully for new alert:', newAlert.title);
-        } else {
-          console.warn('Failed to send notification for new alert:', newAlert.title);
-        }
-      } else {
-        console.log('Notifications not enabled, skipping push notification');
+        // Optional: handle post-send state without console noise
       }
 
       // Reset form
@@ -908,7 +898,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#6366f1',
+    backgroundColor: '#3b82f6',
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 8,

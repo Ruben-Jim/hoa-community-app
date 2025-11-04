@@ -10,6 +10,7 @@ export default defineSchema({
     bio: v.optional(v.string()),
     image: v.optional(v.string()),
     termEnd: v.optional(v.string()),
+    sortOrder: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   }),
@@ -20,8 +21,8 @@ export default defineSchema({
     category: v.union(
       v.literal("Architecture"),
       v.literal("Landscaping"),
-      v.literal("Parking"),
-      v.literal("Pets"),
+      v.literal("Minutes"),
+      v.literal("Caveats"),
       v.literal("General")
     ),
     lastUpdated: v.string(),
@@ -129,6 +130,7 @@ export default defineSchema({
     website: v.optional(v.string()),
     officeHours: v.string(),
     emergencyContact: v.string(),
+    eventText: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   }),
@@ -195,6 +197,7 @@ export default defineSchema({
 
   residentNotifications: defineTable({
     residentId: v.id("residents"),
+    createdBy: v.optional(v.string()), // Email of the user who created the notification
     type: v.union(
       v.literal("Selling"),
       v.literal("Moving")
@@ -217,4 +220,12 @@ export default defineSchema({
     selectedOptions: v.array(v.number()), // Array of option indices
     createdAt: v.number(),
   }).index("by_poll", ["pollId"]).index("by_user", ["userId"]),
+
+  pets: defineTable({
+    residentId: v.id("residents"),
+    name: v.string(),
+    image: v.string(), // Storage ID for pet image
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_resident", ["residentId"]),
 }); 

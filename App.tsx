@@ -18,7 +18,6 @@ import EmergencyScreen from './src/screens/EmergencyScreen';
 import FeesScreen from './src/screens/FeesScreen';
 import BlockedAccountScreen from './src/screens/BlockedAccountScreen';
 import AdminScreen from './src/screens/AdminScreen';
-import ResidentNotificationsScreen from './src/screens/ResidentNotificationsScreen';
 
 const Stack = createStackNavigator();
 
@@ -57,7 +56,6 @@ const MainApp = () => {
       <Stack.Screen name="Community" component={CommunityScreen} />
       <Stack.Screen name="Emergency" component={EmergencyScreen} />
       <Stack.Screen name="Fees" component={FeesScreen} />
-      <Stack.Screen name="ResidentNotifications" component={ResidentNotificationsScreen} />
       {(isBoardMember || isDev) && (
         <Stack.Screen 
           name="Admin" 

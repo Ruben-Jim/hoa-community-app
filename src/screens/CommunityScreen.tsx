@@ -14,11 +14,13 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation } from 'convex/react';
+import { useConvex } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
@@ -27,11 +29,13 @@ import CustomTabBar from '../components/CustomTabBar';
 import MobileTabBar from '../components/MobileTabBar';
 import CustomAlert from '../components/CustomAlert';
 import { useCustomAlert } from '../hooks/useCustomAlert';
+import ProfileImage from '../components/ProfileImage';
 
 const CommunityScreen = () => {
   const { user } = useAuth();
   const { alertState, showAlert, hideAlert } = useCustomAlert();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [activeSubTab, setActiveSubTab] = useState<'posts' | 'polls' | 'notifications' | 'pets'>('posts');
   const [showNewPostModal, setShowNewPostModal] = useState(false);
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [selectedPostForComment, setSelectedPostForComment] = useState<any>(null);
@@ -43,6 +47,39 @@ const CommunityScreen = () => {
     content: '',
     category: 'General' as any,
   });
+
+  // Notification state
+  const [showAddNotificationModal, setShowAddNotificationModal] = useState(false);
+  const [showEditNotificationModal, setShowEditNotificationModal] = useState(false);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [selectedNotification, setSelectedNotification] = useState<any>(null);
+  const [selectedImageStorageId, setSelectedImageStorageId] = useState<string | null>(null);
+  const [selectedNotificationType, setSelectedNotificationType] = useState<string | null>(null);
+  const [notificationFormData, setNotificationFormData] = useState({
+    residentId: '',
+    type: 'Selling' as 'Selling' | 'Moving',
+    listingDate: '',
+    closingDate: '',
+    realtorInfo: '',
+    newResidentName: '',
+    isRental: false,
+    additionalInfo: '',
+    houseImage: null as string | null,
+  });
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+  // Pet state
+  const [showAddPetModal, setShowAddPetModal] = useState(false);
+  const [showEditPetModal, setShowEditPetModal] = useState(false);
+  const [selectedPet, setSelectedPet] = useState<any>(null);
+  const [petPreviewImage, setPetPreviewImage] = useState<string | null>(null);
+  const [removingPetImage, setRemovingPetImage] = useState(false);
+  const [petFormData, setPetFormData] = useState({
+    name: '',
+    image: null as string | null,
+  });
+  const petModalOpacity = useRef(new Animated.Value(0)).current;
+  const petModalTranslateY = useRef(new Animated.Value(300)).current;
 
   // Poll voting state
   const [selectedPollVotes, setSelectedPollVotes] = useState<{[pollId: string]: number[]}>({});
@@ -76,6 +113,9 @@ const CommunityScreen = () => {
   const postModalTranslateY = useRef(new Animated.Value(300)).current;
   const commentModalOpacity = useRef(new Animated.Value(0)).current;
   const commentModalTranslateY = useRef(new Animated.Value(400)).current;
+  const notificationModalOpacity = useRef(new Animated.Value(0)).current;
+  const notificationModalTranslateY = useRef(new Animated.Value(300)).current;
+  const contentAnim = useRef(new Animated.Value(1)).current;
   
   // ScrollView ref for better control
   const scrollViewRef = useRef<ScrollView>(null);
@@ -103,11 +143,7 @@ const CommunityScreen = () => {
           // Force a layout update
           scrollViewRef.current.scrollTo({ y: 0, animated: false });
           
-          // Debug: Log scroll view properties
-          console.log('CommunityScreen ScrollView initialized for web');
-          console.log('Screen width:', screenWidth);
-          console.log('Show mobile nav:', showMobileNav);
-          console.log('Show desktop nav:', showDesktopNav);
+          // Debug logging removed
         }
       }, 100);
       
@@ -124,6 +160,9 @@ const CommunityScreen = () => {
   const posts = useQuery(api.communityPosts.getAll) ?? [];
   const polls = useQuery(api.polls.getAll) ?? [];
   const userVotes = useQuery(api.polls.getAllUserVotes, user ? { userId: user._id } : "skip");
+  const notifications = useQuery(api.residentNotifications.getAllActive);
+  const residents = useQuery(api.residents.getAll);
+  const pets = useQuery(api.pets.getAll) ?? [];
 
   // Convex mutations
   const createPost = useMutation(api.communityPosts.create);
@@ -131,6 +170,13 @@ const CommunityScreen = () => {
   const likePost = useMutation(api.communityPosts.like);
   const voteOnPoll = useMutation(api.polls.vote);
   const generateUploadUrl = useMutation(api.storage.generateUploadUrl);
+  const deleteStorageFile = useMutation(api.storage.deleteStorageFile);
+  const createNotification = useMutation(api.residentNotifications.create);
+  const updateNotification = useMutation(api.residentNotifications.update);
+  const deleteNotification = useMutation(api.residentNotifications.remove);
+  const createPet = useMutation(api.pets.create);
+  const updatePet = useMutation(api.pets.update);
+  const deletePet = useMutation(api.pets.remove);
 
   const categories = ['General', 'Event', 'Complaint', 'Suggestion', 'Lost & Found'];
   const COMMENTS_PREVIEW_LIMIT = 2; // Show only 2 comments initially
@@ -230,11 +276,9 @@ const CommunityScreen = () => {
     !selectedCategory || post.category === selectedCategory
   );
 
-  // Combine posts and polls for display
-  const allContent = [
-    ...filteredPosts.map(post => ({ ...post, type: 'post' })),
-    ...polls.map(poll => ({ ...poll, type: 'poll' }))
-  ].sort((a, b) => b.createdAt - a.createdAt);
+  // Separate posts and polls for display
+  const postsContent = filteredPosts.map(post => ({ ...post, type: 'post' })).sort((a, b) => b.createdAt - a.createdAt);
+  const pollsContent = polls.map(poll => ({ ...poll, type: 'poll' })).sort((a, b) => b.createdAt - a.createdAt);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -526,6 +570,561 @@ const CommunityScreen = () => {
     );
   };
 
+  // Helper component for notification house images
+  const HouseImage = ({ storageId, isFullScreen = false }: { storageId: string; isFullScreen?: boolean }) => {
+    const imageUrl = useQuery(api.storage.getUrl, { storageId: storageId as any });
+    
+    if (imageUrl === undefined) {
+      return (
+        <View style={isFullScreen ? styles.fullImageLoading : styles.imageLoading}>
+          <Ionicons name="image" size={24} color="#9ca3af" />
+        </View>
+      );
+    }
+    
+    if (!imageUrl) {
+      return null;
+    }
+    
+    return (
+      <Image 
+        source={{ uri: imageUrl }} 
+        style={isFullScreen ? styles.fullImage : styles.cardHouseImage}
+        resizeMode={isFullScreen ? "contain" : "cover"}
+      />
+    );
+  };
+
+  // Notification helper functions
+  const formatDateInput = (text: string): string => {
+    const numbers = text.replace(/\D/g, '');
+    if (numbers.length <= 2) {
+      return numbers;
+    } else if (numbers.length <= 4) {
+      return `${numbers.slice(0, 2)}-${numbers.slice(2)}`;
+    } else {
+      return `${numbers.slice(0, 2)}-${numbers.slice(2, 4)}-${numbers.slice(4, 8)}`;
+    }
+  };
+
+  const pickNotificationImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Permission to access camera roll is required!');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setPreviewImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
+  const uploadNotificationImage = async (imageUri: string): Promise<string> => {
+    try {
+      const uploadUrl = await generateUploadUrl();
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': blob.type },
+        body: blob,
+      });
+      const { storageId } = await uploadResponse.json();
+      return storageId;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      throw new Error('Failed to upload image');
+    }
+  };
+
+  const animateNotificationModalIn = () => {
+    Animated.parallel([
+      Animated.timing(overlayOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.timing(notificationModalOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.spring(notificationModalTranslateY, {
+        toValue: 0,
+        tension: 100,
+        friction: 8,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+    ]).start();
+  };
+
+  const animateNotificationModalOut = (callback: () => void) => {
+    Animated.parallel([
+      Animated.timing(overlayOpacity, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.timing(notificationModalOpacity, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.timing(notificationModalTranslateY, {
+        toValue: 300,
+        duration: 250,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+    ]).start(callback);
+  };
+
+  const handleAddNotification = () => {
+    setNotificationFormData({
+      residentId: '',
+      type: 'Selling',
+      listingDate: '',
+      closingDate: '',
+      realtorInfo: '',
+      newResidentName: '',
+      isRental: false,
+      additionalInfo: '',
+      houseImage: null,
+    });
+    setPreviewImage(null);
+    setShowAddNotificationModal(true);
+    animateNotificationModalIn();
+  };
+
+  const handleEditNotification = (notification: any) => {
+    setSelectedNotification(notification);
+    setNotificationFormData({
+      residentId: notification.residentId,
+      type: notification.type,
+      listingDate: notification.listingDate || '',
+      closingDate: notification.closingDate || '',
+      realtorInfo: notification.realtorInfo || '',
+      newResidentName: notification.newResidentName || '',
+      isRental: notification.isRental || false,
+      additionalInfo: notification.additionalInfo || '',
+      houseImage: notification.houseImage || null,
+    });
+    setPreviewImage(null);
+    setShowEditNotificationModal(true);
+    animateNotificationModalIn();
+  };
+
+  const handleSubmitNotification = async () => {
+    if (!notificationFormData.residentId) {
+      Alert.alert('Error', 'Please select a resident');
+      return;
+    }
+
+    try {
+      let houseImageId: string | undefined;
+      if (previewImage) {
+        houseImageId = await uploadNotificationImage(previewImage);
+      }
+
+      if (showEditNotificationModal && selectedNotification) {
+        if (!user?.email) {
+          Alert.alert('Error', 'User email not found. Please log in again.');
+          return;
+        }
+        await updateNotification({
+          id: selectedNotification._id,
+          updatedBy: user.email,
+          listingDate: notificationFormData.listingDate || undefined,
+          closingDate: notificationFormData.closingDate || undefined,
+          realtorInfo: notificationFormData.realtorInfo || undefined,
+          newResidentName: notificationFormData.newResidentName || undefined,
+          isRental: notificationFormData.isRental || undefined,
+          additionalInfo: notificationFormData.additionalInfo || undefined,
+          houseImage: houseImageId || notificationFormData.houseImage || undefined,
+        });
+        Alert.alert('Success', 'Notification updated successfully');
+      } else {
+        if (!user?.email) {
+          Alert.alert('Error', 'User email not found. Please log in again.');
+          return;
+        }
+        await createNotification({
+          residentId: notificationFormData.residentId as any,
+          createdBy: user.email,
+          type: notificationFormData.type,
+          listingDate: notificationFormData.listingDate || undefined,
+          closingDate: notificationFormData.closingDate || undefined,
+          realtorInfo: notificationFormData.realtorInfo || undefined,
+          newResidentName: notificationFormData.newResidentName || undefined,
+          isRental: notificationFormData.isRental,
+          additionalInfo: notificationFormData.additionalInfo || undefined,
+          houseImage: houseImageId,
+        });
+        Alert.alert('Success', 'Notification created successfully');
+      }
+      
+      setShowAddNotificationModal(false);
+      setShowEditNotificationModal(false);
+      setSelectedNotification(null);
+      setPreviewImage(null);
+      setNotificationFormData({
+        ...notificationFormData,
+        houseImage: null,
+      });
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to save notification');
+    }
+  };
+
+  const handleDeleteNotification = async (notificationId: string) => {
+    if (!user?.email) {
+      Alert.alert('Error', 'User email not found. Please log in again.');
+      return;
+    }
+    
+    Alert.alert(
+      'Confirm Delete',
+      'Are you sure you want to delete this notification?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteNotification({ 
+                id: notificationId as any,
+                deletedBy: user.email 
+              });
+              Alert.alert('Success', 'Notification deleted');
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to delete');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const getResidentInfo = (residentId: any) => {
+    const resident = residents?.find((r: any) => r._id === residentId);
+    if (!resident) return { name: 'Unknown', address: '' };
+    return {
+      name: `${resident.firstName} ${resident.lastName}`,
+      address: `${resident.address}${resident.unitNumber ? ` #${resident.unitNumber}` : ''}`,
+    };
+  };
+
+  const notificationCards = notifications?.map((notification: any) => {
+    const residentInfo = getResidentInfo(notification.residentId);
+    return { ...notification, ...residentInfo };
+  }).filter((notification: any) => {
+    if (!selectedNotificationType) return true;
+    return notification.type === selectedNotificationType;
+  });
+
+  // Pet helper functions
+  const pickPetImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Permission to access camera roll is required!');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.6,
+        allowsMultipleSelection: false,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setPetPreviewImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
+  const uploadPetImage = async (imageUri: string): Promise<string> => {
+    try {
+      const uploadUrl = await generateUploadUrl();
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': blob.type },
+        body: blob,
+      });
+      const { storageId } = await uploadResponse.json();
+      return storageId;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      throw new Error('Failed to upload image');
+    }
+  };
+
+  const handleRemovePetImage = async () => {
+    if (!selectedPet || !selectedPet.image) {
+      return;
+    }
+
+    try {
+      setRemovingPetImage(true);
+      
+      // Delete the image from Convex storage
+      if (!selectedPet.image.startsWith('http')) {
+        await deleteStorageFile({ storageId: selectedPet.image as any });
+      }
+      
+      // Update the pet to remove the image reference
+      await updatePet({
+        id: selectedPet._id,
+        image: undefined,
+      });
+
+      // Update local state to remove the image
+      setPetFormData({ ...petFormData, image: null });
+
+      showAlert({
+        title: 'Success',
+        message: 'Pet image removed successfully!',
+        type: 'success'
+      });
+
+      setTimeout(() => {
+        hideAlert();
+      }, 2000);
+    } catch (error: any) {
+      console.error('Error removing pet image:', error);
+      showAlert({
+        title: 'Error',
+        message: error.message || 'Failed to remove pet image',
+        type: 'error'
+      });
+      
+      setTimeout(() => {
+        hideAlert();
+      }, 2000);
+    } finally {
+      setRemovingPetImage(false);
+    }
+  };
+
+  const animatePetModalIn = () => {
+    Animated.parallel([
+      Animated.timing(overlayOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.timing(petModalOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.spring(petModalTranslateY, {
+        toValue: 0,
+        tension: 100,
+        friction: 8,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+    ]).start();
+  };
+
+  const animatePetModalOut = (callback: () => void) => {
+    Animated.parallel([
+      Animated.timing(overlayOpacity, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.timing(petModalOpacity, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.timing(petModalTranslateY, {
+        toValue: 300,
+        duration: 250,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+    ]).start(callback);
+  };
+
+  const handleAddPet = () => {
+    if (!user?._id) {
+      Alert.alert('Error', 'Please sign in to register a pet');
+      return;
+    }
+    setPetFormData({
+      name: '',
+      image: null,
+    });
+    setPetPreviewImage(null);
+    setShowAddPetModal(true);
+    animatePetModalIn();
+  };
+
+  const handleEditPet = (pet: any) => {
+    setSelectedPet(pet);
+    setPetFormData({
+      name: pet.name,
+      image: pet.image || null,
+    });
+    setPetPreviewImage(null);
+    setShowEditPetModal(true);
+    animatePetModalIn();
+  };
+
+  const handleSubmitPet = async () => {
+    if (!petFormData.name.trim()) {
+      Alert.alert('Error', 'Please enter a pet name');
+      return;
+    }
+
+    if (!user?._id) {
+      Alert.alert('Error', 'Please sign in to register a pet');
+      return;
+    }
+
+    try {
+      let petImageId: string | undefined;
+      if (petPreviewImage) {
+        // If editing, delete the old image before uploading the new one
+        if (showEditPetModal && selectedPet && selectedPet.image) {
+          await deleteStorageFile({ storageId: selectedPet.image as any });
+        }
+        petImageId = await uploadPetImage(petPreviewImage);
+      } else if (!petFormData.image) {
+        Alert.alert('Error', 'Please add a pet image');
+        return;
+      }
+
+      if (showEditPetModal && selectedPet) {
+        await updatePet({
+          id: selectedPet._id,
+          name: petFormData.name.trim(),
+          image: petImageId || petFormData.image || undefined,
+        });
+        Alert.alert('Success', 'Pet updated successfully');
+      } else {
+        await createPet({
+          residentId: user._id as any,
+          name: petFormData.name.trim(),
+          image: petImageId || petFormData.image || '',
+        });
+        Alert.alert('Success', 'Pet registered successfully');
+      }
+      
+      setShowAddPetModal(false);
+      setShowEditPetModal(false);
+      setSelectedPet(null);
+      setPetPreviewImage(null);
+      setPetFormData({
+        name: '',
+        image: null,
+      });
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to save pet');
+    }
+  };
+
+  const handleDeletePet = async (petId: string) => {
+    Alert.alert(
+      'Confirm Delete',
+      'Are you sure you want to delete this pet registration?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deletePet({ id: petId as any });
+              Alert.alert('Success', 'Pet registration deleted');
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to delete');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Helper component for pet images
+  const PetImage = ({ storageId, isFullScreen = false }: { storageId: string; isFullScreen?: boolean }) => {
+    const imageUrl = useQuery(api.storage.getUrl, { storageId: storageId as any });
+    const pulseAnim = useRef(new Animated.Value(0.4)).current;
+    
+    useEffect(() => {
+      if (imageUrl === undefined) {
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(pulseAnim, {
+              toValue: 1,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+            Animated.timing(pulseAnim, {
+              toValue: 0.4,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+          ])
+        ).start();
+      }
+    }, [imageUrl]);
+    
+    if (imageUrl === undefined) {
+      return (
+        <Animated.View 
+          style={[
+            isFullScreen ? styles.fullImageLoading : styles.petImageLoading,
+            { opacity: pulseAnim }
+          ]}
+        >
+          <View style={styles.loadingContent}>
+            <Ionicons name="paw" size={32} color="#cbd5e1" />
+            {isFullScreen && (
+              <ActivityIndicator 
+                size="large" 
+                color="#cbd5e1" 
+                style={{ marginTop: 12 }}
+              />
+            )}
+          </View>
+        </Animated.View>
+      );
+    }
+    
+    if (!imageUrl) {
+      return null;
+    }
+    
+    return (
+      <Image 
+        source={{ uri: imageUrl }} 
+        style={isFullScreen ? styles.fullImage : styles.petCardImage}
+        resizeMode={isFullScreen ? "contain" : "cover"}
+      />
+    );
+  };
+
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case 'Event':
@@ -612,6 +1211,7 @@ const CommunityScreen = () => {
             source={require('../../assets/hoa-4k.jpg')}
             style={styles.header}
             imageStyle={styles.headerImage}
+            resizeMode="stretch"
           >
             <View style={styles.headerOverlay} />
             <View style={styles.headerTop}>
@@ -650,7 +1250,103 @@ const CommunityScreen = () => {
           </Animated.View>
         )}
 
-        {/* Category Filter with New Post Button */}
+        {/* Sub-tab Selector (Posts/Notifications/Pets) */}
+        <Animated.View style={[
+          styles.subTabContainer,
+          {
+            opacity: fadeAnim,
+          }
+        ]}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.subTabContent}
+            style={styles.subTabScrollView}
+          >
+            <TouchableOpacity
+              style={[
+                styles.subTabButton,
+                activeSubTab === 'posts' && styles.subTabButtonActive
+              ]}
+              onPress={() => setActiveSubTab('posts')}
+            >
+              <Ionicons 
+                name="chatbubbles" 
+                size={18} 
+                color={activeSubTab === 'posts' ? '#eab308' : '#6b7280'} 
+              />
+              <Text style={[
+                styles.subTabButtonText,
+                activeSubTab === 'posts' && styles.subTabButtonTextActive
+              ]}>
+                Posts
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[
+                styles.subTabButton,
+                activeSubTab === 'polls' && styles.subTabButtonActive
+              ]}
+              onPress={() => setActiveSubTab('polls')}
+            >
+              <Ionicons 
+                name="bar-chart" 
+                size={18} 
+                color={activeSubTab === 'polls' ? '#eab308' : '#6b7280'} 
+              />
+              <Text style={[
+                styles.subTabButtonText,
+                activeSubTab === 'polls' && styles.subTabButtonTextActive
+              ]}>
+                Polls
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[
+                styles.subTabButton,
+                activeSubTab === 'notifications' && styles.subTabButtonActive
+              ]}
+              onPress={() => setActiveSubTab('notifications')}
+            >
+              <Ionicons 
+                name="home" 
+                size={18} 
+                color={activeSubTab === 'notifications' ? '#eab308' : '#6b7280'} 
+              />
+              <Text style={[
+                styles.subTabButtonText,
+                activeSubTab === 'notifications' && styles.subTabButtonTextActive
+              ]}>
+                Moving/Leaving
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.subTabButton,
+                activeSubTab === 'pets' && styles.subTabButtonActive
+              ]}
+              onPress={() => setActiveSubTab('pets')}
+            >
+              <Ionicons 
+                name="paw" 
+                size={18} 
+                color={activeSubTab === 'pets' ? '#eab308' : '#6b7280'} 
+              />
+              <Text style={[
+                styles.subTabButtonText,
+                activeSubTab === 'pets' && styles.subTabButtonTextActive
+              ]}>
+                Pet Registration
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </Animated.View>
+
+        {/* Category Filter / Type Filter with Action Buttons */}
+        {activeSubTab === 'posts' ? (
         <Animated.View style={[
           styles.categoryContainer,
           {
@@ -698,8 +1394,9 @@ const CommunityScreen = () => {
               ))}
             </ScrollView>
             
-            {/* New Post Button - Desktop Only */}
+              {/* Action Buttons - Desktop Only */}
             {showDesktopNav && (
+                <View style={styles.actionButtonsContainer}>
               <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
                 <TouchableOpacity
                   style={styles.newPostButton}
@@ -709,17 +1406,120 @@ const CommunityScreen = () => {
                     animateIn('post');
                   }}
                 >
-                  <Ionicons name="add" size={20} color="#ffffff" />
+                      <Ionicons name="add" size={18} color="#ffffff" />
                   <Text style={styles.newPostButtonText}>New Post</Text>
                 </TouchableOpacity>
               </Animated.View>
+                </View>
             )}
           </View>
         </Animated.View>
+        ) : activeSubTab === 'notifications' ? (
+          <Animated.View style={[
+            styles.typeFilterContainer,
+            {
+              opacity: fadeAnim,
+            }
+          ]}>
+            <View style={styles.filterRow}>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.typeFilterContent}
+                style={styles.typeFilterScrollView}
+              >
+                <TouchableOpacity
+                  style={[
+                    styles.typeFilterButton,
+                    !selectedNotificationType && styles.typeFilterButtonActive
+                  ]}
+                  onPress={() => setSelectedNotificationType(null)}
+                >
+                  <Text style={[
+                    styles.typeFilterButtonText,
+                    !selectedNotificationType && styles.typeFilterButtonTextActive
+                  ]}>
+                    All
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[
+                    styles.typeFilterButton,
+                    selectedNotificationType === 'Selling' && styles.typeFilterButtonActive
+                  ]}
+                  onPress={() => setSelectedNotificationType('Selling')}
+                >
+                  <Text style={[
+                    styles.typeFilterButtonText,
+                    selectedNotificationType === 'Selling' && styles.typeFilterButtonTextActive
+                  ]}>
+                    Selling
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[
+                    styles.typeFilterButton,
+                    selectedNotificationType === 'Moving' && styles.typeFilterButtonActive
+                  ]}
+                  onPress={() => setSelectedNotificationType('Moving')}
+                >
+                  <Text style={[
+                    styles.typeFilterButtonText,
+                    selectedNotificationType === 'Moving' && styles.typeFilterButtonTextActive
+                  ]}>
+                    Moving
+                  </Text>
+                </TouchableOpacity>
+              </ScrollView>
+              
+              {/* Action Buttons - Desktop Only */}
+              {showDesktopNav && (
+                <View style={styles.actionButtonsContainer}>
+                  <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+                    <TouchableOpacity
+                      style={styles.addNotificationButton}
+                      onPress={handleAddNotification}
+                    >
+                      <Ionicons name="add" size={18} color="#ffffff" />
+                      <Text style={styles.addNotificationButtonText}>Add Notification</Text>
+                    </TouchableOpacity>
+                  </Animated.View>
+                </View>
+              )}
+            </View>
+          </Animated.View>
+        ) : activeSubTab === 'pets' ? (
+          <Animated.View style={[
+            styles.petsFilterContainer,
+            {
+              opacity: fadeAnim,
+            }
+          ]}>
+            <View style={[styles.filterRow, styles.petsFilterRow]}>
+              {/* Action Buttons - Desktop Only */}
+              {showDesktopNav && (
+                <View style={styles.actionButtonsContainer}>
+                  <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+                    <TouchableOpacity
+                      style={styles.addPetButton}
+                      onPress={handleAddPet}
+                    >
+                      <Ionicons name="add" size={18} color="#ffffff" />
+                      <Text style={styles.addPetButtonText}>Register Pet</Text>
+                    </TouchableOpacity>
+                  </Animated.View>
+                </View>
+              )}
+            </View>
+          </Animated.View>
+        ) : null}
         
         {/* Content with padding */}
         <View style={styles.contentWrapper}>
-          {allContent.length === 0 ? (
+          {activeSubTab === 'posts' ? (
+            postsContent.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="chatbubbles-outline" size={48} color="#9ca3af" />
               <Text style={styles.emptyStateText}>No posts found</Text>
@@ -728,7 +1528,7 @@ const CommunityScreen = () => {
               </Text>
             </View>
           ) : (
-            allContent.map((item: any, index: number) => (
+            postsContent.map((item: any, index: number) => (
             <Animated.View 
               key={item._id} 
               style={[
@@ -745,22 +1545,11 @@ const CommunityScreen = () => {
                 }
               ]}
             >
-              {item.type === 'post' ? (
-                // Render post
-                <>
-                  <View style={styles.postHeader}>
+              {/* Render post */}
+              <>
+                <View style={styles.postHeader}>
                     <View style={styles.postAuthor}>
-                      <View style={styles.avatar}>
-                        {item.authorProfileImage ? (
-                          <Image 
-                            source={{ uri: item.authorProfileImage }} 
-                            style={styles.avatarImage}
-                            resizeMode="cover"
-                          />
-                        ) : (
-                          <Ionicons name="person" size={20} color="#6b7280" />
-                        )}
-                      </View>
+                      <ProfileImage source={item.authorProfileImage} size={40} style={{ marginRight: 8 }} />
                       <View>
                         <Text style={styles.authorName}>{item.author}</Text>
                         <Text style={styles.postTime}>{formatDate(new Date(item.createdAt).toISOString())}</Text>
@@ -846,17 +1635,11 @@ const CommunityScreen = () => {
                         <View key={comment._id ?? index} style={styles.commentItem}>
                           <View style={styles.commentHeader}>
                             <View style={styles.commentAuthorInfo}>
-                              <View style={styles.commentAvatar}>
-                                {comment.authorProfileImage ? (
-                                  <Image 
-                                    source={{ uri: comment.authorProfileImage }} 
-                                    style={styles.commentAvatarImage}
-                                    resizeMode="cover"
-                                  />
-                                ) : (
-                                  <Ionicons name="person" size={16} color="#6b7280" />
-                                )}
-                              </View>
+                              <ProfileImage 
+                              source={comment.authorProfileImage} 
+                              size={24} 
+                              style={{ marginRight: 6 }}
+                            />
                               <Text style={styles.commentAuthor}>{comment.author}</Text>
                             </View>
                             <Text style={styles.commentTime}>
@@ -879,20 +1662,14 @@ const CommunityScreen = () => {
                             {item.comments.slice(COMMENTS_PREVIEW_LIMIT).map((comment: any, index: number) => (
                               <View key={comment._id ?? `expanded-${index}`} style={styles.commentItem}>
                                 <View style={styles.commentHeader}>
-                                  <View style={styles.commentAuthorInfo}>
-                                    <View style={styles.commentAvatar}>
-                                      {comment.authorProfileImage ? (
-                                        <Image 
-                                          source={{ uri: comment.authorProfileImage }} 
-                                          style={styles.commentAvatarImage}
-                                          resizeMode="cover"
-                                        />
-                                      ) : (
-                                        <Ionicons name="person" size={16} color="#6b7280" />
-                                      )}
-                                    </View>
-                                    <Text style={styles.commentAuthor}>{comment.author}</Text>
-                                  </View>
+                            <View style={styles.commentAuthorInfo}>
+                              <ProfileImage 
+                                source={comment.authorProfileImage} 
+                                size={24} 
+                                style={{ marginRight: 6 }}
+                              />
+                              <Text style={styles.commentAuthor}>{comment.author}</Text>
+                            </View>
                                   <Text style={styles.commentTime}>
                                     {formatDate(comment.createdAt ? new Date(comment.createdAt).toISOString() : comment.timestamp || new Date().toISOString())}
                                   </Text>
@@ -906,105 +1683,341 @@ const CommunityScreen = () => {
                     </View>
                   )}
                 </>
-              ) : (
-                // Render poll
-                <>
-                  <View style={styles.postHeader}>
-                    <View style={styles.postAuthor}>
-                      <View style={styles.avatar}>
-                        <Ionicons name="bar-chart" size={20} color="#2563eb" />
-                      </View>
-                      <View>
-                        <Text style={styles.authorName}>Community Poll</Text>
-                        <Text style={styles.postTime}>{formatDate(new Date(item.createdAt).toISOString())}</Text>
-                      </View>
-                    </View>
-                    <View style={styles.categoryBadge}>
-                      <Ionicons name="checkmark-circle" size={12} color={item.isActive ? '#10b981' : '#ef4444'} />
-                      <Text style={[styles.categoryText, { color: item.isActive ? '#10b981' : '#ef4444' }]}>
-                        {item.isActive ? 'Active' : 'inActive'}
-                      </Text>
-                    </View>
-                  </View>
-                  
-                  <Text style={styles.postTitle}>{item.title}</Text>
-                  {item.description && (
-                    <Text style={styles.postContent}>{item.description}</Text>
-                  )}
-                  
-                  {/* Poll Options */}
-                  <View style={styles.pollOptionsContainer}>
-                    {item.options.map((option: string, optionIndex: number) => {
-                      const isSelected = selectedPollVotes[item._id]?.includes(optionIndex) || false;
-                      const voteCount = item.optionVotes?.[optionIndex] || 0;
-                      const totalVotes = item.totalVotes || 0;
-                      const percentage = totalVotes > 0 ? (voteCount / totalVotes) * 100 : 0;
-                      const isWinningOption = !item.isActive && item.winningOption && item.winningOption.tiedIndices?.includes(optionIndex);
-                      const isTied = isWinningOption && item.winningOption?.isTied;
-                      
-                      return (
-                        <TouchableOpacity
-                          key={optionIndex}
-                          style={[
-                            styles.pollOption,
-                            isSelected && styles.pollOptionSelected,
-                            !item.isActive && styles.pollOptionDisabled,
-                            isWinningOption && styles.pollWinningOption
-                          ]}
-                          onPress={() => item.isActive ? handleVoteOnPoll(item._id, optionIndex) : null}
-                          disabled={!item.isActive}
-                        >
-                          <View style={styles.pollOptionContent}>
-                            <Text style={[
-                              styles.pollOptionText,
-                              isSelected && styles.pollOptionTextSelected,
-                              isWinningOption && styles.pollWinningOptionText
-                            ]}>
-                              {option}
-                            </Text>
-                            <Text style={[
-                              styles.pollVoteCount,
-                              isWinningOption && styles.pollWinningVoteCount
-                            ]}>
-                              {voteCount} votes ({percentage.toFixed(1)}%)
-                            </Text>
-                          </View>
-                          <View style={styles.pollOptionActions}>
-                            {isSelected && (
-                              <Ionicons name="checkmark-circle" size={20} color="#2563eb" />
-                            )}
-                            {isWinningOption && (
-                              <View style={styles.winningBadge}>
-                                <Ionicons name="trophy" size={16} color="#ffffff" />
-                                <Text style={styles.winningBadgeText}>
-                                  {isTied ? 'Tied' : 'Most Voted'}
-                                </Text>
-                              </View>
-                            )}
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                  
-                  <View style={styles.postFooter}>
-                    <View style={styles.actionButton}>
-                      <Ionicons name="people" size={16} color="#6b7280" />
-                      <Text style={styles.actionText}>{item.totalVotes || 0} total votes</Text>
-                    </View>
-                    
-                    {item.allowMultipleVotes && (
-                      <View style={styles.actionButton}>
-                        <Ionicons name="checkmark-done" size={16} color="#6b7280" />
-                        <Text style={styles.actionText}>Multiple votes allowed</Text>
-                      </View>
-                    )}
-                  </View>
-                </>
-              )}
             </Animated.View>
             ))
-          )}
+            )
+          ) : activeSubTab === 'polls' ? (
+            pollsContent.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="bar-chart-outline" size={48} color="#9ca3af" />
+              <Text style={styles.emptyStateText}>No polls found</Text>
+              <Text style={styles.emptyStateSubtext}>
+                Be the first to create a community poll!
+              </Text>
+            </View>
+          ) : (
+            pollsContent.map((item: any, index: number) => (
+            <Animated.View 
+              key={item._id} 
+              style={[
+                styles.postCard,
+                {
+                  borderLeftColor: borderColors[index % borderColors.length],
+                  opacity: fadeAnim,
+                  transform: [{
+                    translateY: fadeAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [50, 0],
+                    })
+                  }]
+                }
+              ]}
+            >
+              {/* Render poll */}
+              <>
+                <View style={styles.postHeader}>
+                  <View style={styles.postAuthor}>
+                    <View style={styles.avatar}>
+                      <Ionicons name="bar-chart" size={20} color="#eab308" />
+                    </View>
+                    <View>
+                      <Text style={styles.authorName}>Community Poll</Text>
+                      <Text style={styles.postTime}>{formatDate(new Date(item.createdAt).toISOString())}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.categoryBadge}>
+                    <Ionicons name="checkmark-circle" size={12} color={item.isActive ? '#10b981' : '#ef4444'} />
+                    <Text style={[styles.categoryText, { color: item.isActive ? '#10b981' : '#ef4444' }]}>
+                      {item.isActive ? 'Active' : 'inActive'}
+                    </Text>
+                  </View>
+                </View>
+                
+                <Text style={styles.postTitle}>{item.title}</Text>
+                {item.description && (
+                  <Text style={styles.postContent}>{item.description}</Text>
+                )}
+                
+                {/* Poll Options */}
+                <View style={styles.pollOptionsContainer}>
+                  {item.options.map((option: string, optionIndex: number) => {
+                    const isSelected = selectedPollVotes[item._id]?.includes(optionIndex) || false;
+                    const voteCount = item.optionVotes?.[optionIndex] || 0;
+                    const totalVotes = item.totalVotes || 0;
+                    const percentage = totalVotes > 0 ? (voteCount / totalVotes) * 100 : 0;
+                    const isWinningOption = !item.isActive && item.winningOption && item.winningOption.tiedIndices?.includes(optionIndex);
+                    const isTied = isWinningOption && item.winningOption?.isTied;
+                    
+                    return (
+                      <TouchableOpacity
+                        key={optionIndex}
+                        style={[
+                          styles.pollOption,
+                          isSelected && styles.pollOptionSelected,
+                          !item.isActive && styles.pollOptionDisabled,
+                          isWinningOption && styles.pollWinningOption
+                        ]}
+                        onPress={() => item.isActive ? handleVoteOnPoll(item._id, optionIndex) : null}
+                        disabled={!item.isActive}
+                      >
+                        <View style={styles.pollOptionContent}>
+                          <Text style={[
+                            styles.pollOptionText,
+                            isSelected && styles.pollOptionTextSelected,
+                            isWinningOption && styles.pollWinningOptionText
+                          ]}>
+                            {option}
+                          </Text>
+                          <Text style={[
+                            styles.pollVoteCount,
+                            isWinningOption && styles.pollWinningVoteCount
+                          ]}>
+                            {voteCount} votes ({percentage.toFixed(1)}%)
+                          </Text>
+                        </View>
+                        <View style={styles.pollOptionActions}>
+                          {isSelected && (
+                            <Ionicons name="checkmark-circle" size={20} color="#2563eb" />
+                          )}
+                          {isWinningOption && (
+                            <View style={styles.winningBadge}>
+                              <Ionicons name="trophy" size={16} color="#ffffff" />
+                              <Text style={styles.winningBadgeText}>
+                                {isTied ? 'Tied' : 'Most Voted'}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                
+                <View style={styles.postFooter}>
+                  <View style={styles.actionButton}>
+                    <Ionicons name="people" size={16} color="#6b7280" />
+                    <Text style={styles.actionText}>{item.totalVotes || 0} total votes</Text>
+                  </View>
+                  
+                  {item.allowMultipleVotes && (
+                    <View style={styles.actionButton}>
+                      <Ionicons name="checkmark-done" size={16} color="#6b7280" />
+                      <Text style={styles.actionText}>Multiple votes allowed</Text>
+                    </View>
+                  )}
+                </View>
+              </>
+            </Animated.View>
+            ))
+            )
+          ) : activeSubTab === 'notifications' ? (
+            notificationCards && notificationCards.length > 0 ? (
+              <View style={[
+                styles.notificationsCardsContainer,
+                showMobileNav && styles.notificationsCardsContainerMobile
+              ]}>
+                {notificationCards.map((notification: any) => {
+                  const typeColor = notification.type === 'Selling' ? '#10b981' : '#f59e0b';
+                  return (
+                    <Animated.View 
+                      key={notification._id} 
+                      style={[
+                        styles.notificationCard,
+                        showMobileNav && styles.notificationCardMobile,
+                        {
+                          opacity: contentAnim,
+                          transform: [{
+                            translateY: contentAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [50, 0],
+                            })
+                          }]
+                        }
+                      ]}
+                    >
+                      <View style={styles.notificationCardContent}>
+                        <View style={styles.notificationCardMainInfo}>
+                          <ProfileImage 
+                            source={notification.profileImage} 
+                            size={48}
+                            style={{ marginRight: 10 }}
+                            initials={notification.name ? notification.name.split(' ').map((n: string) => n.charAt(0)).join('').substring(0, 2) : undefined}
+                          />
+                          
+                          <View style={styles.notificationCardDetails}>
+                            {notification.createdBy && user?.email === notification.createdBy && (
+                              <TouchableOpacity
+                                onPress={() => handleEditNotification(notification)}
+                                style={styles.editButtonTopRight}
+                              >
+                                <Ionicons name="create-outline" size={18} color="#6b7280" />
+                              </TouchableOpacity>
+                            )}
+                            
+                            <Text style={styles.notificationCardType} numberOfLines={1}>
+                              {notification.type}
+                            </Text>
+                            
+                            <Text style={styles.notificationCardEmail} numberOfLines={1}>
+                              {notification.name || 'Unknown'}
+                            </Text>
+                            
+                            <Text style={styles.notificationCardAddress} numberOfLines={1}>
+                              {notification.address || ''}
+                            </Text>
+                          </View>
+                        </View>
+
+                        {/* House Image */}
+                        {notification.houseImage && (
+                          <TouchableOpacity 
+                            onPress={() => {
+                              setSelectedImageStorageId(notification.houseImage);
+                              setShowImageModal(true);
+                            }}
+                            activeOpacity={0.9}
+                          >
+                            <View style={styles.houseImageContainer}>
+                              <HouseImage storageId={notification.houseImage} />
+                              <View style={styles.imageOverlay}>
+                                <Ionicons name="expand" size={20} color="#ffffff" />
+                                <Text style={styles.viewImageText}>Tap to View</Text>
+                              </View>
+                            </View>
+                          </TouchableOpacity>
+                        )}
+
+                        {/* Additional Details Section */}
+                        <View style={styles.notificationCardDetailsSection}>
+                          {/* Dates Row */}
+                          {(notification.listingDate || notification.closingDate) && (
+                            <View style={styles.dateRow}>
+                              {notification.listingDate && (
+                                <View style={styles.dateItem}>
+                                  <Ionicons name="calendar-outline" size={16} color="#6b7280" />
+                                  <Text style={styles.dateLabel}>Listing:</Text>
+                                  <Text style={styles.dateValue}>{notification.listingDate}</Text>
+                                </View>
+                              )}
+                              {notification.closingDate && (
+                                <View style={styles.dateItem}>
+                                  <Ionicons name="calendar" size={16} color="#6b7280" />
+                                  <Text style={styles.dateLabel}>Closing:</Text>
+                                  <Text style={styles.dateValue}>{notification.closingDate}</Text>
+                                </View>
+                              )}
+                            </View>
+                          )}
+
+                          {/* Realtor Info */}
+                          {notification.realtorInfo && (
+                            <View style={styles.infoBlock}>
+                              <View style={styles.infoHeader}>
+                                <Ionicons name="business" size={14} color="#2563eb" />
+                                <Text style={styles.infoBlockTitle}>Realtor Contact</Text>
+                              </View>
+                              <Text style={styles.infoBlockContent}>{notification.realtorInfo}</Text>
+                            </View>
+                          )}
+
+                          {/* New Resident Info */}
+                          {notification.newResidentName && (
+                            <View style={styles.infoBlock}>
+                              <View style={styles.infoHeader}>
+                                <Ionicons
+                                  name={notification.isRental ? 'key-outline' : 'person-outline'}
+                                  size={14}
+                                  color={notification.isRental ? '#f59e0b' : '#10b981'}
+                                />
+                                <Text style={styles.infoBlockTitle}>
+                                  New {notification.isRental ? 'Renter' : 'Owner'}
+                                </Text>
+                              </View>
+                              <Text style={styles.infoBlockContent}>{notification.newResidentName}</Text>
+                            </View>
+                          )}
+
+                          {/* Additional Info */}
+                          {notification.additionalInfo && (
+                            <View style={styles.infoBlock}>
+                              <View style={styles.infoHeader}>
+                                <Ionicons name="chatbubble-outline" size={14} color="#6b7280" />
+                                <Text style={styles.infoBlockTitle}>Additional Details</Text>
+                              </View>
+                              <Text style={styles.infoBlockContent}>{notification.additionalInfo}</Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                    </Animated.View>
+                  );
+                })}
+              </View>
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="home-outline" size={64} color="#9ca3af" />
+                <Text style={styles.emptyStateText}>No notifications yet</Text>
+                <Text style={styles.emptyStateSubtext}>
+                  Residents can submit information when selling or moving
+                </Text>
+              </View>
+            )
+          ) : activeSubTab === 'pets' ? (
+            pets.length > 0 ? (
+              <View style={[
+                styles.petsCardsContainer,
+                showMobileNav && styles.petsCardsContainerMobile
+              ]}>
+                {pets.map((pet: any) => (
+                  <Animated.View 
+                    key={pet._id} 
+                    style={[
+                      styles.petCard,
+                      showMobileNav && styles.petCardMobile,
+                      {
+                        opacity: contentAnim,
+                        transform: [{
+                          translateY: contentAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [50, 0],
+                          })
+                        }]
+                      }
+                    ]}
+                  >
+                    <View style={styles.petCardContent}>
+                      <View style={styles.petCardHeader}>
+                        {pet.residentId === user?._id && (
+                          <TouchableOpacity
+                            onPress={() => handleEditPet(pet)}
+                            style={styles.editButtonTopRight}
+                          >
+                            <Ionicons name="create-outline" size={18} color="#6b7280" />
+                          </TouchableOpacity>
+                        )}
+                        <View style={styles.petImageContainer}>
+                          <PetImage storageId={pet.image} />
+                        </View>
+                        <Text style={styles.petCardName}>{pet.name}</Text>
+                        <Text style={styles.petCardOwner}>
+                          Owner: {pet.residentName || 'Unknown'}
+                        </Text>
+                        <Text style={styles.petCardAddress}>{pet.residentAddress || ''}</Text>
+                      </View>
+                    </View>
+                  </Animated.View>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="paw-outline" size={64} color="#9ca3af" />
+                <Text style={styles.emptyStateText}>No pets registered yet</Text>
+                <Text style={styles.emptyStateSubtext}>
+                  Register your pet according to HOA guide laws
+                </Text>
+              </View>
+            )
+          ) : null}
         </View>
         
         {/* Additional content to ensure scrollable content */}
@@ -1017,8 +2030,14 @@ const CommunityScreen = () => {
           style={styles.floatingActionButton}
           onPress={() => {
             animateButtonPress();
+            if (activeSubTab === 'posts') {
             setShowNewPostModal(true);
             animateIn('post');
+            } else if (activeSubTab === 'notifications') {
+              handleAddNotification();
+            } else if (activeSubTab === 'pets') {
+              handleAddPet();
+            }
           }}
         >
           <Ionicons name="add" size={28} color="#ffffff" />
@@ -1206,6 +2225,411 @@ const CommunityScreen = () => {
           </Animated.View>
         </Animated.View>
       </Modal>
+
+      {/* Add/Edit Notification Modal */}
+      <Modal
+        visible={showAddNotificationModal || showEditNotificationModal}
+        animationType="none"
+        transparent={true}
+        onRequestClose={() => {
+          animateNotificationModalOut(() => {
+            setShowAddNotificationModal(false);
+            setShowEditNotificationModal(false);
+          });
+        }}
+      >
+        <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalWrapper}
+          >
+            <Animated.View 
+              style={[
+                styles.modalContainer,
+                {
+                  opacity: notificationModalOpacity,
+                  transform: [{ translateY: notificationModalTranslateY }],
+                }
+              ]}
+            >
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>
+                  {showEditNotificationModal ? 'Edit Notification' : 'Add Notification'}
+                </Text>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => {
+                    animateNotificationModalOut(() => {
+                      setShowAddNotificationModal(false);
+                      setShowEditNotificationModal(false);
+                    });
+                  }}
+                >
+                  <Ionicons name="close" size={24} color="#6b7280" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Resident *</Text>
+                  <ScrollView style={styles.picker} nestedScrollEnabled>
+                    {residents?.map((resident: any) => (
+                      <TouchableOpacity
+                        key={resident._id}
+                        style={[
+                          styles.pickerOption,
+                          notificationFormData.residentId === resident._id && styles.pickerOptionSelected,
+                        ]}
+                        onPress={() => setNotificationFormData({ ...notificationFormData, residentId: resident._id })}
+                      >
+                        <Text
+                          style={[
+                            styles.pickerOptionText,
+                            notificationFormData.residentId === resident._id && styles.pickerOptionTextSelected,
+                          ]}
+                        >
+                          {resident.firstName} {resident.lastName} - {resident.address}
+                          {resident.unitNumber ? ` #${resident.unitNumber}` : ''}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Type *</Text>
+                  <View style={styles.typeSelector}>
+                    <TouchableOpacity
+                      style={[
+                        styles.typeButton,
+                        notificationFormData.type === 'Selling' && styles.typeButtonSelected,
+                      ]}
+                      onPress={() => setNotificationFormData({ ...notificationFormData, type: 'Selling' })}
+                    >
+                      <Text
+                        style={[
+                          styles.typeButtonText,
+                          notificationFormData.type === 'Selling' && styles.typeButtonTextSelected,
+                        ]}
+                      >
+                        Selling
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.typeButton,
+                        notificationFormData.type === 'Moving' && styles.typeButtonSelected,
+                      ]}
+                      onPress={() => setNotificationFormData({ ...notificationFormData, type: 'Moving' })}
+                    >
+                      <Text
+                        style={[
+                          styles.typeButtonText,
+                          notificationFormData.type === 'Moving' && styles.typeButtonTextSelected,
+                        ]}
+                      >
+                        Moving
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Listing Date</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="DD-MM-YYYY"
+                    value={notificationFormData.listingDate}
+                    onChangeText={(text) => {
+                      const formatted = formatDateInput(text);
+                      setNotificationFormData({ ...notificationFormData, listingDate: formatted });
+                    }}
+                    keyboardType="numeric"
+                    maxLength={10}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Closing Date</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="DD-MM-YYYY"
+                    value={notificationFormData.closingDate}
+                    onChangeText={(text) => {
+                      const formatted = formatDateInput(text);
+                      setNotificationFormData({ ...notificationFormData, closingDate: formatted });
+                    }}
+                    keyboardType="numeric"
+                    maxLength={10}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Realtor Information</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Realtor name and contact info"
+                    value={notificationFormData.realtorInfo}
+                    onChangeText={(text) => setNotificationFormData({ ...notificationFormData, realtorInfo: text })}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>New Owner/Renter Name</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Name of new occupant"
+                    value={notificationFormData.newResidentName}
+                    onChangeText={(text) => setNotificationFormData({ ...notificationFormData, newResidentName: text })}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Is this a rental?</Text>
+                  <View style={styles.typeSelector}>
+                    <TouchableOpacity
+                      style={[
+                        styles.typeButton,
+                        notificationFormData.isRental === true && styles.typeButtonSelected,
+                      ]}
+                      onPress={() => setNotificationFormData({ ...notificationFormData, isRental: true })}
+                    >
+                      <Text
+                        style={[
+                          styles.typeButtonText,
+                          notificationFormData.isRental === true && styles.typeButtonTextSelected,
+                        ]}
+                      >
+                        Yes
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.typeButton,
+                        notificationFormData.isRental === false && styles.typeButtonSelected,
+                      ]}
+                      onPress={() => setNotificationFormData({ ...notificationFormData, isRental: false })}
+                    >
+                      <Text
+                        style={[
+                          styles.typeButtonText,
+                          notificationFormData.isRental === false && styles.typeButtonTextSelected,
+                        ]}
+                      >
+                        No
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>House Image (Optional)</Text>
+                  {previewImage ? (
+                    <View style={styles.imagePreviewContainer}>
+                      <Image source={{ uri: previewImage }} style={styles.imagePreview} />
+                      <TouchableOpacity
+                        style={styles.removeImageButton}
+                        onPress={() => setPreviewImage(null)}
+                      >
+                        <Ionicons name="close-circle" size={24} color="#ef4444" />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.imagePickerButton}
+                      onPress={pickNotificationImage}
+                    >
+                      <Ionicons name="image-outline" size={24} color="#6b7280" />
+                      <Text style={styles.imagePickerText}>Add House Image</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Additional Information</Text>
+                  <TextInput
+                    style={[styles.input, styles.textArea]}
+                    placeholder="Any additional information"
+                    value={notificationFormData.additionalInfo}
+                    onChangeText={(text) => setNotificationFormData({ ...notificationFormData, additionalInfo: text })}
+                    multiline
+                    numberOfLines={4}
+                  />
+                </View>
+
+                <TouchableOpacity style={styles.submitButton} onPress={handleSubmitNotification}>
+                  <Text style={styles.submitButtonText}>
+                    {showEditNotificationModal ? 'Update' : 'Create'} Notification
+                  </Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </Animated.View>
+          </KeyboardAvoidingView>
+        </Animated.View>
+      </Modal>
+
+      {/* Image Viewer Modal */}
+      <Modal
+        visible={showImageModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowImageModal(false)}
+      >
+        <View style={styles.imageModalOverlay}>
+          <TouchableOpacity 
+            style={styles.imageModalClose}
+            onPress={() => setShowImageModal(false)}
+          >
+            <Ionicons name="close" size={32} color="#ffffff" />
+          </TouchableOpacity>
+          {selectedImageStorageId && (
+            <HouseImage storageId={selectedImageStorageId} isFullScreen={true} />
+          )}
+        </View>
+      </Modal>
+
+      {/* Add/Edit Pet Modal */}
+      <Modal
+        visible={showAddPetModal || showEditPetModal}
+        animationType="none"
+        transparent={true}
+        onRequestClose={() => {
+          animatePetModalOut(() => {
+            setShowAddPetModal(false);
+            setShowEditPetModal(false);
+          });
+        }}
+      >
+        <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalWrapper}
+          >
+            <Animated.View 
+              style={[
+                styles.modalContainer,
+                {
+                  opacity: petModalOpacity,
+                  transform: [{ translateY: petModalTranslateY }],
+                }
+              ]}
+            >
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>
+                  {showEditPetModal ? 'Edit Pet' : 'Register Pet'}
+                </Text>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => {
+                    animatePetModalOut(() => {
+                      setShowAddPetModal(false);
+                      setShowEditPetModal(false);
+                    });
+                  }}
+                >
+                  <Ionicons name="close" size={24} color="#6b7280" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Pet Name *</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter pet name"
+                    value={petFormData.name}
+                    onChangeText={(text) => setPetFormData({ ...petFormData, name: text })}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Pet Photo *</Text>
+                  {petPreviewImage ? (
+                    <View style={styles.petImagePreviewContainer}>
+                      <Image source={{ uri: petPreviewImage }} style={styles.petImagePreview} />
+                      <TouchableOpacity
+                        style={styles.removeImageButton}
+                        onPress={() => setPetPreviewImage(null)}
+                      >
+                        <Ionicons name="close-circle" size={24} color="#ef4444" />
+                      </TouchableOpacity>
+                    </View>
+                  ) : petFormData.image ? (
+                    <View style={styles.petImagePreviewContainer}>
+                      <PetImage storageId={petFormData.image} />
+                    </View>
+                  ) : (
+                    <View style={styles.emptyImageContainer}>
+                      <Ionicons name="paw" size={64} color="#d1d5db" />
+                      <Text style={styles.emptyImageText}>No Pet Photo</Text>
+                    </View>
+                  )}
+
+                  {/* Show add buttons only if no image exists */}
+                  {!petPreviewImage && !petFormData.image && (
+                    <>
+                      <TouchableOpacity
+                        style={styles.imagePickerButton}
+                        onPress={pickPetImage}
+                      >
+                        <Ionicons name="image" size={32} color="#6b7280" />
+                        <Text style={styles.imagePickerText}>Choose from Gallery</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.imagePickerButton, { marginTop: 12 }]}
+                        onPress={pickPetImage}
+                      >
+                        <Ionicons name="camera" size={32} color="#6b7280" />
+                        <Text style={styles.imagePickerText}>Take Photo</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
+
+                {/* Show remove button if there's a current image and no new image selected (only in edit mode) */}
+                {showEditPetModal && petFormData.image && !petPreviewImage && (
+                  <TouchableOpacity
+                    style={[styles.removeButton, removingPetImage && styles.removeButtonDisabled]}
+                    onPress={handleRemovePetImage}
+                    disabled={removingPetImage}
+                  >
+                    {removingPetImage ? (
+                      <ActivityIndicator size="small" color="#ffffff" />
+                    ) : (
+                      <>
+                        <Ionicons name="trash-outline" size={20} color="#ffffff" />
+                        <Text style={styles.removeButtonText}>Remove Pet Image</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
+
+                {/* Show save button if there's a new image selected */}
+                {petPreviewImage ? (
+                  <TouchableOpacity style={styles.submitButton} onPress={handleSubmitPet}>
+                    <Text style={styles.submitButtonText}>Save</Text>
+                  </TouchableOpacity>
+                ) : !showEditPetModal || !petFormData.image ? (
+                  /* 
+                    Show Register/Update button when:
+                    - Not in edit mode (!showEditPetModal) - shows "Register Pet"
+                    - In edit mode but no current image (!petFormData.image) - shows "Update Pet"
+                    
+                    Don't show when:
+                    - In edit mode with existing image - user needs to remove image first
+                  */
+                  <TouchableOpacity style={styles.submitButton} onPress={handleSubmitPet}>
+                    <Text style={styles.submitButtonText}>
+                      {showEditPetModal ? 'Update' : 'Register'} Pet
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+              </ScrollView>
+            </Animated.View>
+          </KeyboardAvoidingView>
+        </Animated.View>
+      </Modal>
       </View>
       
       {/* Custom Alert */}
@@ -1240,7 +2664,6 @@ const styles = StyleSheet.create({
   },
   headerImage: {
     borderRadius: 0,
-    resizeMode: 'stretch',
     width: '100%',
   },
   headerOverlay: {
@@ -1281,26 +2704,22 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 8,
   },
-  headerTitle: {
+  headerTitle: ({
     color: '#ffffff',
     fontSize: 24,
     fontWeight: 'bold',
-    textShadowColor: 'rgba(0, 0, 0, 0.9)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
+    textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9)' as any,
     textAlign: 'center',
-  },
-  headerSubtitle: {
+  } as any),
+  headerSubtitle: ({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '400',
     opacity: 0.9,
     marginTop: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.9)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
+    textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9)' as any,
     textAlign: 'center',
-  },
+  } as any),
   newPostButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1358,7 +2777,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f3f4f6',
   },
   categoryButtonActive: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#eab308',
   },
   categoryButtonText: {
     fontSize: 14,
@@ -1441,18 +2860,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#f3f4f6',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
-  },
-  avatarImage: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
   },
   authorName: {
     fontSize: 14,
@@ -1570,20 +2984,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-  },
-  commentAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#f3f4f6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 6,
-  },
-  commentAvatarImage: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
   },
   commentAuthor: {
     fontSize: 12,
@@ -1946,6 +3346,540 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f3f4f6',
+  },
+  // Sub-tab styles
+  subTabContainer: {
+    backgroundColor: '#ffffff',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  subTabRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 15,
+    gap: 12,
+  },
+  subTabScrollView: {
+    flex: 1,
+  },
+  subTabContent: {
+    paddingHorizontal: 15,
+    gap: 12,
+  },
+  subTabButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: '#f3f4f6',
+    gap: 8,
+  },
+  subTabButtonActive: {
+    backgroundColor: '#eff6ff',
+  },
+  subTabButtonText: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  subTabButtonTextActive: {
+    color: '#eab308',
+    fontWeight: '600',
+  },
+  // Action buttons container
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  // Notification styles
+  typeFilterContainer: {
+    backgroundColor: '#ffffff',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  typeFilterScrollView: {
+    flex: 1,
+  },
+  typeFilterContent: {
+    paddingHorizontal: 0,
+  },
+  typeFilterButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 8,
+    borderRadius: 20,
+    backgroundColor: '#f3f4f6',
+  },
+  typeFilterButtonActive: {
+    backgroundColor: '#eab308',
+  },
+  typeFilterButtonText: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  typeFilterButtonTextActive: {
+    color: '#ffffff',
+    fontWeight: '600',
+  },
+  addNotificationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+  },
+  addNotificationButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  notificationsCardsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 6,
+    gap: 12,
+  },
+  notificationsCardsContainerMobile: {
+    flexDirection: 'column',
+    gap: 16,
+    padding: 15,
+  },
+  notificationCard: {
+    flex: 1,
+    minWidth: '47%',
+    maxWidth: '47%',
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  notificationCardMobile: {
+    minWidth: '100%',
+    maxWidth: '100%',
+  },
+  notificationCardContent: {
+    padding: 12,
+  },
+  notificationCardMainInfo: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  notificationCardDetails: {
+    flex: 1,
+    position: 'relative',
+  },
+  editButtonTopRight: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    padding: 4,
+  },
+  notificationCardType: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  notificationCardEmail: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  notificationCardAddress: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#4b5563',
+    marginBottom: 8,
+  },
+  notificationCardDetailsSection: {
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+    gap: 10,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 4,
+  },
+  dateItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+    minWidth: '45%',
+    padding: 8,
+    backgroundColor: '#f9fafb',
+    borderRadius: 6,
+  },
+  dateLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  dateValue: {
+    fontSize: 13,
+    color: '#1f2937',
+    fontWeight: '600',
+  },
+  infoBlock: {
+    padding: 8,
+    backgroundColor: '#f9fafb',
+    borderRadius: 6,
+    borderLeftWidth: 3,
+    borderLeftColor: '#e5e7eb',
+  },
+  infoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  infoBlockTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#374151',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  infoBlockContent: {
+    fontSize: 12,
+    color: '#1f2937',
+    lineHeight: 16,
+  },
+  houseImageContainer: {
+    width: '100%',
+    height: 120,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 8,
+    position: 'relative',
+  },
+  cardHouseImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imageOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  viewImageText: {
+    fontSize: 11,
+    color: '#ffffff',
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  imageModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageModalClose: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+  },
+  fullImage: {
+    width: '90%',
+    height: '80%',
+    alignSelf: 'center',
+    marginTop: 100,
+  },
+  fullImageLoading: {
+    width: '90%',
+    height: '80%',
+    backgroundColor: '#1f2937',
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginTop: 100,
+    borderRadius: 12,
+  },
+  // Notification modal styles (shared with post modal, but adding missing ones)
+  modalWrapper: {
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: '#f9fafb',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    color: '#1f2937',
+  },
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  picker: {
+    maxHeight: 150,
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  pickerOption: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  pickerOptionSelected: {
+    backgroundColor: '#eff6ff',
+  },
+  pickerOptionText: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  pickerOptionTextSelected: {
+    color: '#2563eb',
+    fontWeight: '600',
+  },
+  typeSelector: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  typeButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    alignItems: 'center',
+  },
+  typeButtonSelected: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#2563eb',
+  },
+  typeButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  typeButtonTextSelected: {
+    color: '#2563eb',
+    fontWeight: '600',
+  },
+  submitButton: {
+    backgroundColor: '#2563eb',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  submitButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  removeButton: {
+    backgroundColor: '#ef4444',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  removeButtonDisabled: {
+    backgroundColor: '#9ca3af',
+  },
+  removeButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  imagePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderWidth: 2,
+    borderColor: '#d1d5db',
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    gap: 8,
+  },
+  imagePickerText: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  imagePreviewContainer: {
+    position: 'relative',
+    width: '100%',
+    height: 150,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  // Pet styles
+  petsFilterContainer: {
+    backgroundColor: '#ffffff',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  petsFilterRow: {
+    justifyContent: 'flex-end',
+  },
+  addPetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#10b981',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+  },
+  addPetButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  petsCardsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 6,
+    gap: 12,
+  },
+  petsCardsContainerMobile: {
+    flexDirection: 'column',
+    gap: 16,
+    padding: 15,
+  },
+  petCard: {
+    flex: 1,
+    minWidth: '47%',
+    maxWidth: '47%',
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  petCardMobile: {
+    minWidth: '100%',
+    maxWidth: '100%',
+  },
+  petCardContent: {
+    padding: 12,
+  },
+  petCardHeader: {
+    alignItems: 'center',
+    position: 'relative',
+  },
+  petImageContainer: {
+    width: 240,
+    height: 240,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 12,
+    borderWidth: 3,
+    borderColor: '#e5e7eb',
+  },
+  petCardImage: {
+    width: '100%',
+    height: '100%',
+  },
+  petCardName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  petCardOwner: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  petCardAddress: {
+    fontSize: 12,
+    color: '#9ca3af',
+    textAlign: 'center',
+  },
+  petImageLoading: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#e2e8f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyImageContainer: {
+    width: '100%',
+    height: 200,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 100,
+    backgroundColor: '#f9fafb',
+    borderWidth: 3,
+    borderColor: '#e5e7eb',
+    borderStyle: 'dashed',
+    alignSelf: 'center',
+    marginVertical: 12,
+  },
+  emptyImageText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#9ca3af',
+    fontWeight: '500',
+  },
+  petImagePreviewContainer: {
+    position: 'relative',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    overflow: 'hidden',
+    alignSelf: 'center',
+    marginVertical: 12,
+    borderWidth: 3,
+    borderColor: '#e5e7eb',
+  },
+  petImagePreview: {
+    width: '100%',
+    height: '100%',
   },
 });
 

@@ -246,11 +246,30 @@ export const getAllComments = query({
       .order("desc")
       .collect();
     
-    // Get post information for each comment
+    // Get all active residents for profile image lookup
+    const residents = await ctx.db
+      .query("residents")
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+    
+    // Create a map for quick lookup by full name
+    const residentsByName = new Map();
+    residents.forEach(resident => {
+      const fullName = `${resident.firstName} ${resident.lastName}`;
+      residentsByName.set(fullName, resident);
+    });
+    
+    // Get post information and author profile image for each comment
     const commentsWithPosts = await Promise.all(
       comments.map(async (comment) => {
         const post = await ctx.db.get(comment.postId);
-        return { ...comment, postTitle: post?.title || 'Deleted Post' };
+        const authorResident = residentsByName.get(comment.author);
+        
+        return { 
+          ...comment, 
+          postTitle: post?.title || 'Deleted Post',
+          authorProfileImage: authorResident?.profileImage || null
+        };
       })
     );
     

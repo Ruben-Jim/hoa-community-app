@@ -162,10 +162,7 @@ const SignupScreen = () => {
       });
       
       const { storageId } = await uploadResponse.json();
-      
-      // Get the proper URL from Convex
-      const imageUrl = await convex.query(api.storage.getUrl, { storageId });
-      return imageUrl || storageId;
+      return storageId;
     } catch (error) {
       console.error('Error uploading image:', error);
       throw new Error('Failed to upload image');

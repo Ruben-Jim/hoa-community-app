@@ -47,7 +47,7 @@ const CovenantsScreen = () => {
     }
   }, []);
 
-  const categories = ['Architecture', 'Landscaping', 'Parking', 'Pets', 'General'];
+  const categories = ['Architecture', 'Landscaping', 'Minutes', 'Caveats', 'General'];
   const covenants = useQuery(api.covenants.getAll) ?? [];
 
   const filteredCovenants = covenants.filter((covenant: any) => {
@@ -71,10 +71,10 @@ const CovenantsScreen = () => {
         return 'home';
       case 'Landscaping':
         return 'leaf';
-      case 'Parking':
-        return 'car';
-      case 'Pets':
-        return 'paw';
+      case 'Minutes':
+        return 'clipboard';
+      case 'Caveats':
+        return 'warning';
       case 'General':
         return 'document-text';
       default:
@@ -88,10 +88,10 @@ const CovenantsScreen = () => {
         return '#3b82f6';
       case 'Landscaping':
         return '#10b981';
-      case 'Parking':
+      case 'Minutes':
+        return '#06b6d4';
+      case 'Caveats':
         return '#f59e0b';
-      case 'Pets':
-        return '#8b5cf6';
       case 'General':
         return '#6b7280';
       default:
@@ -404,7 +404,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f3f4f6',
   },
   categoryButtonActive: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#22c55e',
   },
   categoryButtonText: {
     fontSize: 14,

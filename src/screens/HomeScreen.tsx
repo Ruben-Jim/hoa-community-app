@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useQuery, useMutation } from 'convex/react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
@@ -26,6 +27,7 @@ import MobileTabBar from '../components/MobileTabBar';
 import { webCompatibleAlert } from '../utils/webCompatibleAlert';
 import CustomAlert from '../components/CustomAlert';
 import { useCustomAlert } from '../hooks/useCustomAlert';
+import ProfileImage from '../components/ProfileImage';
 
 const HomeScreen = () => {
   const { user, signOut } = useAuth();
@@ -60,6 +62,10 @@ const HomeScreen = () => {
   const quickActionsAnim = useRef(new Animated.Value(0)).current;
   const postsAnim = useRef(new Animated.Value(0)).current;
   const officeAnim = useRef(new Animated.Value(0)).current;
+  
+  // Onboarding state
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const arrowAnim = useRef(new Animated.Value(0)).current;
   
   // ScrollView ref for better control
   const scrollViewRef = useRef<ScrollView>(null);
@@ -131,11 +137,58 @@ const HomeScreen = () => {
     }
   }, [userVotes]);
 
+  // Check if user needs onboarding (show onboarding arrow pointing to nav bar)
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      try {
+        const hasSeenOnboarding = await AsyncStorage.getItem(`onboarding_seen_${user?._id}`);
+        if (!hasSeenOnboarding && showMobileNav) {
+          // Show onboarding after a delay
+          setTimeout(() => {
+            setShowOnboarding(true);
+            // Start arrow animation
+            Animated.loop(
+              Animated.sequence([
+                Animated.timing(arrowAnim, {
+                  toValue: 1,
+                  duration: 800,
+                  useNativeDriver: Platform.OS !== 'web',
+                }),
+                Animated.timing(arrowAnim, {
+                  toValue: 0,
+                  duration: 800,
+                  useNativeDriver: Platform.OS !== 'web',
+                }),
+              ])
+            ).start();
+          }, 1000);
+        }
+      } catch (error) {
+        console.error('Error checking onboarding:', error);
+      }
+    };
+    if (user?._id) {
+      checkOnboarding();
+    }
+  }, [user?._id, showMobileNav]);
+
   const handleContact = (type: 'phone' | 'email') => {
     if (type === 'phone') {
       if (hoaInfo?.phone) Linking.openURL(`tel:${hoaInfo.phone}`);
     } else {
       if (hoaInfo?.email) Linking.openURL(`mailto:${hoaInfo.email}`);
+    }
+  };
+
+  const dismissOnboarding = async () => {
+    try {
+      if (user?._id) {
+        await AsyncStorage.setItem(`onboarding_seen_${user._id}`, 'true');
+      }
+      setShowOnboarding(false);
+      arrowAnim.stopAnimation();
+    } catch (error) {
+      console.error('Error dismissing onboarding:', error);
     }
   };
 
@@ -287,6 +340,38 @@ const HomeScreen = () => {
           />
         )}
         
+        {/* Onboarding Arrow */}
+        {showOnboarding && showMobileNav && (
+          <View style={styles.onboardingContainer}>
+            <Animated.View 
+              style={[
+                styles.onboardingArrow,
+                {
+                  transform: [{
+                    translateX: arrowAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, -15],
+                    })
+                  }],
+                  opacity: arrowAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.7, 1],
+                  })
+                }
+              ]}
+            >
+              <Ionicons name="arrow-back" size={48} color="#ef4444" />
+              <Text style={styles.onboardingText}>Tap menu{'\n'}to navigate</Text>
+              <TouchableOpacity 
+                style={styles.onboardingCloseButton}
+                onPress={dismissOnboarding}
+              >
+                <Ionicons name="close-circle" size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
+        )}
+        
         <ScrollView 
           ref={scrollViewRef}
           style={[styles.scrollContainer, Platform.OS === 'web' && styles.webScrollContainer]}
@@ -331,6 +416,7 @@ const HomeScreen = () => {
           source={require('../../assets/hoa-4k.jpg')}
           style={styles.header}
           imageStyle={styles.headerImage}
+          resizeMode="stretch"
         >
         <View style={styles.headerOverlay} />
         <View style={styles.headerTop}>
@@ -517,54 +603,97 @@ const HomeScreen = () => {
           <Ionicons name="people" size={24} color="#64748b" />
           <Text style={[styles.sectionTitle, { marginLeft: 8, marginBottom: 0 }]}>Recent Community Posts</Text>
         </View>
-        {communityPosts?.slice(0, 2).map((post: any, index: number) => (
-          <Animated.View 
-            key={post._id} 
-            style={[
-              styles.postCard,
-              {
-                opacity: postsAnim,
-                transform: [{
-                  translateY: postsAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [30 + (index * 20), 0],
-                  })
-                }]
-              }
-            ]}
-          >
-            <View style={styles.postHeader}>
-              <View style={styles.postAuthorInfo}>
-                <View style={styles.postAvatar}>
-                  {post.authorProfileImage ? (
-                    <Image 
-                      source={{ uri: post.authorProfileImage }} 
-                      style={styles.postAvatarImage}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <Ionicons name="person" size={20} color="#6b7280" />
-                  )}
+        {communityPosts?.slice(0, 2).map((post: any, index: number) => {
+          // Helper component for displaying images
+          const PostImage = ({ storageId }: { storageId: string }) => {
+            const imageUrl = useQuery(api.storage.getUrl, { storageId: storageId as any });
+
+            if (imageUrl === undefined) {
+              return (
+                <View style={[styles.postImageWrapper, styles.imageLoading]}>
+                  <Ionicons name="image" size={20} color="#9ca3af" />
                 </View>
-                <Text style={styles.postAuthor}>{post.author}</Text>
+              );
+            }
+
+            if (!imageUrl) {
+              return null;
+            }
+
+            return (
+              <View style={styles.postImageWrapper}>
+                <Image 
+                  source={{ uri: imageUrl }} 
+                  style={styles.postImage}
+                  resizeMode="cover"
+                />
               </View>
-              <Text style={styles.postCategory}>{post.category}</Text>
-            </View>
-            <Text style={styles.postTitle}>{post.title}</Text>
-            <Text style={styles.postContent} numberOfLines={2}>
-              {post.content}
-            </Text>
-            <View style={styles.postFooter}>
-              <Text style={styles.postTime}>{formatDate(new Date(post.createdAt).toISOString())}</Text>
-              <View style={styles.postStats}>
-                <Ionicons name="heart" size={16} color="#6b7280" />
-                <Text style={styles.postStatsText}>{post.likes}</Text>
-                <Ionicons name="chatbubble" size={16} color="#6b7280" />
-                <Text style={styles.postStatsText}>{post.comments?.length ?? 0}</Text>
+            );
+          };
+
+          return (
+            <Animated.View 
+              key={post._id} 
+              style={[
+                styles.postCard,
+                {
+                  opacity: postsAnim,
+                  transform: [{
+                    translateY: postsAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [30 + (index * 20), 0],
+                    })
+                  }]
+                }
+              ]}
+            >
+              <View style={styles.postHeader}>
+                <View style={styles.postAuthorInfo}>
+                  <ProfileImage source={post.authorProfileImage} size={40} style={{ marginRight: 8 }} />
+                  <Text style={styles.postAuthor}>{post.author}</Text>
+                </View>
+                <Text style={styles.postCategory}>{post.category}</Text>
               </View>
-            </View>
-          </Animated.View>
-        ))}
+              <Text style={styles.postTitle}>{post.title}</Text>
+              <Text style={styles.postContent}>
+                {post.content}
+              </Text>
+              
+              {/* Post Images */}
+              {post.images && post.images.length > 0 && (
+                <View style={styles.postImagesContainer}>
+                  {post.images.slice(0, 3).map((imageStorageId: string, imgIndex: number) => (
+                    <PostImage 
+                      key={imgIndex}
+                      storageId={imageStorageId}
+                    />
+                  ))}
+                </View>
+              )}
+              
+              <View style={styles.postFooter}>
+                <Text style={styles.postTime}>{formatDate(new Date(post.createdAt).toISOString())}</Text>
+                <View style={styles.postStats}>
+                  <Ionicons name="heart" size={16} color="#6b7280" />
+                  <Text style={styles.postStatsText}>{post.likes}</Text>
+                  <Ionicons name="chatbubble" size={16} color="#6b7280" />
+                  <Text style={styles.postStatsText}>{post.comments?.length ?? 0}</Text>
+                </View>
+              </View>
+            </Animated.View>
+          );
+        })}
+        
+        {/* View More Button */}
+        <TouchableOpacity
+          style={styles.viewMoreButton}
+          onPress={() => {
+            navigation.navigate('Community' as never);
+          }}
+        >
+          <Text style={styles.viewMoreButtonText}>View More</Text>
+          <Ionicons name="arrow-forward" size={14} color="#f97316" />
+        </TouchableOpacity>
       </Animated.View>
 
       {/* Recent Polls */}
@@ -604,9 +733,9 @@ const HomeScreen = () => {
             >
               <View style={styles.postHeader}>
                 <View style={styles.postAuthorInfo}>
-                  <View style={styles.postAvatar}>
+                  {/* <View style={styles.postAvatar}>
                     <Ionicons name="bar-chart" size={20} color="#6b7280" />
-                  </View>
+                  </View> */}
                   <Text style={styles.postAuthor}>Community Poll</Text>
                 </View>
                 <Text style={styles.postTime}>
@@ -688,7 +817,7 @@ const HomeScreen = () => {
                 )}
                 
                 <TouchableOpacity 
-                  style={styles.viewMoreButton}
+                  style={styles.viewPollButton}
                   onPress={() => {
                     navigation.navigate('Community' as never);
                   }}
@@ -793,15 +922,13 @@ const HomeScreen = () => {
           <Text style={[styles.sectionTitle, { marginLeft: 8, marginBottom: 0 }]}>Upcoming Events</Text>
         </View>
         <View style={styles.infoCard}>
-          <Text style={styles.eventText}>
-            📅 Board Meeting - Next Tuesday at 7:00 PM
-          </Text>
-          <Text style={styles.eventText}>
-            🏠 Community Cleanup - This Saturday 9:00 AM
-          </Text>
-          <Text style={styles.eventText}>
-            🎉 Annual BBQ - June 15th at the Clubhouse
-          </Text>
+          {(hoaInfo?.eventText || '').split(/\r?\n/).filter(line => line.trim().length > 0).length > 0 ? (
+            (hoaInfo?.eventText || '').split(/\r?\n/).map((line, idx) => (
+              <Text key={idx} style={styles.eventText}>{line}</Text>
+            ))
+          ) : (
+            <Text style={styles.eventText}>No upcoming events posted.</Text>
+          )}
         </View>
       </Animated.View>
       
@@ -949,7 +1076,6 @@ const styles = StyleSheet.create({
   },
   headerImage: {
     borderRadius: 0,
-    resizeMode: 'stretch',
     width: '100%',
   },
   headerOverlay: {
@@ -1004,37 +1130,31 @@ const styles = StyleSheet.create({
     color: '#e0e7ff',
     opacity: 0.9,
   },
-  welcomeText: {
+  welcomeText: ({
     color: '#ffffff',
     fontSize: 18,
     fontWeight: '500',
     opacity: 0.95,
-    textShadowColor: 'rgba(0, 0, 0, 0.9)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
+    textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9)' as any,
     textAlign: 'center',
-  },
-  hoaName: {
+  } as any),
+  hoaName: ({
     color: '#ffffff',
     fontSize: 28,
     fontWeight: 'bold',
     marginTop: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.9)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
+    textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9)' as any,
     textAlign: 'center',
-  },
-  subtitle: {
+  } as any),
+  subtitle: ({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '400',
     opacity: 0.9,
     marginTop: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.9)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
+    textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9)' as any,
     textAlign: 'center',
-  },
+  } as any),
   quickActions: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -1163,18 +1283,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   postAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#f3f4f6',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
-  },
-  postAvatarImage: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
   },
   postAuthor: {
     fontSize: 14,
@@ -1221,6 +1336,47 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginLeft: 4,
     marginRight: 12,
+  },
+  postImagesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginVertical: 12,
+    gap: 8,
+  },
+  postImageWrapper: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  postImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imageLoading: {
+    backgroundColor: '#e2e8f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  viewMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    gap: 4,
+  },
+  viewMoreButtonText: {
+    color: '#f97316',
+    fontSize: 14,
+    fontWeight: '600',
   },
   pollOptionsContainer: {
     marginVertical: 12,
@@ -1297,14 +1453,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginLeft: 4,
   },
-  viewMoreButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
   viewMoreText: {
     fontSize: 12,
     color: '#3b82f6',
     marginRight: 4,
+  },
+  viewPollButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   infoCard: {
     backgroundColor: '#ffffff',
@@ -1491,6 +1647,40 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  onboardingContainer: {
+    position: 'absolute',
+    top: 60,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 10,
+    pointerEvents: 'box-none',
+  },
+  onboardingArrow: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    position: 'relative',
+  },
+  onboardingText: {
+    marginTop: 8,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  onboardingCloseButton: {
+    position: 'absolute',
+    top: -12,
+    right: -12,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
   },
 });
 

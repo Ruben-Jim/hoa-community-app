@@ -8,13 +8,21 @@ import {
   Dimensions,
   Modal,
   Platform,
-  Image
+  Image,
+  ScrollView,
+  Alert,
+  KeyboardAvoidingView,
+  ActivityIndicator,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { useQuery } from 'convex/react';
+import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
+import CustomAlert from './CustomAlert';
+import { useCustomAlert } from '../hooks/useCustomAlert';
+import ProfileImage from './ProfileImage';
 
 interface TabItem {
   name: string;
@@ -32,16 +40,34 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
   const navigation = useNavigation();
   const route = useRoute();
   const { user } = useAuth();
+  const { alertState, showAlert, hideAlert } = useCustomAlert();
   const [internalMenuOpen, setInternalMenuOpen] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [removing, setRemoving] = useState(false);
   
   // Get user's profile image from residents table
   const residents = useQuery(api.residents.getAll) ?? [];
   const currentUser = residents.find(resident => resident.email === user?.email);
+  const currentUserImageUrl = useQuery(
+    api.storage.getUrl,
+    currentUser?.profileImage && !currentUser.profileImage.startsWith('http') ? { storageId: currentUser.profileImage as any } : "skip"
+  );
+  const displayImageUrl = currentUser?.profileImage?.startsWith('http') ? currentUser.profileImage : currentUserImageUrl;
+  
+  // Convex mutations
+  const updateResident = useMutation(api.residents.update);
+  const generateUploadUrl = useMutation(api.storage.generateUploadUrl);
+  const deleteStorageFile = useMutation(api.storage.deleteStorageFile);
   
   const isMenuOpen = externalIsMenuOpen !== undefined ? externalIsMenuOpen : internalMenuOpen;
   
   const slideAnim = useRef(new Animated.Value(-300)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const profileModalOpacity = useRef(new Animated.Value(0)).current;
+  const profileModalOverlayOpacity = useRef(new Animated.Value(0)).current;
+  const profileModalTranslateY = useRef(new Animated.Value(300)).current;
 
   const isBoardMember = user?.isBoardMember && user?.isActive;
   const isRenter = user?.isRenter;
@@ -74,7 +100,7 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
     { name: 'Home', icon: 'home', label: 'Home', color: '#6b7280' },
     { name: 'Board', icon: 'people', label: 'Board', color: '#6b7280' },
     { name: 'Community', icon: 'chatbubbles', label: 'Community', color: '#6b7280' },
-    { name: 'ResidentNotifications', icon: 'home', label: 'Residents', color: '#6b7280' },
+    // { name: 'ResidentNotifications', icon: 'home', label: 'Residents', color: '#6b7280' },
     { name: 'Covenants', icon: 'document-text', label: 'Covenants', color: '#6b7280' },
     { name: 'Emergency', icon: 'warning', label: 'Emergency', color: '#6b7280' },
     // Hide fees tab for renters and regular residents (only show for board members and dev users)
@@ -126,6 +152,206 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
     });
   };
 
+  const pickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Permission to access camera roll is required!');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.6,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setProfileImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
+  const takePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Permission to access camera is required!');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.6,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setProfileImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error taking photo:', error);
+      Alert.alert('Error', 'Failed to take photo. Please try again.');
+    }
+  };
+
+  const uploadImage = async (imageUri: string): Promise<string> => {
+    try {
+      const uploadUrl = await generateUploadUrl();
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': blob.type },
+        body: blob,
+      });
+      const { storageId } = await uploadResponse.json();
+      return storageId;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      throw new Error('Failed to upload image');
+    }
+  };
+
+  const animateProfileModalIn = () => {
+    Animated.parallel([
+      Animated.timing(profileModalOverlayOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.timing(profileModalOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.spring(profileModalTranslateY, {
+        toValue: 0,
+        tension: 100,
+        friction: 8,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+    ]).start();
+  };
+
+  const animateProfileModalOut = (callback: () => void) => {
+    Animated.parallel([
+      Animated.timing(profileModalOverlayOpacity, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.timing(profileModalOpacity, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.timing(profileModalTranslateY, {
+        toValue: 300,
+        duration: 250,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+    ]).start(callback);
+  };
+
+  const handleRemoveProfileImage = async () => {
+    if (!currentUser || !currentUser.profileImage) {
+      return;
+    }
+
+    try {
+      setRemoving(true);
+      
+      // Delete the image from Convex storage
+      if (!currentUser.profileImage.startsWith('http')) {
+        await deleteStorageFile({ storageId: currentUser.profileImage as any });
+      }
+      
+      // Update the resident to remove the profile image reference
+      await updateResident({
+        id: currentUser._id as any,
+        profileImage: undefined,
+      });
+
+      showAlert({
+        title: 'Success',
+        message: 'Profile image removed successfully!',
+        type: 'success'
+      });
+
+      setTimeout(() => {
+        hideAlert();
+      }, 2000);
+
+      // Don't close the modal - let user choose a new image or close manually
+    } catch (error) {
+      console.error('Error removing profile image:', error);
+      showAlert({
+        title: 'Error',
+        message: 'Failed to remove profile image. Please try again.',
+        type: 'error'
+      });
+      setTimeout(() => {
+        hideAlert();
+      }, 3000);
+    } finally {
+      setRemoving(false);
+    }
+  };
+
+  const handleSaveProfileImage = async () => {
+    if (!profileImage || !currentUser) {
+      return;
+    }
+
+    try {
+      setUploading(true);
+      
+      // Delete old image from storage if it exists
+      if (currentUser.profileImage && !currentUser.profileImage.startsWith('http')) {
+        await deleteStorageFile({ storageId: currentUser.profileImage as any });
+      }
+      
+      // Upload new image
+      const storageId = await uploadImage(profileImage);
+      await updateResident({
+        id: currentUser._id as any,
+        profileImage: storageId,
+      });
+
+      showAlert({
+        title: 'Success',
+        message: 'Profile image updated successfully!',
+        type: 'success'
+      });
+
+      setTimeout(() => {
+        hideAlert();
+      }, 2000);
+
+      animateProfileModalOut(() => {
+        setShowProfileModal(false);
+        setProfileImage(null);
+      });
+    } catch (error) {
+      console.error('Error updating profile image:', error);
+      showAlert({
+        title: 'Error',
+        message: 'Failed to update profile image. Please try again.',
+        type: 'error'
+      });
+      setTimeout(() => {
+        hideAlert();
+      }, 3000);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <>
       {/* Mobile Navigation Modal */}
@@ -158,7 +384,15 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
             </View>
 
             {/* Menu Items */}
-            <View style={styles.menuItems}>
+            <ScrollView 
+              style={styles.menuItems}
+              contentContainerStyle={styles.menuItemsContent}
+              showsVerticalScrollIndicator={true}
+              scrollEnabled={true}
+              bounces={true}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled={true}
+            >
               {tabs.map((tab, index) => {
                 const isActive = route.name === tab.name;
                 return (
@@ -193,23 +427,17 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
                   </TouchableOpacity>
                 );
               })}
-            </View>
+            </ScrollView>
 
             {/* User Info */}
             {user && (
               <View style={styles.userSection}>
                 <View style={styles.userInfo}>
-                  <View style={styles.userAvatar}>
-                    {currentUser?.profileImage ? (
-                      <Image 
-                        source={{ uri: currentUser.profileImage }} 
-                        style={styles.userAvatarImage}
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <Ionicons name="person" size={20} color="#6b7280" />
-                    )}
-                  </View>
+                  <ProfileImage 
+                    source={currentUser?.profileImage} 
+                    size={40}
+                    style={{ marginRight: 12 }}
+                  />
                   <View style={styles.userDetails}>
                     <Text style={styles.userName}>
                       {user.firstName} {user.lastName}
@@ -218,12 +446,173 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
                       {(user.isDev ?? false) ? 'Developer' : user.isBoardMember ? 'Board Member' : user.isRenter ? 'Renter' : 'Resident'}
                     </Text>
                   </View>
+                  <TouchableOpacity
+                    style={styles.settingsButton}
+                    onPress={() => {
+                      setShowProfileModal(true);
+                      animateProfileModalIn();
+                    }}
+                  >
+                    <Ionicons name="settings-outline" size={20} color="#6b7280" />
+                  </TouchableOpacity>
                 </View>
               </View>
             )}
           </Animated.View>
         </Animated.View>
       </Modal>
+
+      {/* Profile Image Edit Modal */}
+      <Modal
+        visible={showProfileModal}
+        transparent={true}
+        animationType="none"
+        onRequestClose={() => {
+          animateProfileModalOut(() => setShowProfileModal(false));
+        }}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.profileModalKeyboardView}
+        >
+          <Animated.View style={[
+            styles.profileModalOverlay,
+            { opacity: profileModalOverlayOpacity }
+          ]}>
+            <TouchableOpacity
+              style={styles.profileModalOverlayTouchable}
+              activeOpacity={1}
+              onPress={() => {
+                if (!uploading && !removing) {
+                  animateProfileModalOut(() => {
+                    setShowProfileModal(false);
+                    setProfileImage(null);
+                  });
+                }
+              }}
+              disabled={uploading || removing}
+            />
+            <Animated.View
+              style={[
+                styles.profileModalContent,
+                {
+                  opacity: profileModalOpacity,
+                  transform: [{ translateY: profileModalTranslateY }],
+                }
+              ]}
+            >
+              <View style={styles.profileModalHeader}>
+                <Text style={styles.profileModalTitle}>Edit Profile Image</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (!uploading && !removing) {
+                      animateProfileModalOut(() => {
+                        setShowProfileModal(false);
+                        setProfileImage(null);
+                      });
+                    }
+                  }}
+                  disabled={uploading || removing}
+                >
+                  <Ionicons name="close" size={24} color="#374151" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.profileModalBody} showsVerticalScrollIndicator={false}>
+                <View style={styles.imagePickerContainer}>
+                  {/* Show current profile image if exists */}
+                  {displayImageUrl && !profileImage ? (
+                    <View style={styles.imagePreviewContainer}>
+                      <Image source={{ uri: displayImageUrl }} style={styles.imagePreview} resizeMode="cover" />
+                    </View>
+                  ) : profileImage ? (
+                    <View style={styles.imagePreviewContainer}>
+                      <Image source={{ uri: profileImage }} style={styles.imagePreview} resizeMode="cover" />
+                      <TouchableOpacity
+                        style={styles.removeImageButton}
+                        onPress={() => setProfileImage(null)}
+                      >
+                        <Ionicons name="close-circle" size={24} color="#ef4444" />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={styles.emptyImageContainer}>
+                      <Ionicons name="person" size={64} color="#d1d5db" />
+                      <Text style={styles.emptyImageText}>No Profile Image</Text>
+                    </View>
+                  )}
+
+                  {/* Show add buttons only if no image exists */}
+                  {!profileImage && !displayImageUrl && (
+                    <>
+                      <TouchableOpacity
+                        style={styles.imagePickerButton}
+                        onPress={pickImage}
+                        disabled={removing || uploading}
+                      >
+                        <Ionicons name="image" size={32} color="#6b7280" />
+                        <Text style={styles.imagePickerText}>Choose from Gallery</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.cameraButton}
+                        onPress={takePhoto}
+                        disabled={removing || uploading}
+                      >
+                        <Ionicons name="camera" size={32} color="#6b7280" />
+                        <Text style={styles.imagePickerText}>Take Photo</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
+
+                {/* Show remove button if there's a current image and no new image selected */}
+                {displayImageUrl && !profileImage && (
+                  <TouchableOpacity
+                    style={[styles.removeButton, (removing || uploading) && styles.removeButtonDisabled]}
+                    onPress={handleRemoveProfileImage}
+                    disabled={removing || uploading}
+                  >
+                    {(removing || uploading) ? (
+                      <ActivityIndicator size="small" color="#ffffff" />
+                    ) : (
+                      <>
+                        <Ionicons name="trash-outline" size={20} color="#ffffff" />
+                        <Text style={styles.removeButtonText}>Remove Profile Image</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
+
+                {/* Show save button if there's a new image selected */}
+                {profileImage && (
+                  <TouchableOpacity
+                    style={[styles.saveButton, uploading && styles.saveButtonDisabled]}
+                    onPress={handleSaveProfileImage}
+                    disabled={uploading}
+                  >
+                    {uploading ? (
+                      <ActivityIndicator size="small" color="#ffffff" />
+                    ) : (
+                      <Text style={styles.saveButtonText}>Save</Text>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </ScrollView>
+            </Animated.View>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertState.visible}
+        title={alertState.title}
+        message={alertState.message}
+        buttons={alertState.buttons}
+        type={alertState.type}
+        onClose={hideAlert}
+      />
     </>
   );
 };
@@ -243,10 +632,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: 280,
     backgroundColor: '#ffffff',
-    shadowColor: '#000',
-    shadowOffset: { width: 2, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
+    // Use web-compatible shadow to avoid deprecation warnings
+    boxShadow: '0px 0px 10px rgba(0,0,0,0.25)' as any,
     elevation: 10,
   },
   menuHeader: {
@@ -275,7 +662,11 @@ const styles = StyleSheet.create({
   },
   menuItems: {
     flex: 1,
+  },
+  menuItemsContent: {
     paddingTop: 20,
+    paddingBottom: 20,
+    flexGrow: 1,
   },
   menuItem: {
     paddingHorizontal: 20,
@@ -323,21 +714,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  userAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#e5e7eb',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-    overflow: 'hidden',
-  },
-  userAvatarImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-  },
   userDetails: {
     flex: 1,
   },
@@ -350,6 +726,170 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6b7280',
     marginTop: 2,
+  },
+  settingsButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#f3f4f6',
+  },
+  profileModalKeyboardView: {
+    flex: 1,
+  },
+  profileModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileModalOverlayTouchable: {
+    flex: 1,
+  },
+  profileModalContent: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    padding: 0,
+    width: '90%',
+    maxHeight: '90%',
+    minHeight: '70%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 15,
+  },
+  profileModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    paddingTop: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    backgroundColor: '#f8fafc',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  profileModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    flex: 1,
+    textAlign: 'center',
+    marginRight: 24,
+  },
+  profileModalBody: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    paddingBottom: 20,
+  },
+  imagePickerContainer: {
+    gap: 16,
+    marginBottom: 20,
+  },
+  imagePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    borderWidth: 2,
+    borderColor: '#d1d5db',
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    gap: 12,
+    backgroundColor: '#f9fafb',
+  },
+  cameraButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    borderWidth: 2,
+    borderColor: '#d1d5db',
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    gap: 12,
+    backgroundColor: '#f9fafb',
+  },
+  imagePickerText: {
+    fontSize: 16,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  imagePreviewContainer: {
+    position: 'relative',
+    width: '100%',
+    height: 250,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+  },
+  imagePreview: {
+    width: '100%',
+    height: '100%',
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 4,
+  },
+  emptyImageContainer: {
+    width: '100%',
+    height: 250,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 12,
+    backgroundColor: '#f9fafb',
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    borderStyle: 'dashed',
+  },
+  emptyImageText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#9ca3af',
+    fontWeight: '500',
+  },
+  removeButton: {
+    backgroundColor: '#ef4444',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  removeButtonDisabled: {
+    backgroundColor: '#9ca3af',
+  },
+  removeButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  saveButton: {
+    backgroundColor: '#2563eb',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#9ca3af',
+  },
+  saveButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

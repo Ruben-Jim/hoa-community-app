@@ -85,8 +85,8 @@ class EnhancedNotificationService {
       // Configure notification categories
       await this.configureNotificationCategories();
 
-      // Get push token for remote notifications
-      if (finalStatus === 'granted') {
+      // Get push token for remote notifications (skip on web)
+      if (finalStatus === 'granted' && Platform.OS !== 'web') {
         await this.getPushToken();
       }
 

@@ -23,6 +23,7 @@ import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import DeveloperIndicator from '../components/DeveloperIndicator';
 import CustomTabBar from '../components/CustomTabBar';
 import MobileTabBar from '../components/MobileTabBar';
+import ProfileImage from '../components/ProfileImage';
 
 const BoardScreen = () => {
   const { user } = useAuth();
@@ -119,11 +120,7 @@ const BoardScreen = () => {
           // Force a layout update
           scrollViewRef.current.scrollTo({ y: 0, animated: false });
           
-          // Debug: Log scroll view properties
-          console.log('BoardScreen ScrollView initialized for web');
-          console.log('Screen width:', screenWidth);
-          console.log('Show mobile nav:', showMobileNav);
-          console.log('Show desktop nav:', showDesktopNav);
+          // Debug logging removed
         }
       }, 100);
       
@@ -187,6 +184,7 @@ const BoardScreen = () => {
             source={require('../../assets/hoa-4k.jpg')}
             style={styles.header}
             imageStyle={styles.headerImage}
+            resizeMode="stretch"
           >
             <View style={styles.headerOverlay} />
             <View style={styles.headerTop}>
@@ -228,13 +226,7 @@ const BoardScreen = () => {
       <Animated.View style={{
         opacity: membersAnim,
       }}>
-        {members.map((member: any, index: number) => {
-          if (index === members.length - 1) {
-            const lastColor = borderColors[index % borderColors.length];
-            console.log(`Last board member (${member.name}) has border color: ${lastColor} (index ${index})`);
-          }
-          
-          return (
+        {members.map((member: any, index: number) => (
           <View key={member._id} style={[
             styles.memberCard,
             {
@@ -244,17 +236,11 @@ const BoardScreen = () => {
             {/* Member Header with Avatar and Basic Info */}
             <View style={styles.memberHeader}>
               <View style={styles.avatarContainer}>
-                <View style={styles.avatar}>
-                  {member.image ? (
-                    <Image 
-                      source={{ uri: member.image }} 
-                      style={styles.avatarImage}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <Ionicons name="person" size={32} color="#6b7280" />
-                  )}
-                </View>
+                <ProfileImage 
+                  source={member.image}
+                  size={70}
+                  style={styles.avatarImage}
+                />
               </View>
               <View style={styles.memberInfo}>
                 <Text style={styles.memberName}>{member.name}</Text>
@@ -299,13 +285,12 @@ const BoardScreen = () => {
                   onPress={() => handleContact(member, 'email')}
                 >
                   <Ionicons name="mail" size={20} color="#2563eb" />
-                  <Text style={styles.contactText}>{member.email}</Text>
+                  <Text style={styles.contactText} numberOfLines={2}>{member.email}</Text>
                 </TouchableOpacity>
               </View>
             </View>
           </View>
-        );
-        })}
+        ))}
       </Animated.View>
 
       <Animated.View style={{
@@ -315,13 +300,7 @@ const BoardScreen = () => {
         <View style={[styles.infoSection, {
           borderLeftColor: borderColors[(members.length) % borderColors.length], // Next color after last member
         }]}>
-          {(() => {
-            console.log(`Total members: ${members.length}`);
-            console.log(`Board Meetings: border color = ${borderColors[(members.length) % borderColors.length]} (index ${members.length})`);
-            console.log(`Contact the Board: border color = ${borderColors[(members.length + 1) % borderColors.length]} (index ${members.length + 1})`);
-            console.log(`Resources: border color = ${borderColors[(members.length + 2) % borderColors.length]} (index ${members.length + 2})`);
-            return null;
-          })()}
+          
           <View style={styles.infoHeader}>
             <View style={styles.infoIconContainer}>
               <Ionicons name="calendar" size={24} color="#2563eb" />
@@ -455,7 +434,6 @@ const styles = StyleSheet.create({
   },
   headerImage: {
     borderRadius: 0,
-    resizeMode: 'stretch',
     width: '100%',
   },
   headerOverlay: {
@@ -496,26 +474,22 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 8,
   },
-  headerTitle: {
+  headerTitle: ({
     color: '#ffffff',
     fontSize: 24,
     fontWeight: 'bold',
-    textShadowColor: 'rgba(0, 0, 0, 0.9)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
+    textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9)' as any,
     textAlign: 'center',
-  },
-  headerSubtitle: {
+  } as any),
+  headerSubtitle: ({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '400',
     opacity: 0.9,
     marginTop: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.9)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
+    textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9)' as any,
     textAlign: 'center',
-  },
+  } as any),
   memberCard: {
     backgroundColor: '#ffffff',
     margin: 15,
@@ -537,24 +511,12 @@ const styles = StyleSheet.create({
   avatarContainer: {
     marginRight: 16,
   },
-  avatar: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: '#f8fafc',
-    justifyContent: 'center',
-    alignItems: 'center',
+  avatarImage: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
-    overflow: 'hidden',
-  },
-  avatarImage: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
   },
   memberInfo: {
     flex: 1,
@@ -627,6 +589,7 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     flex: 1,
     fontWeight: '500',
+    flexShrink: 1,
   },
   infoSection: {
     backgroundColor: '#ffffff',

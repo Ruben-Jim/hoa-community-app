@@ -16,8 +16,8 @@ export const getByCategory = query({
   args: { category: v.union(
     v.literal("Architecture"),
     v.literal("Landscaping"),
-    v.literal("Parking"),
-    v.literal("Pets"),
+    v.literal("Minutes"),
+    v.literal("Caveats"),
     v.literal("General")
   ) },
   handler: async (ctx, args) => {
@@ -44,8 +44,8 @@ export const create = mutation({
     category: v.union(
       v.literal("Architecture"),
       v.literal("Landscaping"),
-      v.literal("Parking"),
-      v.literal("Pets"),
+      v.literal("Minutes"),
+      v.literal("Caveats"),
       v.literal("General")
     ),
     lastUpdated: v.string(),
@@ -70,8 +70,8 @@ export const update = mutation({
     category: v.optional(v.union(
       v.literal("Architecture"),
       v.literal("Landscaping"),
-      v.literal("Parking"),
-      v.literal("Pets"),
+      v.literal("Minutes"),
+      v.literal("Caveats"),
       v.literal("General")
     )),
     lastUpdated: v.optional(v.string()),

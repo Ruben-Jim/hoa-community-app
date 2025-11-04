@@ -22,6 +22,7 @@ import DeveloperIndicator from '../components/DeveloperIndicator';
 import CustomTabBar from '../components/CustomTabBar';
 import MobileTabBar from '../components/MobileTabBar';
 import PaymentModal from '../components/PaymentModal';
+import ProfileImage from '../components/ProfileImage';
 
 const FeesScreen = () => {
   const { user } = useAuth();
@@ -192,6 +193,11 @@ const FeesScreen = () => {
     return 'guest';
   };
 
+  // Get the latest user data from database (for fresh profile image)
+  const residents = useQuery(api.residents.getAll) ?? [];
+  const currentUser = residents.find(resident => resident.email === user?.email);
+  const displayProfileImage = currentUser?.profileImage || user?.profileImage;
+
   // Get all fees from database and filter for current user
   const allFeesFromDatabase = useQuery(api.fees.getAll) ?? [];
   
@@ -320,15 +326,12 @@ const FeesScreen = () => {
           ]}>
             <View style={styles.compactUserCard}>
               <View style={styles.compactUserInfo}>
-                <View style={styles.compactAvatar}>
-                  {user.profileImage ? (
-                    <Image source={{ uri: user.profileImage }} style={styles.compactAvatarImage} />
-                  ) : (
-                    <Text style={styles.compactAvatarText}>
-                      {user.firstName.charAt(0)}{user.lastName.charAt(0)}
-                    </Text>
-                  )}
-                </View>
+                <ProfileImage 
+                  source={displayProfileImage} 
+                  size={50}
+                  initials={`${user.firstName.charAt(0)}${user.lastName.charAt(0)}`}
+                  style={{ marginRight: 10 }}
+                />
                 <View style={styles.compactUserDetails}>
                   <Text style={styles.compactUserName}>{user.firstName} {user.lastName}</Text>
                   <Text style={styles.compactUserType}>
@@ -584,6 +587,15 @@ const FeesScreen = () => {
           }
         ]}>
           <Text style={styles.sectionTitle}>Payment Information</Text>
+          <View style={styles.dropboxInfo}>
+            <Ionicons name="cube" size={24} color="#2563eb" style={{ marginRight: 12 }} />
+            <View style={styles.dropboxTextContainer}>
+              <Text style={styles.dropboxLabel}>Dropbox:</Text>
+              <Text style={styles.dropboxText}>
+                301 Elderberry St, Shelton, WA
+              </Text>
+            </View>
+          </View>
           <Text style={styles.infoText}>
             • Payments can be made online through the HOA portal
           </Text>
@@ -923,6 +935,32 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 6,
   },
+  dropboxInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#eff6ff',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#2563eb',
+  },
+  dropboxTextContainer: {
+    flex: 1,
+  },
+  dropboxLabel: {
+    fontSize: 16,
+    color: '#2563eb',
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  dropboxText: {
+    fontSize: 18,
+    color: '#1e40af',
+    fontWeight: '800',
+    lineHeight: 24,
+  },
   // Compact user status styles
   compactUserCard: {
     backgroundColor: '#ffffff',
@@ -940,27 +978,6 @@ const styles = StyleSheet.create({
   compactUserInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  compactAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#2563eb',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  compactAvatarImage: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  compactAvatarText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: 'bold',
   },
   compactUserDetails: {
     flex: 1,

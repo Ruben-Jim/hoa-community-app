@@ -16,6 +16,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ImageBackground,
+  ActivityIndicator,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,6 +29,7 @@ import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import DeveloperIndicator from '../components/DeveloperIndicator';
 import CustomTabBar from '../components/CustomTabBar';
 import MobileTabBar from '../components/MobileTabBar';
+import ProfileImage from '../components/ProfileImage';
 
 const AdminScreen = () => {
   const { user } = useAuth();
@@ -65,6 +67,24 @@ const AdminScreen = () => {
   const allFinesFromDatabase = useQuery(api.fees.getAllFines) ?? [];
   const polls = useQuery(api.polls.getAll) ?? [];
   const pendingVenmoPayments = useQuery(api.payments.getPendingVenmoPayments) ?? [];
+  const pets = useQuery(api.pets.getAll) ?? [];
+  const hoaInfo = useQuery(api.hoaInfo.get) ?? null;
+
+  // Load HOA info into form when it's available
+  useEffect(() => {
+    if (hoaInfo) {
+      setHoaInfoForm({
+        name: hoaInfo.name || '',
+        address: hoaInfo.address || '',
+        phone: hoaInfo.phone || '',
+        email: hoaInfo.email || '',
+        website: hoaInfo.website || '',
+        officeHours: hoaInfo.officeHours || '',
+        emergencyContact: hoaInfo.emergencyContact || '',
+        eventText: (hoaInfo as any).eventText || '',
+      });
+    }
+  }, [hoaInfo]);
   
   // Mutations
   const setBlockStatus = useMutation(api.residents.setBlockStatus);
@@ -96,10 +116,17 @@ const AdminScreen = () => {
   // Payment management mutations
   const verifyVenmoPayment = useMutation(api.payments.verifyVenmoPayment);
   
+  // Pet management mutations
+  const deletePet = useMutation(api.pets.remove);
+  const updatePet = useMutation(api.pets.update);
+  
+  // HOA Info management mutation
+  const upsertHoaInfo = useMutation(api.hoaInfo.upsert);
+  
   // State
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'residents' | 'board' | 'covenants' | 'Community' | 'emergency' | 'fees'>('residents');
-  const [postsSubTab, setPostsSubTab] = useState<'posts' | 'comments' | 'polls'>('posts');
+  const [activeTab, setActiveTab] = useState<'SheltonHOA' | 'residents' | 'board' | 'covenants' | 'Community' | 'emergency' | 'fees'>('SheltonHOA');
+  const [postsSubTab, setPostsSubTab] = useState<'posts' | 'comments' | 'polls' | 'pets'>('posts');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const [showBlockModal, setShowBlockModal] = useState(false);
@@ -154,9 +181,21 @@ const AdminScreen = () => {
   const [covenantForm, setCovenantForm] = useState({
     title: '',
     description: '',
-    category: 'General' as 'Architecture' | 'Landscaping' | 'Parking' | 'Pets' | 'General',
+    category: 'General' as 'Architecture' | 'Landscaping' | 'Minutes' | 'Caveats' | 'General',
     lastUpdated: new Date().toLocaleDateString('en-US'),
     pdfUrl: '',
+  });
+  
+  // HOA Info form state
+  const [hoaInfoForm, setHoaInfoForm] = useState({
+    name: '',
+    address: '',
+    phone: '',
+    email: '',
+    website: '',
+    officeHours: '',
+    emergencyContact: '',
+    eventText: '',
   });
 
   // Poll modal state
@@ -385,6 +424,10 @@ const AdminScreen = () => {
           await deleteEmergencyAlert({ id: selectedItem._id });
           Alert.alert('Success', 'Emergency alert deleted successfully.');
           break;
+        case 'pet':
+          await deletePet({ id: selectedItem._id });
+          Alert.alert('Success', 'Pet registration deleted successfully.');
+          break;
         default:
           Alert.alert('Error', 'Unknown item type.');
       }
@@ -405,6 +448,27 @@ const AdminScreen = () => {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  // HOA Info handler
+  const handleSaveHoaInfo = async () => {
+    try {
+      await upsertHoaInfo({
+        name: hoaInfoForm.name.trim() || '',
+        address: hoaInfoForm.address.trim() || '',
+        phone: hoaInfoForm.phone.trim() || '',
+        email: hoaInfoForm.email.trim() || '',
+        website: hoaInfoForm.website.trim() || undefined,
+        officeHours: hoaInfoForm.officeHours.trim() || '',
+        emergencyContact: hoaInfoForm.emergencyContact.trim() || '',
+        eventText: hoaInfoForm.eventText.trim() || undefined,
+      });
+
+      Alert.alert('Success', 'HOA information updated successfully.');
+    } catch (error) {
+      console.error('Error saving HOA info:', error);
+      Alert.alert('Error', 'Failed to save HOA information. Please try again.');
+    }
   };
 
   // Board member handlers
@@ -1045,14 +1109,63 @@ const AdminScreen = () => {
       });
       
       const { storageId } = await uploadResponse.json();
-      
-      // Get the proper URL from Convex
-      const imageUrl = await convex.query(api.storage.getUrl, { storageId });
-      return imageUrl || storageId;
+      return storageId;
     } catch (error) {
       console.error('Error uploading image:', error);
       throw new Error('Failed to upload image');
     }
+  };
+
+  // Helper component for pet images
+  const PetImage = ({ storageId }: { storageId: string }) => {
+    const imageUrl = useQuery(api.storage.getUrl, { storageId: storageId as any });
+    const pulseAnim = useRef(new Animated.Value(0.4)).current;
+    
+    useEffect(() => {
+      if (imageUrl === undefined) {
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(pulseAnim, {
+              toValue: 1,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+            Animated.timing(pulseAnim, {
+              toValue: 0.4,
+              duration: 1000,
+              useNativeDriver: true,
+            }),
+          ])
+        ).start();
+      }
+    }, [imageUrl]);
+    
+    if (imageUrl === undefined) {
+      return (
+        <Animated.View 
+          style={[
+            styles.petImageLoading,
+            { opacity: pulseAnim }
+          ]}
+        >
+          <View style={styles.loadingContent}>
+            <Ionicons name="paw" size={32} color="#cbd5e1" />
+          </View>
+        </Animated.View>
+      );
+    }
+    
+    if (!imageUrl) {
+      return null;
+    }
+    
+    return (
+      <Image 
+        source={{ uri: imageUrl }} 
+        style={styles.petCardImage}
+        resizeMode="cover"
+      />
+    );
   };
 
   if (!isBoardMember) {
@@ -1073,14 +1186,123 @@ const AdminScreen = () => {
 
   const renderTabContent = () => {
     switch (activeTab) {
+      case 'SheltonHOA':
+        return (
+          <View style={styles.tabContent}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Shelton HOA Information</Text>
+            </View>
+            
+            <View style={styles.hoaInfoContainer}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>HOA Name</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={hoaInfoForm.name}
+                  onChangeText={(text) => setHoaInfoForm({ ...hoaInfoForm, name: text })}
+                  placeholder="e.g., Shelton Homeowners Association"
+                  placeholderTextColor="#9ca3af"
+                />
+              </View>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Address</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={hoaInfoForm.address}
+                  onChangeText={(text) => setHoaInfoForm({ ...hoaInfoForm, address: text })}
+                  placeholder="e.g., 123 Main Street, Shelton, CT 06484"
+                  placeholderTextColor="#9ca3af"
+                />
+              </View>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Phone</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={hoaInfoForm.phone}
+                  onChangeText={(text) => setHoaInfoForm({ ...hoaInfoForm, phone: text })}
+                  placeholder="e.g., (203) 555-1234"
+                  placeholderTextColor="#9ca3af"
+                  keyboardType="phone-pad"
+                />
+              </View>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Email</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={hoaInfoForm.email}
+                  onChangeText={(text) => setHoaInfoForm({ ...hoaInfoForm, email: text })}
+                  placeholder="e.g., info@sheltonhoa.org"
+                  placeholderTextColor="#9ca3af"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Website</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={hoaInfoForm.website}
+                  onChangeText={(text) => setHoaInfoForm({ ...hoaInfoForm, website: text })}
+                  placeholder="e.g., https://www.sheltonhoa.org"
+                  placeholderTextColor="#9ca3af"
+                  autoCapitalize="none"
+                />
+              </View>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Office Hours</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={hoaInfoForm.officeHours}
+                  onChangeText={(text) => setHoaInfoForm({ ...hoaInfoForm, officeHours: text })}
+                  placeholder="e.g., Monday-Friday 9:00 AM - 5:00 PM"
+                  placeholderTextColor="#9ca3af"
+                />
+              </View>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Emergency Contact</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={hoaInfoForm.emergencyContact}
+                  onChangeText={(text) => setHoaInfoForm({ ...hoaInfoForm, emergencyContact: text })}
+                  placeholder="e.g., (203) 555-9999 or emergency@sheltonhoa.org"
+                  placeholderTextColor="#9ca3af"
+                />
+              </View>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Upcoming Events Text</Text>
+                <TextInput
+                  style={[styles.textInput, { height: 100, textAlignVertical: 'top' }]}
+                  value={hoaInfoForm.eventText}
+                  onChangeText={(text) => setHoaInfoForm({ ...hoaInfoForm, eventText: text })}
+                  placeholder={"e.g.,\n📅 Board Meeting - Next Tuesday at 7:00 PM\n🏠 Community Cleanup - This Saturday 9:00 AM"}
+                  placeholderTextColor="#9ca3af"
+                  multiline
+                />
+              </View>
+              
+              <TouchableOpacity
+                style={[styles.adminFeeButton, { backgroundColor: '#8b5cf6', marginTop: 20 }]}
+                onPress={handleSaveHoaInfo}
+              >
+                <Ionicons name="save" size={16} color="#ffffff" />
+                <Text style={styles.adminFeeButtonText}>Save HOA Information</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        );
+      
       case 'residents':
         return (
           <View style={styles.tabContent}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Residents</Text>
-              <Text style={styles.sectionSubtitle}>
-                {residents.length} total residents
-              </Text>
             </View>
             
             {/* Role Statistics */}
@@ -1133,6 +1355,8 @@ const AdminScreen = () => {
               data={residents}
               keyExtractor={(item) => item._id}
               numColumns={2}
+              scrollEnabled={false}
+              nestedScrollEnabled={false}
               refreshControl={
                 <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
               }
@@ -1178,17 +1402,12 @@ const AdminScreen = () => {
                     <View style={styles.residentGridCardContent}>
                       {/* Main Info Row - Avatar Left, Details Right */}
                       <View style={styles.residentGridMainInfo}>
-                        <View style={styles.residentGridAvatar}>
-                          {item.profileImage ? (
-                            <Image source={{ uri: item.profileImage }} style={styles.residentGridAvatarImage} />
-                          ) : (
-                            <View style={styles.residentGridAvatarPlaceholder}>
-                              <Text style={styles.residentGridAvatarText}>
-                                {item.firstName.charAt(0)}{item.lastName.charAt(0)}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
+                        <ProfileImage 
+                          source={item.profileImage} 
+                          size={48}
+                          initials={`${item.firstName.charAt(0)}${item.lastName.charAt(0)}`}
+                          style={{ marginRight: 8 }}
+                        />
                         
                         <View style={styles.residentGridDetails}>
                           {/* Name and Role Row */}
@@ -1196,16 +1415,35 @@ const AdminScreen = () => {
                             <Text style={styles.residentGridName} numberOfLines={1}>
                               {item.firstName} {item.lastName}
                             </Text>
-                            <View style={[styles.residentGridRoleBadge, { backgroundColor: roleColor + '20' }]}>
-                              <Ionicons name={roleIcon as any} size={12} color={roleColor} />
-                              <Text style={[styles.residentGridRoleText, { color: roleColor }]} numberOfLines={1}>
-                                {primaryRole}
-                              </Text>
+                            <View style={styles.residentGridRoleBadgesContainer}>
+                              <View style={[styles.residentGridRoleBadge, { backgroundColor: roleColor + '20' }]}>
+                                <Ionicons name={roleIcon as any} size={Platform.OS === 'web' ? 12 : 13} color={roleColor} />
+                                <Text style={[styles.residentGridRoleText, { color: roleColor }]} numberOfLines={1}>
+                                  {primaryRole}
+                                </Text>
+                              </View>
+                              {/* Additional indicators for board members */}
+                              {item.isBoardMember && item.isResident && (
+                                <View style={[styles.residentGridRoleBadge, { backgroundColor: '#10b98120' }]}>
+                                  <Ionicons name="people" size={Platform.OS === 'web' ? 10 : 11} color="#10b981" />
+                                  <Text style={[styles.residentGridRoleText, { color: '#10b981' }]} numberOfLines={1}>
+                                    Resident
+                                  </Text>
+                                </View>
+                              )}
+                              {item.isBoardMember && item.isRenter && (
+                                <View style={[styles.residentGridRoleBadge, { backgroundColor: '#3b82f620' }]}>
+                                  <Ionicons name="home" size={Platform.OS === 'web' ? 10 : 11} color="#3b82f6" />
+                                  <Text style={[styles.residentGridRoleText, { color: '#3b82f6' }]} numberOfLines={1}>
+                                    Renter
+                                  </Text>
+                                </View>
+                              )}
                             </View>
                           </View>
                           
                           {/* Email */}
-                          <Text style={styles.residentGridEmail} numberOfLines={1}>
+                          <Text style={styles.residentGridEmail} numberOfLines={2}>
                             {item.email}
                           </Text>
                           
@@ -1263,7 +1501,7 @@ const AdminScreen = () => {
               <Text style={styles.sectionTitle}>Board Members</Text>
               <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
                 <TouchableOpacity
-                  style={styles.addButton}
+                  style={[styles.addButton, { backgroundColor: '#eab308' }]}
                   onPress={() => {
                     animateButtonPress();
                     handleAddBoardMember();
@@ -1323,17 +1561,12 @@ const AdminScreen = () => {
                     <View style={styles.residentGridCardContent}>
                       {/* Main Info Row - Avatar Left, Details Right */}
                       <View style={styles.residentGridMainInfo}>
-                        <View style={styles.residentGridAvatar}>
-                          {item.image ? (
-                            <Image source={{ uri: item.image }} style={styles.residentGridAvatarImage} />
-                          ) : (
-                            <View style={styles.residentGridAvatarPlaceholder}>
-                              <Text style={styles.residentGridAvatarText}>
-                                {item.name.split(' ').map(n => n.charAt(0)).join('').substring(0, 2)}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
+                        <ProfileImage 
+                          source={item.image} 
+                          size={48}
+                          initials={item.name.split(' ').map(n => n.charAt(0)).join('').substring(0, 2)}
+                          style={{ marginRight: 8 }}
+                        />
                         
                         <View style={styles.residentGridDetails}>
                           {/* Name and Role Row */}
@@ -1410,7 +1643,7 @@ const AdminScreen = () => {
               <Text style={styles.sectionTitle}>Covenants & Rules</Text>
               <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
                 <TouchableOpacity
-                  style={styles.addButton}
+                  style={[styles.addButton, { backgroundColor: '#22c55e' }]}
                   onPress={() => {
                     animateButtonPress();
                     setShowCovenantModal(true);
@@ -1440,12 +1673,12 @@ const AdminScreen = () => {
                 } else if (item.category === 'Landscaping') {
                   covenantIcon = 'leaf';
                   covenantColor = '#10b981';
-                } else if (item.category === 'Parking') {
-                  covenantIcon = 'car';
-                  covenantColor = '#3b82f6';
-                } else if (item.category === 'Pets') {
-                  covenantIcon = 'paw';
-                  covenantColor = '#ef4444';
+                } else if (item.category === 'Minutes') {
+                  covenantIcon = 'clipboard';
+                  covenantColor = '#06b6d4';
+                } else if (item.category === 'Caveats') {
+                  covenantIcon = 'warning';
+                  covenantColor = '#f59e0b';
                 } else if (item.category === 'General') {
                   covenantIcon = 'document-text';
                   covenantColor = '#6b7280';
@@ -1542,6 +1775,10 @@ const AdminScreen = () => {
       case 'Community':
         return (
           <View style={styles.tabContent}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Community Posts</Text>
+            </View>
+            
             {/* Posts Sub-tabs */}
             <ScrollView 
               horizontal 
@@ -1553,7 +1790,7 @@ const AdminScreen = () => {
                 style={[styles.subTab, postsSubTab === 'posts' && styles.activeSubTab]}
                 onPress={() => setPostsSubTab('posts')}
               >
-                <Ionicons name="chatbubbles" size={18} color={postsSubTab === 'posts' ? '#2563eb' : '#6b7280'} />
+                <Ionicons name="chatbubbles" size={18} color={postsSubTab === 'posts' ? '#3b82f6' : '#6b7280'} />
                 <Text style={[styles.subTabText, postsSubTab === 'posts' && styles.activeSubTabText]}>
                   Posts ({communityPosts.length})
                 </Text>
@@ -1563,7 +1800,7 @@ const AdminScreen = () => {
                 style={[styles.subTab, postsSubTab === 'comments' && styles.activeSubTab]}
                 onPress={() => setPostsSubTab('comments')}
               >
-                <Ionicons name="chatbox" size={18} color={postsSubTab === 'comments' ? '#2563eb' : '#6b7280'} />
+                <Ionicons name="chatbox" size={18} color={postsSubTab === 'comments' ? '#3b82f6' : '#6b7280'} />
                 <Text style={[styles.subTabText, postsSubTab === 'comments' && styles.activeSubTabText]}>
                   Comments ({comments.length})
                 </Text>
@@ -1573,9 +1810,19 @@ const AdminScreen = () => {
                 style={[styles.subTab, postsSubTab === 'polls' && styles.activeSubTab]}
                 onPress={() => setPostsSubTab('polls')}
               >
-                <Ionicons name="bar-chart" size={18} color={postsSubTab === 'polls' ? '#2563eb' : '#6b7280'} />
+                <Ionicons name="bar-chart" size={18} color={postsSubTab === 'polls' ? '#3b82f6' : '#6b7280'} />
                 <Text style={[styles.subTabText, postsSubTab === 'polls' && styles.activeSubTabText]}>
                   Polls ({polls.length})
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.subTab, postsSubTab === 'pets' && styles.activeSubTab]}
+                onPress={() => setPostsSubTab('pets')}
+              >
+                <Ionicons name="paw" size={18} color={postsSubTab === 'pets' ? '#3b82f6' : '#6b7280'} />
+                <Text style={[styles.subTabText, postsSubTab === 'pets' && styles.activeSubTabText]}>
+                  Pets ({pets.length})
                 </Text>
               </TouchableOpacity>
             </ScrollView>
@@ -1606,22 +1853,22 @@ const AdminScreen = () => {
                   <View style={styles.residentGridCardContent}>
                     {/* Main Info Row - Icon Left, Details Right */}
                     <View style={styles.residentGridMainInfo}>
-                      <View style={styles.residentGridAvatar}>
-                        <View style={styles.postAvatarPlaceholder}>
-                          <Ionicons name="document-text" size={24} color="#6b7280" />
-                        </View>
-                      </View>
+                      <ProfileImage 
+                        source={item.authorProfileImage} 
+                        size={48}
+                        style={{ marginRight: 12 }}
+                      />
                       
                       <View style={styles.residentGridDetails}>
-                        {/* Title and Date Row */}
-                        <View style={styles.residentGridNameRow}>
-                          <Text style={styles.residentGridName} numberOfLines={2}>
-                            {item.title}
-                          </Text>
-                          <Text style={styles.residentGridRoleText} numberOfLines={1}>
-                            {formatDate(item.createdAt)}
-                          </Text>
-                        </View>
+                        {/* Title */}
+                        <Text style={styles.postTitleText}>
+                          {item.title}
+                        </Text>
+                        
+                        {/* Date */}
+                        <Text style={styles.postDateText}>
+                          {formatDate(item.createdAt)}
+                        </Text>
                         
                         {/* Author */}
                         <Text style={styles.residentGridEmail} numberOfLines={1}>
@@ -1629,7 +1876,7 @@ const AdminScreen = () => {
                         </Text>
                         
                         {/* Content */}
-                        <Text style={styles.residentGridAddress} numberOfLines={3}>
+                        <Text style={styles.postContentText}>
                           {item.content}
                         </Text>
                       </View>
@@ -1684,9 +1931,19 @@ const AdminScreen = () => {
                       {/* Main Info Row - Icon Left, Details Right */}
                       <View style={styles.residentGridMainInfo}>
                         <View style={styles.residentGridAvatar}>
-                          <View style={styles.postAvatarPlaceholder}>
-                            <Ionicons name="chatbubble" size={24} color="#6b7280" />
-                          </View>
+                          {item.authorProfileImage ? (
+                            <View style={styles.postAvatarContainer}>
+                              <Image 
+                                source={{ uri: item.authorProfileImage }} 
+                                style={styles.postAvatarImage}
+                                resizeMode="cover"
+                              />
+                            </View>
+                          ) : (
+                            <View style={styles.postAvatarPlaceholder}>
+                              <Ionicons name="person" size={24} color="#6b7280" />
+                            </View>
+                          )}
                         </View>
                         
                         <View style={styles.residentGridDetails}>
@@ -1740,7 +1997,7 @@ const AdminScreen = () => {
                   <Text style={styles.sectionTitle}>Community Polls</Text>
                   <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
                     <TouchableOpacity
-                      style={styles.adminFeeButton}
+                      style={[styles.adminFeeButton, { backgroundColor: '#3b82f6' }]}
                       onPress={() => {
                         animateButtonPress();
                         setShowPollModal(true);
@@ -1888,6 +2145,83 @@ const AdminScreen = () => {
                   }}
                 />
               </>
+            )}
+            
+            {postsSubTab === 'pets' && (
+              <FlatList
+                data={pets}
+                keyExtractor={(item) => item._id}
+                numColumns={2}
+                refreshControl={
+                  <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+                }
+                renderItem={({ item }) => (
+                    <Animated.View 
+                      style={[
+                        styles.residentGridCard,
+                        {
+                          opacity: fadeAnim,
+                          transform: [{
+                            translateY: fadeAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [50, 0],
+                            })
+                          }]
+                        }
+                      ]}
+                    >
+                      <View style={styles.residentGridCardContent}>
+                        {/* Pet Image - Centered */}
+                        <View style={styles.petCardImageContainer}>
+                          <View style={styles.petImageAvatar}>
+                            <PetImage storageId={item.image} />
+                          </View>
+                        </View>
+                        
+                        {/* Text Content - Underneath Image */}
+                        <View style={styles.petCardTextContent}>
+                          {/* Pet Name and Date Row */}
+                          <View style={styles.petCardNameRow}>
+                            <Text style={styles.petCardName} numberOfLines={2}>
+                              {item.name}
+                            </Text>
+                            <Text style={styles.petCardDate} numberOfLines={1}>
+                              {formatDate(item.createdAt)}
+                            </Text>
+                          </View>
+                          
+                          {/* Owner */}
+                          <Text style={styles.petCardOwner} numberOfLines={1}>
+                            Owner: {item.residentName || 'Unknown'}
+                          </Text>
+                          
+                          {/* Address */}
+                          <Text style={styles.petCardAddress} numberOfLines={2}>
+                            {item.residentAddress || ''}
+                          </Text>
+                        </View>
+                        
+                        {/* Action Button */}
+                        <View style={styles.residentGridActions}>
+                          <TouchableOpacity
+                            style={[styles.residentGridActionButton, styles.blockButton]}
+                            onPress={() => handleDeleteItem(item, 'pet')}
+                          >
+                            <Ionicons name="trash" size={16} color="#ef4444" />
+                            <Text style={styles.residentGridActionText}>Delete</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </Animated.View>
+                  )
+                }
+                ListEmptyComponent={
+                  <View style={styles.emptyState}>
+                    <Ionicons name="paw-outline" size={48} color="#9ca3af" />
+                    <Text style={styles.emptyStateText}>No pet registrations found</Text>
+                  </View>
+                }
+              />
             )}
           </View>
         );
@@ -2075,7 +2409,7 @@ const AdminScreen = () => {
       
       case 'fees':
         return (
-          <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={true} persistentScrollbar={true}>
+          <View style={styles.tabContent}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Fees Status</Text>
               <View style={styles.adminFeeButtonsContainer}>
@@ -2184,6 +2518,11 @@ const AdminScreen = () => {
                         <Text style={styles.compactPaymentDate}>
                           {paymentDate}
                         </Text>
+                        {(payment.transactionId || payment.venmoTransactionId) && (
+                          <Text style={styles.compactPaymentTransactionId} numberOfLines={2}>
+                            ID: {payment.transactionId || payment.venmoTransactionId}
+                          </Text>
+                        )}
                         <View style={styles.compactPaymentActions}>
                           <TouchableOpacity
                             style={styles.compactRejectButton}
@@ -2234,15 +2573,17 @@ const AdminScreen = () => {
             )}
             
             {/* Fees and Fines Status Grid */}
-            <FlatList
-              data={homeownersPaymentStatus.filter((item: any) => {
-                // Only show homeowners who have fees or fines
-                const hasFees = allFeesFromDatabase.some((fee: any) => fee.userId === item._id);
-                const hasFines = allFinesFromDatabase.some((fine: any) => fine.residentId === item._id);
-                return hasFees || hasFines;
-              })}
-              keyExtractor={(item) => item._id}
-              numColumns={2}
+            <View style={isMobileDevice || screenWidth < 768 ? styles.feesGridContainerMobile : {}}>
+              <FlatList
+                key={`fees-grid-${isMobileDevice || screenWidth < 768 ? 1 : 2}`}
+                data={homeownersPaymentStatus.filter((item: any) => {
+                  // Only show homeowners who have fees or fines
+                  const hasFees = allFeesFromDatabase.some((fee: any) => fee.userId === item._id);
+                  const hasFines = allFinesFromDatabase.some((fine: any) => fine.residentId === item._id);
+                  return hasFees || hasFines;
+                })}
+                keyExtractor={(item) => item._id}
+                numColumns={isMobileDevice || screenWidth < 768 ? 1 : 2}
               refreshControl={
                 <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
               }
@@ -2251,10 +2592,23 @@ const AdminScreen = () => {
                 // Get fees and fines for this homeowner
                 const homeownerFees = allFeesFromDatabase.filter((fee: any) => fee.userId === homeowner._id);
                 const homeownerFines = allFinesFromDatabase.filter((fine: any) => fine.residentId === homeowner._id);
+                  const isSingleColumn = isMobileDevice || screenWidth < 768;
                   return (
                     <Animated.View 
                       style={[
                         styles.gridCard,
+                        isSingleColumn && {
+                          marginHorizontal: 16,
+                          marginVertical: 12,
+                          borderRadius: 12,
+                          borderTopWidth: 0,
+                          borderBottomWidth: 0,
+                          borderWidth: 1,
+                          borderColor: '#e5e7eb',
+                          maxWidth: '100%',
+                          alignSelf: 'center',
+                          width: screenWidth < 400 ? screenWidth - 32 : Math.min(screenWidth - 40, 600),
+                        },
                         {
                           opacity: fadeAnim,
                           transform: [{
@@ -2266,27 +2620,49 @@ const AdminScreen = () => {
                         }
                       ]}
                     >
-                      <View style={styles.gridCardContent}>
-                        <View style={styles.gridProfileSection}>
-                          <View style={styles.gridProfileImage}>
-                            {homeowner.profileImage ? (
-                              <Image source={{ uri: homeowner.profileImage }} style={styles.gridProfileImageSrc} />
-                            ) : (
-                              <View style={styles.gridProfilePlaceholder}>
-                                <Text style={styles.gridProfileText}>
-                                  {homeowner.firstName.charAt(0)}{homeowner.lastName.charAt(0)}
-                                </Text>
-                              </View>
-                            )}
-                          </View>
+                      <View style={[
+                        styles.gridCardContent,
+                        isSingleColumn && {
+                          padding: 16,
+                        }
+                      ]}>
+                        <View style={[
+                          styles.gridProfileSection,
+                          isSingleColumn && {
+                            marginBottom: 16,
+                          }
+                        ]}>
+                          <ProfileImage 
+                            source={homeowner.profileImage} 
+                            size={56}
+                            initials={`${homeowner.firstName.charAt(0)}${homeowner.lastName.charAt(0)}`}
+                            style={{ marginRight: 8 }}
+                          />
                           <View style={styles.gridProfileInfo}>
-                            <Text style={styles.gridName} numberOfLines={1}>
+                            <Text style={[
+                              styles.gridName,
+                              isSingleColumn && {
+                                fontSize: 16,
+                                marginBottom: 4,
+                              }
+                            ]} numberOfLines={1}>
                               {homeowner.firstName} {homeowner.lastName}
                             </Text>
-                            <Text style={styles.gridRole} numberOfLines={1}>
+                            <Text style={[
+                              styles.gridRole,
+                              isSingleColumn && {
+                                fontSize: 13,
+                                marginBottom: 4,
+                              }
+                            ]} numberOfLines={1}>
                               {homeowner.userType === 'board-member' ? 'Board Member' : 'Homeowner'}
                             </Text>
-                            <Text style={styles.gridAddress} numberOfLines={1}>
+                            <Text style={[
+                              styles.gridAddress,
+                              isSingleColumn && {
+                                fontSize: 12,
+                              }
+                            ]} numberOfLines={2}>
                               {homeowner.address} {homeowner.unitNumber && `Unit ${homeowner.unitNumber}`}
                             </Text>
                           </View>
@@ -2294,28 +2670,53 @@ const AdminScreen = () => {
                         
                         {/* Show fees for this homeowner */}
                         {homeownerFees.length > 0 ? (
-                          <View style={styles.gridFeeSection}>
-                            <Text style={styles.gridFeeAmount}>
+                          <View style={[
+                            styles.gridFeeSection,
+                            isSingleColumn && {
+                              paddingTop: 12,
+                              marginTop: 12,
+                            }
+                          ]}>
+                            <Text style={[
+                              styles.gridFeeAmount,
+                              isSingleColumn && {
+                                fontSize: 20,
+                                marginBottom: 4,
+                              }
+                            ]}>
                               ${homeownerFees.reduce((sum: number, fee: any) => sum + fee.amount, 0).toFixed(2)}
                             </Text>
-                            <Text style={styles.gridFeeLabel}>
+                            <Text style={[
+                              styles.gridFeeLabel,
+                              isSingleColumn && {
+                                fontSize: 12,
+                                marginBottom: 8,
+                              }
+                            ]}>
                               {homeownerFees.length === 1 ? 'Fee' : `Fees (${homeownerFees.length})`}
                             </Text>
                             <View style={[
                               styles.gridStatusBadge,
                               homeownerFees.every((f: any) => f.status === 'Paid') 
                                 ? styles.gridPaidBadge 
-                                : styles.gridPendingBadge
+                                : styles.gridPendingBadge,
+                              isSingleColumn && {
+                                paddingHorizontal: 12,
+                                paddingVertical: 6,
+                              }
                             ]}>
                               <Ionicons 
                                 name={homeownerFees.every((f: any) => f.status === 'Paid') ? "checkmark-circle" : "time"} 
-                                size={14} 
+                                size={isSingleColumn ? 16 : 14} 
                                 color={homeownerFees.every((f: any) => f.status === 'Paid') ? "#10b981" : "#f59e0b"} 
                               />
                               <Text style={[
                                 styles.gridStatusText,
                                 { 
                                   color: homeownerFees.every((f: any) => f.status === 'Paid') ? "#10b981" : "#f59e0b" 
+                                },
+                                isSingleColumn && {
+                                  fontSize: 12,
                                 }
                               ]}>
                                 {homeownerFees.every((f: any) => f.status === 'Paid') ? 'Paid' : 'Pending'}
@@ -2323,12 +2724,43 @@ const AdminScreen = () => {
                             </View>
                           </View>
                         ) : (
-                          <View style={styles.gridFeeSection}>
-                            <Text style={styles.gridFeeAmount}>$0</Text>
-                            <Text style={styles.gridFeeLabel}>No Fees</Text>
-                            <View style={[styles.gridStatusBadge, styles.gridNoFeeBadge]}>
-                              <Ionicons name="card" size={14} color="#6b7280" />
-                              <Text style={[styles.gridStatusText, { color: "#6b7280" }]}>
+                          <View style={[
+                            styles.gridFeeSection,
+                            isSingleColumn && {
+                              paddingTop: 12,
+                              marginTop: 12,
+                            }
+                          ]}>
+                            <Text style={[
+                              styles.gridFeeAmount,
+                              isSingleColumn && {
+                                fontSize: 20,
+                                marginBottom: 4,
+                              }
+                            ]}>$0</Text>
+                            <Text style={[
+                              styles.gridFeeLabel,
+                              isSingleColumn && {
+                                fontSize: 12,
+                                marginBottom: 8,
+                              }
+                            ]}>No Fees</Text>
+                            <View style={[
+                              styles.gridStatusBadge, 
+                              styles.gridNoFeeBadge,
+                              isSingleColumn && {
+                                paddingHorizontal: 12,
+                                paddingVertical: 6,
+                              }
+                            ]}>
+                              <Ionicons name="card" size={isSingleColumn ? 16 : 14} color="#6b7280" />
+                              <Text style={[
+                                styles.gridStatusText, 
+                                { color: "#6b7280" },
+                                isSingleColumn && {
+                                  fontSize: 12,
+                                }
+                              ]}>
                                 Clear
                               </Text>
                             </View>
@@ -2349,10 +2781,10 @@ const AdminScreen = () => {
                                   index === homeownerFines.length - 1 && styles.gridFineItemLast
                                 ]}>
                                   <View style={styles.gridFineLeft}>
-                                    <Text style={styles.gridFineTitle} numberOfLines={1}>
+                                    <Text style={styles.gridFineTitle} numberOfLines={2}>
                                       {fine.violation}
                                     </Text>
-                                    <Text style={styles.gridFineDate}>
+                                    <Text style={styles.gridFineDate} numberOfLines={1}>
                                       Issued: {fine.dateIssued}
                                     </Text>
                                   </View>
@@ -2394,10 +2826,8 @@ const AdminScreen = () => {
                 </View>
               }
             />
-
-
-
-          </ScrollView>
+            </View>
+          </View>
         );
       
       default:
@@ -2493,66 +2923,109 @@ const AdminScreen = () => {
         {/* Folder Tabs */}
         <ScrollView 
           horizontal 
-          showsHorizontalScrollIndicator={false}
+          showsHorizontalScrollIndicator={Platform.OS === 'web'}
+          scrollEnabled={true}
+          bounces={true}
+          alwaysBounceHorizontal={true}
           style={styles.folderTabs}
           contentContainerStyle={styles.folderTabsContent}
+          nestedScrollEnabled={true}
+          keyboardShouldPersistTaps="handled"
         >
           <TouchableOpacity
-            style={[styles.folderTab, activeTab === 'residents' && styles.activeFolderTab]}
+            style={[
+              styles.folderTab, 
+              activeTab === 'SheltonHOA' && styles.activeFolderTab,
+              activeTab === 'SheltonHOA' && { borderColor: '#ef4444' }
+            ]}
+            onPress={() => setActiveTab('SheltonHOA')}
+          >
+            <Ionicons name="business" size={20} color={activeTab === 'SheltonHOA' ? '#ef4444' : '#6b7280'} />
+            <Text style={[styles.folderTabText, activeTab === 'SheltonHOA' && styles.activeFolderTabText, activeTab === 'SheltonHOA' && { color: '#ef4444' }]}>
+              SheltonHOA
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[
+              styles.folderTab, 
+              activeTab === 'residents' && styles.activeFolderTab,
+              activeTab === 'residents' && { borderColor: '#f97316' }
+            ]}
             onPress={() => setActiveTab('residents')}
           >
-            <Ionicons name="people" size={20} color={activeTab === 'residents' ? '#2563eb' : '#6b7280'} />
-            <Text style={[styles.folderTabText, activeTab === 'residents' && styles.activeFolderTabText]}>
+            <Ionicons name="people" size={20} color={activeTab === 'residents' ? '#f97316' : '#6b7280'} />
+            <Text style={[styles.folderTabText, activeTab === 'residents' && styles.activeFolderTabText, activeTab === 'residents' && { color: '#f97316' }]}>
               Residents ({residents.length})
             </Text>
           </TouchableOpacity>
           
           <TouchableOpacity
-            style={[styles.folderTab, activeTab === 'board' && styles.activeFolderTab]}
+            style={[
+              styles.folderTab, 
+              activeTab === 'board' && styles.activeFolderTab,
+              activeTab === 'board' && { borderColor: '#eab308' }
+            ]}
             onPress={() => setActiveTab('board')}
           >
-            <Ionicons name="shield" size={20} color={activeTab === 'board' ? '#2563eb' : '#6b7280'} />
-            <Text style={[styles.folderTabText, activeTab === 'board' && styles.activeFolderTabText]}>
+            <Ionicons name="shield" size={20} color={activeTab === 'board' ? '#eab308' : '#6b7280'} />
+            <Text style={[styles.folderTabText, activeTab === 'board' && styles.activeFolderTabText, activeTab === 'board' && { color: '#eab308' }]}>
               Board ({boardMembers.length})
             </Text>
           </TouchableOpacity>
           
           <TouchableOpacity
-            style={[styles.folderTab, activeTab === 'covenants' && styles.activeFolderTab]}
+            style={[
+              styles.folderTab, 
+              activeTab === 'covenants' && styles.activeFolderTab,
+              activeTab === 'covenants' && { borderColor: '#22c55e' }
+            ]}
             onPress={() => setActiveTab('covenants')}
           >
-            <Ionicons name="document-text" size={20} color={activeTab === 'covenants' ? '#2563eb' : '#6b7280'} />
-            <Text style={[styles.folderTabText, activeTab === 'covenants' && styles.activeFolderTabText]}>
+            <Ionicons name="document-text" size={20} color={activeTab === 'covenants' ? '#22c55e' : '#6b7280'} />
+            <Text style={[styles.folderTabText, activeTab === 'covenants' && styles.activeFolderTabText, activeTab === 'covenants' && { color: '#22c55e' }]}>
               Covenants ({covenants.length})
             </Text>
           </TouchableOpacity>
           
           <TouchableOpacity
-            style={[styles.folderTab, activeTab === 'Community' && styles.activeFolderTab]}
+            style={[
+              styles.folderTab, 
+              activeTab === 'Community' && styles.activeFolderTab,
+              activeTab === 'Community' && { borderColor: '#3b82f6' }
+            ]}
             onPress={() => setActiveTab('Community')}
           >
-            <Ionicons name="chatbubbles" size={20} color={activeTab === 'Community' ? '#2563eb' : '#6b7280'} />
-            <Text style={[styles.folderTabText, activeTab === 'Community' && styles.activeFolderTabText]}>
+            <Ionicons name="chatbubbles" size={20} color={activeTab === 'Community' ? '#3b82f6' : '#6b7280'} />
+            <Text style={[styles.folderTabText, activeTab === 'Community' && styles.activeFolderTabText, activeTab === 'Community' && { color: '#3b82f6' }]}>
               Community ({communityPosts.length + comments.length + polls.length})
             </Text>
           </TouchableOpacity>
           
           <TouchableOpacity
-            style={[styles.folderTab, activeTab === 'emergency' && styles.activeFolderTab]}
+            style={[
+              styles.folderTab, 
+              activeTab === 'emergency' && styles.activeFolderTab,
+              activeTab === 'emergency' && { borderColor: '#6366f1' }
+            ]}
             onPress={() => setActiveTab('emergency')}
           >
-            <Ionicons name="warning" size={20} color={activeTab === 'emergency' ? '#2563eb' : '#6b7280'} />
-            <Text style={[styles.folderTabText, activeTab === 'emergency' && styles.activeFolderTabText]}>
+            <Ionicons name="warning" size={20} color={activeTab === 'emergency' ? '#6366f1' : '#6b7280'} />
+            <Text style={[styles.folderTabText, activeTab === 'emergency' && styles.activeFolderTabText, activeTab === 'emergency' && { color: '#6366f1' }]}>
               Emergency ({emergencyAlerts.length})
             </Text>
           </TouchableOpacity>
           
           <TouchableOpacity
-            style={[styles.folderTab, activeTab === 'fees' && styles.activeFolderTab]}
+            style={[
+              styles.folderTab, 
+              activeTab === 'fees' && styles.activeFolderTab,
+              activeTab === 'fees' && { borderColor: '#ec4899' }
+            ]}
             onPress={() => setActiveTab('fees')}
           >
-            <Ionicons name="card" size={20} color={activeTab === 'fees' ? '#2563eb' : '#6b7280'} />
-              <Text style={[styles.folderTabText, activeTab === 'fees' && styles.activeFolderTabText]}>
+            <Ionicons name="card" size={20} color={activeTab === 'fees' ? '#ec4899' : '#6b7280'} />
+              <Text style={[styles.folderTabText, activeTab === 'fees' && styles.activeFolderTabText, activeTab === 'fees' && { color: '#ec4899' }]}>
                 Fees & Payments ({allFeesFromDatabase.length + allFinesFromDatabase.length})
               </Text>
           </TouchableOpacity>
@@ -3215,7 +3688,7 @@ const AdminScreen = () => {
                         }
                       ]}
                     >
-                      {['Architecture', 'Landscaping', 'Parking', 'Pets', 'General'].map((category, index) => (
+                      {['Architecture', 'Landscaping', 'Minutes', 'Caveats', 'General'].map((category, index) => (
                         <TouchableOpacity
                           key={index}
                           style={[
@@ -3564,17 +4037,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
-    maxHeight: 50, // Reduced from 60
-    marginTop: -20, // Reduce space from header
+    maxHeight: 60,
+    marginTop: 15,
     paddingBottom: 0,
+    ...(Platform.OS === 'web' && {
+      overflowX: 'auto' as any,
+      overflowY: 'hidden' as any,
+      WebkitOverflowScrolling: 'touch' as any,
+    }),
   },
   folderTabsContent: {
     flexDirection: 'row',
     paddingHorizontal: 20,
-    paddingVertical: 4, // Reduced from 8
-    paddingRight: 40, // Extra padding to ensure last tab is fully visible
+    paddingVertical: 4,
+    paddingRight: 40,
     alignItems: 'center',
-    minHeight: 45, // Reduced from 60
+    minHeight: 45,
+    flexGrow: 0,
+    ...(Platform.OS === 'web' && {
+      minWidth: 'max-content' as any,
+    }),
   },
   folderTab: {
     flexDirection: 'row',
@@ -3590,8 +4072,7 @@ const styles = StyleSheet.create({
     flexShrink: 0, // Prevent tabs from shrinking
   },
   activeFolderTab: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#2563eb',
+    backgroundColor: '#ffffff',
   },
   folderTabText: {
     fontSize: 13,
@@ -3609,14 +4090,14 @@ const styles = StyleSheet.create({
   subTabsContent: {
     flexDirection: 'row',
     paddingHorizontal: 12,
-    paddingVertical: 4, // Reduced from 8
+    paddingVertical: 8,
     alignItems: 'center',
   },
   subTab: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
-    paddingVertical: 6, // Reduced from 8
+    paddingVertical: 8, 
     marginRight: 6,
     borderRadius: 8,
     backgroundColor: '#ffffff',
@@ -3625,7 +4106,7 @@ const styles = StyleSheet.create({
   },
   activeSubTab: {
     backgroundColor: '#eff6ff',
-    borderColor: '#2563eb',
+    borderColor: '#3b82f6',
   },
   subTabText: {
     fontSize: 13,
@@ -3634,7 +4115,7 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   activeSubTabText: {
-    color: '#2563eb',
+    color: '#3b82f6',
     fontWeight: '600',
   },
   activeFolderTabText: {
@@ -3871,6 +4352,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: '#ffffff',
     color: '#374151',
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  hoaInfoContainer: {
+    padding: 20,
   },
   textArea: {
     height: 80,
@@ -4250,18 +4740,30 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
+  // Fees grid container for mobile/ narrow desktop
+  feesGridContainerMobile: {
+    // No negative margin needed - cards have their own margins
+  },
   // Grid layout styles
   gridCard: {
-    flex: 1,
     backgroundColor: '#ffffff',
-    margin: 6,
-    borderRadius: 12,
+    // Default desktop styles
+    ...(Platform.OS === 'web' 
+      ? { 
+          flex: 1,
+          margin: 6, 
+          borderRadius: 12,
+          maxWidth: '47%',
+        }
+      : {
+          flex: 1,
+        }
+    ),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    maxWidth: '47%',
   },
   gridCardContent: {
     padding: 12,
@@ -4270,31 +4772,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
-  },
-  gridProfileImage: {
-    marginRight: 8,
-  },
-  gridProfileImageSrc: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  gridProfilePlaceholder: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f3f4f6',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  gridProfileText: {
-    color: '#6b7280',
-    fontSize: 12,
-    fontWeight: '600',
   },
   gridProfileInfo: {
     flex: 1,
@@ -4313,6 +4790,7 @@ const styles = StyleSheet.create({
   gridAddress: {
     fontSize: 10,
     color: '#9ca3af',
+    lineHeight: 12,
   },
   gridFeeSection: {
     alignItems: 'center',
@@ -4361,7 +4839,7 @@ const styles = StyleSheet.create({
   adminFeeButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2563eb',
+    backgroundColor: '#ec4899',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
@@ -4613,7 +5091,7 @@ const styles = StyleSheet.create({
   gridFineItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     backgroundColor: '#ffffff',
     paddingHorizontal: 10,
     paddingVertical: 8,
@@ -4628,6 +5106,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 1,
+    minHeight: 50,
   },
   gridFineItemLast: {
     marginBottom: 0,
@@ -4641,14 +5120,18 @@ const styles = StyleSheet.create({
     color: '#374151',
     fontWeight: '600',
     marginBottom: 2,
+    lineHeight: 13,
   },
   gridFineDate: {
     fontSize: 9,
     color: '#9ca3af',
     fontWeight: '400',
+    lineHeight: 11,
   },
   gridFineRight: {
     alignItems: 'flex-end',
+    justifyContent: 'flex-start',
+    minWidth: 65,
   },
   gridFineAmount: {
     fontSize: 12,
@@ -4672,7 +5155,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fef2f2',
   },
   gridFineStatusText: {
-    fontSize: 8,
+    fontSize: 9,
     fontWeight: '600',
     marginLeft: 3,
     textTransform: 'uppercase',
@@ -4865,8 +5348,8 @@ const styles = StyleSheet.create({
     minHeight: 140,
   },
   residentGridCardContent: {
-    padding: 10,
-    height: '100%',
+    padding: 12,
+    minHeight: '100%',
     justifyContent: 'space-between',
   },
   residentGridMainInfo: {
@@ -4874,72 +5357,106 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 6,
   },
-  residentGridAvatar: {
-    marginRight: 8,
-  },
-  residentGridAvatarImage: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-  },
-  residentGridAvatarPlaceholder: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#f3f4f6',
-    borderWidth: 2,
-    borderColor: '#e5e7eb',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  residentGridAvatarText: {
-    color: '#6b7280',
-    fontSize: 12,
-    fontWeight: '600',
-  },
   residentGridDetails: {
     flex: 1,
   },
   residentGridNameRow: {
-    flexDirection: 'column',
+    flexDirection: 'row',
     alignItems: 'flex-start',
+    justifyContent: 'space-between',
     marginBottom: 4,
-    minHeight: 32,
+    minHeight: Platform.OS === 'web' ? 32 : 36,
+    flexWrap: 'wrap',
   },
   residentGridName: {
-    fontSize: 13,
+    fontSize: Platform.OS === 'web' ? 13 : 14,
     fontWeight: '600',
     color: '#1f2937',
-    width: '100%',
-    marginBottom: 4,
-    lineHeight: 15,
+    flex: 1,
+    marginRight: Platform.OS === 'web' ? 8 : 6,
+    lineHeight: Platform.OS === 'web' ? 15 : 16,
+    minWidth: 0, // Allow text to shrink on mobile
+  },
+  residentGridRoleBadgesContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: Platform.OS === 'web' ? 4 : 3,
+    marginTop: Platform.OS !== 'web' ? 2 : 0,
+    maxWidth: '100%', // Prevent overflow on mobile
   },
   residentGridRoleBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    gap: 3,
+    paddingHorizontal: Platform.OS === 'web' ? 6 : 5,
+    paddingVertical: Platform.OS === 'web' ? 2 : 3,
+    borderRadius: Platform.OS === 'web' ? 6 : 8,
+    gap: Platform.OS === 'web' ? 3 : 2,
     alignSelf: 'flex-start',
+    marginBottom: Platform.OS !== 'web' ? 2 : 0, // Add bottom margin on mobile for wrapped badges
   },
   residentGridRoleText: {
-    fontSize: 9,
+    fontSize: Platform.OS === 'web' ? 9 : 10,
     fontWeight: '600',
+    lineHeight: Platform.OS === 'web' ? 12 : 14,
   },
   residentGridEmail: {
     fontSize: 10,
     color: '#6b7280',
     marginBottom: 2,
-    lineHeight: 12,
+    lineHeight: 13,
   },
   residentGridAddress: {
     fontSize: 9,
     color: '#9ca3af',
     marginBottom: 4,
     lineHeight: 11,
+  },
+  residentGridAvatar: {
+    marginRight: 8,
+  },
+  postAvatarContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+  },
+  postAvatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  postAvatarPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#f3f4f6',
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  postTitleText: {
+    fontSize: Platform.OS === 'web' ? 13 : 14,
+    fontWeight: '600',
+    color: '#1f2937',
+    lineHeight: Platform.OS === 'web' ? 18 : 20,
+    marginBottom: 4,
+  },
+  postDateText: {
+    fontSize: Platform.OS === 'web' ? 10 : 11,
+    color: '#9ca3af',
+    marginBottom: 6,
+    lineHeight: Platform.OS === 'web' ? 14 : 16,
+  },
+  postContentText: {
+    fontSize: Platform.OS === 'web' ? 12 : 13,
+    color: '#374151',
+    lineHeight: Platform.OS === 'web' ? 18 : 20,
+    marginTop: 4,
+    marginBottom: 8,
   },
   residentGridActions: {
     alignItems: 'flex-end',
@@ -4976,16 +5493,65 @@ const styles = StyleSheet.create({
   deactivateButton: {
     backgroundColor: '#fef3c7',
   },
-  // Post/Comment/Emergency avatar placeholder
-  postAvatarPlaceholder: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#f3f4f6',
-    borderWidth: 2,
+  // Pet image styles
+  petImageAvatar: {
+    width: 120,
+    height: 120,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 3,
     borderColor: '#e5e7eb',
+    alignSelf: 'center',
+  },
+  petCardImage: {
+    width: '100%',
+    height: '100%',
+  },
+  petImageLoading: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#e2e8f0',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  petCardImageContainer: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  petCardTextContent: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  petCardNameRow: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  petCardName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  petCardDate: {
+    fontSize: 12,
+    color: '#9ca3af',
+    textAlign: 'center',
+  },
+  petCardOwner: {
+    fontSize: 13,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  petCardAddress: {
+    fontSize: 12,
+    color: '#9ca3af',
+    textAlign: 'center',
   },
   // Emergency indicators layout
   emergencyIndicatorsRow: {
@@ -5292,7 +5858,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
-    margin: 16,
+    margin: Platform.OS === 'web' ? 16 : 12,
     marginBottom: 8,
     borderWidth: 1,
     borderColor: '#fef3c7',
@@ -5318,7 +5884,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     marginRight: 12,
-    width: 200,
+    minWidth: 180,
+    maxWidth: 250,
+    width: Platform.OS === 'web' ? 220 : Dimensions.get('window').width * 0.75,
     borderWidth: 1,
     borderColor: '#fef3c7',
     shadowColor: '#000',
@@ -5338,6 +5906,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1f2937',
     flex: 1,
+    marginRight: 8,
   },
   compactPaymentAmount: {
     fontSize: 16,
@@ -5358,7 +5927,14 @@ const styles = StyleSheet.create({
   compactPaymentDate: {
     fontSize: 11,
     color: '#9ca3af',
+    marginBottom: 4,
+  },
+  compactPaymentTransactionId: {
+    fontSize: 10,
+    color: '#6366f1',
+    fontWeight: '600',
     marginBottom: 8,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   compactPaymentActions: {
     flexDirection: 'row',
