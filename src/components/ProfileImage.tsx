@@ -1,8 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, Image, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from 'convex/react';
-import { api } from '../../convex/_generated/api';
+import { useStorageUrl } from '../hooks/useStorageUrl';
 
 interface ProfileImageProps {
   source: string | null | undefined;
@@ -16,10 +15,8 @@ const ProfileImage = ({ source, size = 40, style, initials }: ProfileImageProps)
   const isUrl = source?.startsWith('http') ?? false;
   const storageId = source && !isUrl ? source : null;
   
-  const imageUrlFromStorage = useQuery(
-    api.storage.getUrl,
-    storageId ? { storageId: storageId as any } : "skip"
-  );
+  // Use cached storage URL hook to reduce API calls
+  const imageUrlFromStorage = useStorageUrl(storageId);
   
   // Use URL directly if it's already a URL, otherwise use converted URL from storage
   const imageUrl = isUrl ? source : imageUrlFromStorage;

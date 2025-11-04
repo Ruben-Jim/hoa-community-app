@@ -30,6 +30,7 @@ import MobileTabBar from '../components/MobileTabBar';
 import CustomAlert from '../components/CustomAlert';
 import { useCustomAlert } from '../hooks/useCustomAlert';
 import ProfileImage from '../components/ProfileImage';
+import { useStorageUrl } from '../hooks/useStorageUrl';
 
 const CommunityScreen = () => {
   const { user } = useAuth();
@@ -571,7 +572,8 @@ const CommunityScreen = () => {
 
   // Helper component for displaying images with URL resolution
   const PostImage = ({ storageId, index }: { storageId: string; index: number }) => {
-    const imageUrl = useQuery(api.storage.getUrl, { storageId: storageId as any });
+    // Use cached storage URL hook to reduce API calls
+    const imageUrl = useStorageUrl(storageId);
 
     if (imageUrl === undefined) {
       return (
@@ -598,7 +600,8 @@ const CommunityScreen = () => {
 
   // Helper component for notification house images
   const HouseImage = ({ storageId, isFullScreen = false }: { storageId: string; isFullScreen?: boolean }) => {
-    const imageUrl = useQuery(api.storage.getUrl, { storageId: storageId as any });
+    // Use cached storage URL hook to reduce API calls
+    const imageUrl = useStorageUrl(storageId);
     
     if (imageUrl === undefined) {
       return (
@@ -1625,11 +1628,6 @@ const CommunityScreen = () => {
                       <Ionicons name="chatbubble" size={16} color="#6b7280" />
                       <Text style={styles.actionText}>{item.comments?.length ?? 0}</Text>
                     </TouchableOpacity>
-                    
-                    <TouchableOpacity style={styles.actionButton}>
-                      <Ionicons name="share" size={16} color="#6b7280" />
-                      <Text style={styles.actionText}>Share</Text>
-                    </TouchableOpacity>
                   </View>
 
                   {/* Comments */}
@@ -1667,16 +1665,15 @@ const CommunityScreen = () => {
                               style={{ marginRight: 6 }}
                             />
                               <Text style={styles.commentAuthor}>{comment.author}</Text>
-                              {isCommentAuthorBoardMember(comment.author) && (
-                                <View style={styles.boardMemberBadge}>
-                                  <Ionicons name="shield" size={10} color="#ffffff" />
-                                  <Text style={styles.boardMemberBadgeText}>Board Member</Text>
-                                </View>
-                              )}
-                              {isCommentAuthorDeveloper(comment.author) && (
+                              {isCommentAuthorDeveloper(comment.author) ? (
                                 <View style={styles.developerBadge}>
                                   <Ionicons name="code-slash" size={10} color="#ffffff" />
                                   <Text style={styles.developerBadgeText}>Developer</Text>
+                                </View>
+                              ) : isCommentAuthorBoardMember(comment.author) && (
+                                <View style={styles.boardMemberBadge}>
+                                  <Ionicons name="shield" size={10} color="#ffffff" />
+                                  <Text style={styles.boardMemberBadgeText}>Board Member</Text>
                                 </View>
                               )}
                             </View>
@@ -1707,16 +1704,15 @@ const CommunityScreen = () => {
                                 style={{ marginRight: 6 }}
                               />
                               <Text style={styles.commentAuthor}>{comment.author}</Text>
-                              {isCommentAuthorBoardMember(comment.author) && (
-                                <View style={styles.boardMemberBadge}>
-                                  <Ionicons name="shield" size={10} color="#ffffff" />
-                                  <Text style={styles.boardMemberBadgeText}>Board Member</Text>
-                                </View>
-                              )}
-                              {isCommentAuthorDeveloper(comment.author) && (
+                              {isCommentAuthorDeveloper(comment.author) ? (
                                 <View style={styles.developerBadge}>
                                   <Ionicons name="code-slash" size={10} color="#ffffff" />
                                   <Text style={styles.developerBadgeText}>Developer</Text>
+                                </View>
+                              ) : isCommentAuthorBoardMember(comment.author) && (
+                                <View style={styles.boardMemberBadge}>
+                                  <Ionicons name="shield" size={10} color="#ffffff" />
+                                  <Text style={styles.boardMemberBadgeText}>Board Member</Text>
                                 </View>
                               )}
                             </View>
@@ -2773,7 +2769,7 @@ const styles = StyleSheet.create({
   newPostButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2563eb',
+    backgroundColor: '#eab308',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
@@ -3511,7 +3507,7 @@ const styles = StyleSheet.create({
   addNotificationButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2563eb',
+    backgroundColor: '#eab308',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
@@ -3843,7 +3839,7 @@ const styles = StyleSheet.create({
   addPetButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#10b981',
+    backgroundColor: '#eab308',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,

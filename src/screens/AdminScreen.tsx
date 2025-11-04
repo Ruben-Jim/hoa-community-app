@@ -30,6 +30,7 @@ import DeveloperIndicator from '../components/DeveloperIndicator';
 import CustomTabBar from '../components/CustomTabBar';
 import MobileTabBar from '../components/MobileTabBar';
 import ProfileImage from '../components/ProfileImage';
+import { useStorageUrl } from '../hooks/useStorageUrl';
 
 const AdminScreen = () => {
   const { user } = useAuth();
@@ -999,7 +1000,8 @@ const AdminScreen = () => {
 
   // Helper component for pet images
   const PetImage = ({ storageId }: { storageId: string }) => {
-    const imageUrl = useQuery(api.storage.getUrl, { storageId: storageId as any });
+    // Use cached storage URL hook to reduce API calls
+    const imageUrl = useStorageUrl(storageId);
     const pulseAnim = useRef(new Animated.Value(0.4)).current;
     
     useEffect(() => {

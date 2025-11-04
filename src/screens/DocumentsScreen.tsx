@@ -25,6 +25,7 @@ import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import DeveloperIndicator from '../components/DeveloperIndicator';
 import CustomTabBar from '../components/CustomTabBar';
 import MobileTabBar from '../components/MobileTabBar';
+import { useStorageUrl } from '../hooks/useStorageUrl';
 
 const DocumentsScreen = () => {
   const { user } = useAuth();
@@ -247,7 +248,8 @@ const DocumentsScreen = () => {
 
   // Helper component to get document URL
   const DocumentViewer = ({ storageId }: { storageId: string }) => {
-    const fileUrl = useQuery(api.storage.getUrl, { storageId: storageId as any });
+    // Use cached storage URL hook to reduce API calls
+    const fileUrl = useStorageUrl(storageId);
 
     if (fileUrl === undefined) {
       return (
@@ -291,13 +293,6 @@ const DocumentsScreen = () => {
             isMenuOpen={isMenuOpen}
             onMenuClose={() => setIsMenuOpen(false)}
           />
-        )}
-
-        {/* Custom Tab Bar - Only when screen is wide enough */}
-        {showDesktopNav && (
-          <Animated.View style={{ opacity: fadeAnim }}>
-            <CustomTabBar />
-          </Animated.View>
         )}
         
         <ScrollView 
@@ -366,6 +361,13 @@ const DocumentsScreen = () => {
               </View>
             </ImageBackground>
           </Animated.View>
+
+          {/* Custom Tab Bar - Only when screen is wide enough */}
+          {showDesktopNav && (
+            <Animated.View style={{ opacity: fadeAnim }}>
+              <CustomTabBar />
+            </Animated.View>
+          )}
 
           {/* Type Tabs */}
           <View style={styles.typeTabsContainer}>

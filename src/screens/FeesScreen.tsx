@@ -227,15 +227,6 @@ const FeesScreen = () => {
             onMenuClose={() => setIsMenuOpen(false)}
           />
         )}
-
-        {/* Custom Tab Bar - Only when screen is wide enough */}
-        {showDesktopNav && (
-          <Animated.View style={{
-            opacity: fadeAnim,
-          }}>
-            <CustomTabBar />
-          </Animated.View>
-        )}
         
         <ScrollView 
           ref={scrollViewRef}
@@ -309,6 +300,15 @@ const FeesScreen = () => {
             </View>
           </ImageBackground>
         </Animated.View>
+
+        {/* Custom Tab Bar - Only when screen is wide enough */}
+        {showDesktopNav && (
+          <Animated.View style={{
+            opacity: fadeAnim,
+          }}>
+            <CustomTabBar />
+          </Animated.View>
+        )}
 
         {/* User Status Section - Compact */}
         {user && (
