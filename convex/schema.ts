@@ -97,31 +97,6 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_post", ["postId"]),
 
-  emergencyNotifications: defineTable({
-    title: v.string(),
-    content: v.string(),
-    type: v.union(
-      v.literal("Emergency"),
-      v.literal("Alert"),
-      v.literal("Info")
-    ),
-    priority: v.union(
-      v.literal("High"),
-      v.literal("Medium"),
-      v.literal("Low")
-    ),
-    isActive: v.boolean(),
-    category: v.union(
-      v.literal("Security"),
-      v.literal("Maintenance"),
-      v.literal("Event"),
-      v.literal("Lost Pet"),
-      v.literal("Other")
-    ),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  }).index("by_active", ["isActive"]).index("by_category", ["category"]).index("by_priority", ["priority"]),
-
   hoaInfo: defineTable({
     name: v.string(),
     address: v.string(),
@@ -228,4 +203,17 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_resident", ["residentId"]),
+
+  documents: defineTable({
+    title: v.string(),
+    description: v.optional(v.string()),
+    type: v.union(
+      v.literal("Minutes"),
+      v.literal("Financial")
+    ),
+    fileStorageId: v.string(), // Storage ID for document file (PDF, etc.)
+    uploadedBy: v.string(), // User who uploaded the document
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_type", ["type"]),
 }); 

@@ -227,43 +227,6 @@ const FeesScreen = () => {
             onMenuClose={() => setIsMenuOpen(false)}
           />
         )}
-        
-        {/* Header */}
-        <Animated.View style={{
-          opacity: fadeAnim,
-        }}>
-          <ImageBackground
-            source={require('../../assets/hoa-4k.jpg')}
-            style={styles.header}
-            imageStyle={styles.headerImage}
-          >
-            <View style={styles.headerOverlay} />
-            <View style={styles.headerTop}>
-              {/* Hamburger Menu - Only when mobile nav is shown */}
-              {showMobileNav && (
-                <TouchableOpacity
-                  style={styles.menuButton}
-                  onPress={() => setIsMenuOpen(true)}
-                >
-                  <Ionicons name="menu" size={24} color="#ffffff" />
-                </TouchableOpacity>
-              )}
-              
-              <View style={styles.headerLeft}>
-                <View style={styles.titleContainer}>
-                  <Text style={styles.headerTitle}>Fees & Fines</Text>
-                </View>
-                <Text style={styles.headerSubtitle}>
-                  Manage your HOA payments and violations
-                </Text>
-                <View style={styles.indicatorsContainer}>
-                  <DeveloperIndicator />
-                  <BoardMemberIndicator />
-                </View>
-              </View>
-            </View>
-          </ImageBackground>
-        </Animated.View>
 
         {/* Custom Tab Bar - Only when screen is wide enough */}
         {showDesktopNav && (
@@ -310,6 +273,43 @@ const FeesScreen = () => {
             },
           })}
         >
+        {/* Header */}
+        <Animated.View style={{
+          opacity: fadeAnim,
+        }}>
+          <ImageBackground
+            source={require('../../assets/hoa-4k.jpg')}
+            style={styles.header}
+            imageStyle={styles.headerImage}
+          >
+            <View style={styles.headerOverlay} />
+            <View style={styles.headerTop}>
+              {/* Hamburger Menu - Only when mobile nav is shown */}
+              {showMobileNav && (
+                <TouchableOpacity
+                  style={styles.menuButton}
+                  onPress={() => setIsMenuOpen(true)}
+                >
+                  <Ionicons name="menu" size={24} color="#ffffff" />
+                </TouchableOpacity>
+              )}
+              
+              <View style={styles.headerLeft}>
+                <View style={styles.titleContainer}>
+                  <Text style={styles.headerTitle}>Fees & Fines</Text>
+                </View>
+                <Text style={styles.headerSubtitle}>
+                  Manage your HOA payments and violations
+                </Text>
+                <View style={styles.indicatorsContainer}>
+                  <DeveloperIndicator />
+                  <BoardMemberIndicator />
+                </View>
+              </View>
+            </View>
+          </ImageBackground>
+        </Animated.View>
+
         {/* User Status Section - Compact */}
         {user && (
           <Animated.View style={[

@@ -37,14 +37,13 @@ npm start
 
 # HOA Community App
 
-A comprehensive React Native mobile application for HOA (Homeowners Association) communities to manage communication, information sharing, and emergency notifications.
+A comprehensive React Native mobile application for HOA (Homeowners Association) communities to manage communication and information sharing.
 
 ## ✨ Features
 
 ### 🏠 Home Screen
 - Welcome dashboard with community information
 - Quick access to office contact information
-- Active emergency alerts display
 - Recent community posts preview
 - Emergency contact button
 - Real-time updates
@@ -82,16 +81,6 @@ A comprehensive React Native mobile application for HOA (Homeowners Association)
 - Post filtering and search
 - Rich text support
 
-### 🚨 Emergency Notifications
-- **NEW**: Enhanced notification system with iOS 18+ and Android 15+ support
-- Real-time emergency alerts
-- Priority-based notifications (High, Medium, Low)
-- Category filtering (Security, Maintenance, Event, Lost Pet, Other)
-- Create new emergency alerts
-- Alert status management (Active/Inactive)
-- Detailed notification views
-- **NEW**: Web notification support
-- **NEW**: Cross-platform notification management
 
 ### 🔐 Authentication & Security
 - **NEW**: Secure user authentication
@@ -127,7 +116,6 @@ The app uses Convex as the backend database with the following tables:
 ### Core Tables
 - **communityPosts**: Community forum posts with categories and interactions
 - **comments**: Post comments and replies with threading
-- **emergencyNotifications**: Emergency alerts and notifications with priorities
 - **residents**: Resident directory with contact information
 - **boardMembers**: Board member profiles and positions
 - **covenants**: Community rules and regulations
@@ -210,7 +198,6 @@ hoa-community-app/
 │   │   ├── CovenantsScreen.tsx
 │   │   ├── FeesScreen.tsx
 │   │   ├── CommunityScreen.tsx
-│   │   ├── EmergencyScreen.tsx
 │   │   ├── AdminScreen.tsx
 │   │   ├── LoginScreen.tsx
 │   │   └── SignupScreen.tsx
@@ -244,7 +231,6 @@ hoa-community-app/
 │   ├── boardMembers.ts       # Board member functions
 │   ├── covenants.ts          # Covenant functions
 │   ├── communityPosts.ts     # Community post functions
-│   ├── emergencyNotifications.ts # Emergency notification functions
 │   ├── fees.ts               # Fee management functions
 │   ├── fines.ts              # Fine management functions
 │   ├── residents.ts          # Resident management functions
@@ -257,7 +243,6 @@ hoa-community-app/
 
 ### Real-time Updates
 The app uses Convex's real-time capabilities to provide instant updates across all connected devices when:
-- New emergency alerts are posted
 - Community posts are created
 - Board information is updated
 - Fees and fines are modified
@@ -301,7 +286,7 @@ The app uses Convex's real-time capabilities to provide instant updates across a
 - Modify fee and fine data in `src/screens/FeesScreen.tsx` (mock data)
 - Update covenant categories and rules in Convex
 - Customize board member information through Admin panel
-- Manage community posts and emergency notifications
+- Manage community posts
 
 ### Features
 - Add new screen components
@@ -393,7 +378,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🔒 Privacy & Compliance
 
-This app is designed for HOA communities and includes features for managing community affairs, emergency notifications, and resident communication. When implementing this solution:
+This app is designed for HOA communities and includes features for managing community affairs and resident communication. When implementing this solution:
 
 - Ensure compliance with local privacy laws (GDPR, CCPA, etc.)
 - Follow HOA regulations and bylaws

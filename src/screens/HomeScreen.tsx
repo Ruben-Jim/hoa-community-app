@@ -12,6 +12,7 @@ import {
   Image,
   Animated,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -33,7 +34,6 @@ const HomeScreen = () => {
   const { user, signOut } = useAuth();
   const navigation = useNavigation();
   const hoaInfo = useQuery(api.hoaInfo.get);
-  const emergencyNotifications = useQuery(api.emergencyNotifications.getActive);
   const communityPosts = useQuery(api.communityPosts.getAll);
   const polls = useQuery(api.polls.getAll);
   const userVotes = useQuery(api.polls.getAllUserVotes, user ? { userId: user._id } : "skip");
@@ -295,7 +295,6 @@ const HomeScreen = () => {
     }
   };
 
-  const activeNotifications = emergencyNotifications?.filter((n: any) => n.isActive) ?? [];
 
   // iOS Home Screen functionality
   const handleIOSInstall = () => {
@@ -545,50 +544,10 @@ const HomeScreen = () => {
         </Animated.View>
       )}
 
-      {/* Active Notifications */}
-      {activeNotifications.length > 0 && (
-        <Animated.View style={[
-          styles.section, 
-        styles.emergencySection,
-        { borderLeftColor: '#ef4444' }, // Red
-        {
-          opacity: quickActionsAnim,
-          transform: [{
-            translateY: quickActionsAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [50, 0],
-            })
-          }]
-        }
-        ]}>
-          <View style={styles.emergencyHeader}>
-            <Ionicons name="warning" size={24} color="#ef4444" />
-            <Text style={styles.emergencyTitle}>Active Alerts</Text>
-          </View>
-          {activeNotifications.slice(0, 2).map((notification: any) => (
-            <View key={notification._id} style={styles.notificationCard}>
-              <View style={styles.notificationHeader}>
-                <Ionicons 
-                  name={notification.type === 'Emergency' ? 'warning' : 'information-circle'} 
-                  size={20} 
-                  color={notification.priority === 'High' ? '#dc2626' : '#f59e0b'} 
-                />
-                <Text style={styles.notificationTitle}>{notification.title}</Text>
-              </View>
-              <Text style={styles.notificationContent}>{notification.content}</Text>
-              <Text style={styles.notificationTime}>
-                {formatDate(new Date(notification.createdAt).toISOString())}
-              </Text>
-            </View>
-          ))}
-        </Animated.View>
-      )}
-
-
       {/* Recent Community Posts */}
       <Animated.View style={[
         styles.section,
-        { borderLeftColor: '#f97316' }, // Orange
+        { borderLeftColor: '#ef4444' }, // Orange
         {
           opacity: postsAnim,
           transform: [{
@@ -603,34 +562,7 @@ const HomeScreen = () => {
           <Ionicons name="people" size={24} color="#64748b" />
           <Text style={[styles.sectionTitle, { marginLeft: 8, marginBottom: 0 }]}>Recent Community Posts</Text>
         </View>
-        {communityPosts?.slice(0, 2).map((post: any, index: number) => {
-          // Helper component for displaying images
-          const PostImage = ({ storageId }: { storageId: string }) => {
-            const imageUrl = useQuery(api.storage.getUrl, { storageId: storageId as any });
-
-            if (imageUrl === undefined) {
-              return (
-                <View style={[styles.postImageWrapper, styles.imageLoading]}>
-                  <Ionicons name="image" size={20} color="#9ca3af" />
-                </View>
-              );
-            }
-
-            if (!imageUrl) {
-              return null;
-            }
-
-            return (
-              <View style={styles.postImageWrapper}>
-                <Image 
-                  source={{ uri: imageUrl }} 
-                  style={styles.postImage}
-                  resizeMode="cover"
-                />
-              </View>
-            );
-          };
-
+        {(communityPosts?.filter((post: any) => post.category !== 'Complaint') || []).slice(0, 2).map((post: any, index: number) => {
           return (
             <Animated.View 
               key={post._id} 
@@ -659,18 +591,6 @@ const HomeScreen = () => {
                 {post.content}
               </Text>
               
-              {/* Post Images */}
-              {post.images && post.images.length > 0 && (
-                <View style={styles.postImagesContainer}>
-                  {post.images.slice(0, 3).map((imageStorageId: string, imgIndex: number) => (
-                    <PostImage 
-                      key={imgIndex}
-                      storageId={imageStorageId}
-                    />
-                  ))}
-                </View>
-              )}
-              
               <View style={styles.postFooter}>
                 <Text style={styles.postTime}>{formatDate(new Date(post.createdAt).toISOString())}</Text>
                 <View style={styles.postStats}>
@@ -692,7 +612,7 @@ const HomeScreen = () => {
           }}
         >
           <Text style={styles.viewMoreButtonText}>View More</Text>
-          <Ionicons name="arrow-forward" size={14} color="#f97316" />
+          <Ionicons name="arrow-forward" size={14} color="#ef4444" />
         </TouchableOpacity>
       </Animated.View>
 
@@ -700,7 +620,7 @@ const HomeScreen = () => {
       {polls && polls.length > 0 && (
         <Animated.View style={[
           styles.section,
-          { borderLeftColor: '#eab308' }, // Yellow
+          { borderLeftColor: '#f97316' }, // Yellow
           {
             opacity: postsAnim,
             transform: [{
@@ -823,7 +743,7 @@ const HomeScreen = () => {
                   }}
                 >
                   <Text style={styles.viewMoreText}>View Poll</Text>
-                  <Ionicons name="arrow-forward" size={16} color="#3b82f6" />
+                  <Ionicons name="arrow-forward" size={16} color="#f97316" />
                 </TouchableOpacity>
               </View>
             </Animated.View>
@@ -834,7 +754,7 @@ const HomeScreen = () => {
       {/* Office Information */}
       <Animated.View style={[
         styles.section,
-        { borderLeftColor: '#22c55e' }, // Green
+        { borderLeftColor: '#eab308' }, // Green
         {
           opacity: officeAnim,
           transform: [{
@@ -872,7 +792,7 @@ const HomeScreen = () => {
       {/* Additional sections for more content - Community Guidelines */}
       <Animated.View style={[
         styles.section,
-        { borderLeftColor: '#3b82f6' }, // Blue
+        { borderLeftColor: '#22c55e' }, // Blue
         {
           opacity: officeAnim,
           transform: [{
@@ -906,7 +826,7 @@ const HomeScreen = () => {
       {/* Upcoming Events */}
       <Animated.View style={[
         styles.section,
-        { borderLeftColor: '#6366f1' }, // Indigo
+        { borderLeftColor: '#3b82f6' }, // Indigo
         {
           opacity: officeAnim,
           transform: [{
@@ -1200,22 +1120,6 @@ const styles = StyleSheet.create({
     color: '#1e293b',
     marginBottom: 15,
   },
-  emergencySection: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#ef4444',
-    backgroundColor: '#fef2f2',
-  },
-  emergencyHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  emergencyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ef4444',
-    marginLeft: 8,
-  },
   communityHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1344,8 +1248,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   postImageWrapper: {
-    width: 100,
-    height: 100,
     borderRadius: 8,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -1355,13 +1257,17 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   postImage: {
-    width: '100%',
-    height: '100%',
+    width: Platform.OS === 'web' ? 120 : 100,
+    height: Platform.OS === 'web' ? 120 : 100,
+    borderRadius: 8,
   },
   imageLoading: {
-    backgroundColor: '#e2e8f0',
+    width: Platform.OS === 'web' ? 120 : 100,
+    height: Platform.OS === 'web' ? 120 : 100,
+    backgroundColor: '#f3f4f6',
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 8,
   },
   viewMoreButton: {
     flexDirection: 'row',
@@ -1374,7 +1280,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   viewMoreButtonText: {
-    color: '#f97316',
+    color: '#ef4444',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -1455,7 +1361,7 @@ const styles = StyleSheet.create({
   },
   viewMoreText: {
     fontSize: 12,
-    color: '#3b82f6',
+    color: '#f97316',
     marginRight: 4,
   },
   viewPollButton: {

@@ -164,6 +164,26 @@ const CommunityScreen = () => {
   const residents = useQuery(api.residents.getAll);
   const pets = useQuery(api.pets.getAll) ?? [];
 
+  // Helper function to check if a comment author is a board member
+  const isCommentAuthorBoardMember = (authorName: string) => {
+    if (!residents || !authorName) return false;
+    const resident = residents.find((r: any) => {
+      const fullName = `${r.firstName} ${r.lastName}`;
+      return fullName === authorName;
+    });
+    return resident?.isBoardMember && resident?.isActive;
+  };
+
+  // Helper function to check if a comment author is a developer
+  const isCommentAuthorDeveloper = (authorName: string) => {
+    if (!residents || !authorName) return false;
+    const resident = residents.find((r: any) => {
+      const fullName = `${r.firstName} ${r.lastName}`;
+      return fullName === authorName;
+    });
+    return resident?.isDev ?? false;
+  };
+
   // Convex mutations
   const createPost = useMutation(api.communityPosts.create);
   const addComment = useMutation(api.communityPosts.addComment);
@@ -178,7 +198,8 @@ const CommunityScreen = () => {
   const updatePet = useMutation(api.pets.update);
   const deletePet = useMutation(api.pets.remove);
 
-  const categories = ['General', 'Event', 'Complaint', 'Suggestion', 'Lost & Found'];
+  const categories = ['General', 'Event', 'Suggestion', 'Lost & Found'];
+  const postCategories = ['General', 'Event', 'Complaint', 'Suggestion', 'Lost & Found']; // Include Complaint for post creation
   const COMMENTS_PREVIEW_LIMIT = 2; // Show only 2 comments initially
 
   // Modern animation functions
@@ -272,9 +293,14 @@ const CommunityScreen = () => {
     }
   }, [userVotes]);
 
-  const filteredPosts = posts.filter((post: any) =>
-    !selectedCategory || post.category === selectedCategory
-  );
+  const filteredPosts = posts.filter((post: any) => {
+    // Exclude complaint posts from regular users - only admins see them in AdminScreen
+    if (post.category === 'Complaint') {
+      return false;
+    }
+    // Apply category filter if one is selected
+    return !selectedCategory || post.category === selectedCategory;
+  });
 
   // Separate posts and polls for display
   const postsContent = filteredPosts.map(post => ({ ...post, type: 'post' })).sort((a, b) => b.createdAt - a.createdAt);
@@ -550,7 +576,7 @@ const CommunityScreen = () => {
     if (imageUrl === undefined) {
       return (
         <View style={[styles.postImageWrapper, styles.imageLoading]}>
-          <Ionicons name="image" size={24} color="#9ca3af" />
+          <ActivityIndicator size="large" color="#9ca3af" />
         </View>
       );
     }
@@ -1641,6 +1667,18 @@ const CommunityScreen = () => {
                               style={{ marginRight: 6 }}
                             />
                               <Text style={styles.commentAuthor}>{comment.author}</Text>
+                              {isCommentAuthorBoardMember(comment.author) && (
+                                <View style={styles.boardMemberBadge}>
+                                  <Ionicons name="shield" size={10} color="#ffffff" />
+                                  <Text style={styles.boardMemberBadgeText}>Board Member</Text>
+                                </View>
+                              )}
+                              {isCommentAuthorDeveloper(comment.author) && (
+                                <View style={styles.developerBadge}>
+                                  <Ionicons name="code-slash" size={10} color="#ffffff" />
+                                  <Text style={styles.developerBadgeText}>Developer</Text>
+                                </View>
+                              )}
                             </View>
                             <Text style={styles.commentTime}>
                               {formatDate(comment.createdAt ? new Date(comment.createdAt).toISOString() : comment.timestamp || new Date().toISOString())}
@@ -1669,6 +1707,18 @@ const CommunityScreen = () => {
                                 style={{ marginRight: 6 }}
                               />
                               <Text style={styles.commentAuthor}>{comment.author}</Text>
+                              {isCommentAuthorBoardMember(comment.author) && (
+                                <View style={styles.boardMemberBadge}>
+                                  <Ionicons name="shield" size={10} color="#ffffff" />
+                                  <Text style={styles.boardMemberBadgeText}>Board Member</Text>
+                                </View>
+                              )}
+                              {isCommentAuthorDeveloper(comment.author) && (
+                                <View style={styles.developerBadge}>
+                                  <Ionicons name="code-slash" size={10} color="#ffffff" />
+                                  <Text style={styles.developerBadgeText}>Developer</Text>
+                                </View>
+                              )}
                             </View>
                                   <Text style={styles.commentTime}>
                                     {formatDate(comment.createdAt ? new Date(comment.createdAt).toISOString() : comment.timestamp || new Date().toISOString())}
@@ -2068,7 +2118,7 @@ const CommunityScreen = () => {
           <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
             <Text style={styles.inputLabel}>Category</Text>
             <View style={styles.categorySelector}>
-              {categories.map((category) => (
+              {postCategories.map((category) => (
                 <TouchableOpacity
                   key={category}
                   style={[
@@ -2989,6 +3039,37 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#374151',
+    marginRight: 4,
+  },
+  boardMemberBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#10b981',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 4,
+    gap: 4,
+  },
+  boardMemberBadgeText: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  developerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 4,
+    gap: 4,
+  },
+  developerBadgeText: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: '#ffffff',
   },
   commentContent: {
     fontSize: 12,
@@ -3326,26 +3407,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginVertical: 12,
-    gap: 8,
+    gap: 12,
   },
   postImageWrapper: {
-    borderRadius: 8,
+    borderRadius: 12,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
   },
   postImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 8,
+    width: Platform.OS === 'web' ? 300 : 280,
+    height: Platform.OS === 'web' ? 300 : 280,
+    borderRadius: 12,
   },
   imageLoading: {
+    width: Platform.OS === 'web' ? 300 : 280,
+    height: Platform.OS === 'web' ? 300 : 280,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f3f4f6',
+    borderRadius: 12,
   },
   // Sub-tab styles
   subTabContainer: {

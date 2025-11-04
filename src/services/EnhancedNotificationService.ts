@@ -164,24 +164,6 @@ class EnhancedNotificationService {
    */
   private async configureNotificationCategories(): Promise<void> {
     try {
-      // Emergency category
-      await Notifications.setNotificationCategoryAsync('emergency', [
-        {
-          identifier: 'view_action',
-          buttonTitle: 'View Alert',
-          options: {
-            opensAppToForeground: true,
-          },
-        },
-        {
-          identifier: 'dismiss_action',
-          buttonTitle: 'Dismiss',
-          options: {
-            opensAppToForeground: false,
-          },
-        },
-      ]);
-
       // Alert category
       await Notifications.setNotificationCategoryAsync('alert', [
         {
@@ -342,9 +324,6 @@ class EnhancedNotificationService {
     if (!this.notificationSettings) return true;
     
     switch (type) {
-      case 'emergency':
-        // Emergency notifications are always enabled for safety
-        return true;
       case 'alert':
         return this.notificationSettings.alerts;
       case 'info':
@@ -352,35 +331,6 @@ class EnhancedNotificationService {
       default:
         return true;
     }
-  }
-
-  /**
-   * Send emergency alert notification
-   */
-  public async sendEmergencyAlert(
-    title: string,
-    content: string,
-    priority: 'High' | 'Medium' | 'Low' = 'High'
-  ): Promise<string | null> {
-    const priorityMap = {
-      High: 'high' as const,
-      Medium: 'normal' as const,
-      Low: 'low' as const,
-    };
-
-    return this.sendLocalNotification({
-      title: `🚨 ${title}`,
-      body: content,
-      priority: priorityMap[priority],
-      category: 'emergency',
-      sound: true,
-      vibrate: true,
-      data: {
-        type: 'emergency',
-        priority,
-        timestamp: Date.now(),
-      },
-    });
   }
 
   /**

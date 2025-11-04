@@ -61,7 +61,6 @@ const AdminScreen = () => {
   const covenants = useQuery(api.covenants.getAll) ?? [];
   const communityPosts = useQuery(api.communityPosts.getAll) ?? [];
   const comments = useQuery(api.communityPosts.getAllComments) ?? [];
-  const emergencyAlerts = useQuery(api.emergencyNotifications.getAll) ?? [];
   const homeownersPaymentStatus = useQuery(api.fees.getAllHomeownersPaymentStatus) ?? [];
   const allFeesFromDatabase = useQuery(api.fees.getAll) ?? [];
   const allFinesFromDatabase = useQuery(api.fees.getAllFines) ?? [];
@@ -95,9 +94,6 @@ const AdminScreen = () => {
   const createBoardMember = useMutation(api.boardMembers.create);
   const updateBoardMember = useMutation(api.boardMembers.update);
   const generateUploadUrl = useMutation(api.storage.generateUploadUrl);
-  const createEmergencyAlert = useMutation(api.emergencyNotifications.create);
-  const updateEmergencyAlert = useMutation(api.emergencyNotifications.update);
-  const deleteEmergencyAlert = useMutation(api.emergencyNotifications.remove);
   
   // Fee management mutations
   const createYearFeesForAllHomeowners = useMutation(api.fees.createYearFeesForAllHomeowners);
@@ -125,8 +121,8 @@ const AdminScreen = () => {
   
   // State
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'SheltonHOA' | 'residents' | 'board' | 'covenants' | 'Community' | 'emergency' | 'fees'>('SheltonHOA');
-  const [postsSubTab, setPostsSubTab] = useState<'posts' | 'comments' | 'polls' | 'pets'>('posts');
+  const [activeTab, setActiveTab] = useState<'SheltonHOA' | 'residents' | 'board' | 'covenants' | 'Community' | 'fees'>('SheltonHOA');
+  const [postsSubTab, setPostsSubTab] = useState<'posts' | 'comments' | 'polls' | 'pets' | 'complaints'>('posts');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const [showBlockModal, setShowBlockModal] = useState(false);
@@ -147,18 +143,6 @@ const AdminScreen = () => {
   });
   const [boardMemberImage, setBoardMemberImage] = useState<string | null>(null);
   
-  // Emergency alert modal state
-  const [showEmergencyModal, setShowEmergencyModal] = useState(false);
-  const [isEditingEmergency, setIsEditingEmergency] = useState(false);
-  const [emergencyForm, setEmergencyForm] = useState({
-    title: '',
-    content: '',
-    type: 'Alert' as 'Emergency' | 'Alert' | 'Info',
-    priority: 'Medium' as 'High' | 'Medium' | 'Low',
-    category: 'Other' as 'Security' | 'Maintenance' | 'Event' | 'Lost Pet' | 'Other',
-    isActive: true,
-  });
-
   // Fee management modal state
   const [showYearFeeModal, setShowYearFeeModal] = useState(false);
   const [showAddFineModal, setShowAddFineModal] = useState(false);
@@ -216,8 +200,6 @@ const AdminScreen = () => {
   const deleteModalTranslateY = useRef(new Animated.Value(300)).current;
   const boardMemberModalOpacity = useRef(new Animated.Value(0)).current;
   const boardMemberModalTranslateY = useRef(new Animated.Value(300)).current;
-  const emergencyModalOpacity = useRef(new Animated.Value(0)).current;
-  const emergencyModalTranslateY = useRef(new Animated.Value(300)).current;
   const yearFeeModalOpacity = useRef(new Animated.Value(0)).current;
   const yearFeeModalTranslateY = useRef(new Animated.Value(300)).current;
   const addFineModalOpacity = useRef(new Animated.Value(0)).current;
@@ -237,24 +219,20 @@ const AdminScreen = () => {
   const isBoardMember = user?.isBoardMember && user?.isActive;
 
   // Modern animation functions
-  const animateIn = (modalType: 'block' | 'delete' | 'boardMember' | 'emergency' | 'yearFee' | 'addFine' | 'covenant' | 'poll') => {
+  const animateIn = (modalType: 'block' | 'delete' | 'boardMember' | 'yearFee' | 'addFine' | 'covenant' | 'poll') => {
     const opacity = modalType === 'block' ? blockModalOpacity : 
                    modalType === 'delete' ? deleteModalOpacity :
                    modalType === 'boardMember' ? boardMemberModalOpacity : 
-                   modalType === 'emergency' ? emergencyModalOpacity :
                    modalType === 'yearFee' ? yearFeeModalOpacity : 
                    modalType === 'addFine' ? addFineModalOpacity :
                    modalType === 'covenant' ? covenantModalOpacity :
                    pollModalOpacity;
-                   pollModalOpacity;
     const translateY = modalType === 'block' ? blockModalTranslateY : 
                       modalType === 'delete' ? deleteModalTranslateY:
                       modalType === 'boardMember' ? boardMemberModalTranslateY : 
-                      modalType === 'emergency' ? emergencyModalTranslateY :
                       modalType === 'yearFee' ? yearFeeModalTranslateY : 
                       modalType === 'addFine' ? addFineModalTranslateY :
                       modalType === 'covenant' ? covenantModalTranslateY :
-                      pollModalTranslateY;
                       pollModalTranslateY;
     
     Animated.parallel([
@@ -277,21 +255,21 @@ const AdminScreen = () => {
     ]).start();
   };
 
-  const animateOut = (modalType: 'block' | 'delete' | 'boardMember' | 'emergency' | 'yearFee' | 'addFine' | 'covenant' | 'poll', callback: () => void) => {
+  const animateOut = (modalType: 'block' | 'delete' | 'boardMember' | 'yearFee' | 'addFine' | 'covenant' | 'poll', callback: () => void) => {
     const opacity = modalType === 'block' ? blockModalOpacity : 
                    modalType === 'delete' ? deleteModalOpacity :
                    modalType === 'boardMember' ? boardMemberModalOpacity : 
-                   modalType === 'emergency' ? emergencyModalOpacity :
                    modalType === 'yearFee' ? yearFeeModalOpacity : 
                    modalType === 'addFine' ? addFineModalOpacity :
-                   covenantModalOpacity;
+                   modalType === 'covenant' ? covenantModalOpacity :
+                   pollModalOpacity;
     const translateY = modalType === 'block' ? blockModalTranslateY : 
                       modalType === 'delete' ? deleteModalTranslateY :
                       modalType === 'boardMember' ? boardMemberModalTranslateY : 
-                      modalType === 'emergency' ? emergencyModalTranslateY :
                       modalType === 'yearFee' ? yearFeeModalTranslateY : 
                       modalType === 'addFine' ? addFineModalTranslateY :
-                      covenantModalTranslateY;
+                      modalType === 'covenant' ? covenantModalTranslateY :
+                      pollModalTranslateY;
     
     Animated.parallel([
       Animated.timing(overlayOpacity, {
@@ -419,10 +397,6 @@ const AdminScreen = () => {
         case 'comment':
           await deleteComment({ id: selectedItem._id });
           Alert.alert('Success', 'Comment deleted successfully.');
-          break;
-        case 'emergency':
-          await deleteEmergencyAlert({ id: selectedItem._id });
-          Alert.alert('Success', 'Emergency alert deleted successfully.');
           break;
         case 'pet':
           await deletePet({ id: selectedItem._id });
@@ -567,99 +541,6 @@ const AdminScreen = () => {
       setBoardMemberImage(null);
       setSelectedItem(null);
     });
-  };
-
-  // Emergency alert handlers
-  const handleAddEmergencyAlert = () => {
-    setEmergencyForm({
-      title: '',
-      content: '',
-      type: 'Alert',
-      priority: 'Medium',
-      category: 'Other',
-      isActive: true,
-    });
-    setIsEditingEmergency(false);
-    setShowEmergencyModal(true);
-    animateIn('emergency');
-  };
-
-  const handleEditEmergencyAlert = (alert: any) => {
-    setEmergencyForm({
-      title: alert.title || '',
-      content: alert.content || '',
-      type: alert.type || 'Alert',
-      priority: alert.priority || 'Medium',
-      category: alert.category || 'Other',
-      isActive: true, // Always true for editing, toggle handled separately
-    });
-    setIsEditingEmergency(true);
-    setSelectedItem(alert);
-    setShowEmergencyModal(true);
-    animateIn('emergency');
-  };
-
-  const handleSaveEmergencyAlert = async () => {
-    if (!emergencyForm.title.trim() || !emergencyForm.content.trim()) {
-      Alert.alert('Error', 'Please fill in all required fields (Title, Content).');
-      return;
-    }
-
-    try {
-      if (isEditingEmergency) {
-        await updateEmergencyAlert({
-          id: selectedItem._id,
-          ...emergencyForm,
-        });
-        Alert.alert('Success', 'Emergency alert updated successfully.');
-      } else {
-        await createEmergencyAlert(emergencyForm);
-        Alert.alert('Success', 'Emergency alert created successfully.');
-      }
-      
-      animateOut('emergency', () => {
-        setShowEmergencyModal(false);
-        setEmergencyForm({
-          title: '',
-          content: '',
-          type: 'Alert',
-          priority: 'Medium',
-          category: 'Other',
-          isActive: true,
-        });
-        setSelectedItem(null);
-      });
-    } catch (error) {
-      Alert.alert('Error', 'Failed to save emergency alert. Please try again.');
-    }
-  };
-
-  const handleCancelEmergencyAlert = () => {
-    animateOut('emergency', () => {
-      setShowEmergencyModal(false);
-      setEmergencyForm({
-        title: '',
-        content: '',
-        type: 'Alert',
-        priority: 'Medium',
-        category: 'Other',
-        isActive: true,
-      });
-      setSelectedItem(null);
-    });
-  };
-
-  const handleToggleEmergencyActive = async (alert: any) => {
-    try {
-      await updateEmergencyAlert({
-        id: alert._id,
-        isActive: !alert.isActive,
-      });
-      Alert.alert('Success', `Emergency alert ${alert.isActive ? 'deactivated' : 'activated'} successfully!`);
-    } catch (error) {
-      console.error('Error toggling emergency alert status:', error);
-      Alert.alert('Error', 'Failed to update emergency alert status. Please try again.');
-    }
   };
 
   // Fee management handlers
@@ -1787,12 +1668,22 @@ const AdminScreen = () => {
               contentContainerStyle={styles.subTabsContent}
             >
               <TouchableOpacity
+                style={[styles.subTab, postsSubTab === 'complaints' && styles.activeSubTab]}
+                onPress={() => setPostsSubTab('complaints')}
+              >
+                <Ionicons name="warning" size={18} color={postsSubTab === 'complaints' ? '#ef4444' : '#6b7280'} />
+                <Text style={[styles.subTabText, postsSubTab === 'complaints' && styles.activeSubTabText]}>
+                  Complaints ({communityPosts.filter((p: any) => p.category === 'Complaint').length})
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
                 style={[styles.subTab, postsSubTab === 'posts' && styles.activeSubTab]}
                 onPress={() => setPostsSubTab('posts')}
               >
                 <Ionicons name="chatbubbles" size={18} color={postsSubTab === 'posts' ? '#3b82f6' : '#6b7280'} />
                 <Text style={[styles.subTabText, postsSubTab === 'posts' && styles.activeSubTabText]}>
-                  Posts ({communityPosts.length})
+                  Posts ({communityPosts.filter((p: any) => p.category !== 'Complaint').length})
                 </Text>
               </TouchableOpacity>
               
@@ -1829,7 +1720,7 @@ const AdminScreen = () => {
             
             {postsSubTab === 'posts' && (
             <FlatList
-              data={communityPosts}
+              data={communityPosts.filter((p: any) => p.category !== 'Complaint')}
               keyExtractor={(item) => item._id}
               numColumns={2}
               refreshControl={
@@ -1930,40 +1821,30 @@ const AdminScreen = () => {
                     <View style={styles.residentGridCardContent}>
                       {/* Main Info Row - Icon Left, Details Right */}
                       <View style={styles.residentGridMainInfo}>
-                        <View style={styles.residentGridAvatar}>
-                          {item.authorProfileImage ? (
-                            <View style={styles.postAvatarContainer}>
-                              <Image 
-                                source={{ uri: item.authorProfileImage }} 
-                                style={styles.postAvatarImage}
-                                resizeMode="cover"
-                              />
-                            </View>
-                          ) : (
-                            <View style={styles.postAvatarPlaceholder}>
-                              <Ionicons name="person" size={24} color="#6b7280" />
-                            </View>
-                          )}
-                        </View>
+                        <ProfileImage 
+                          source={item.authorProfileImage} 
+                          size={48}
+                          style={{ marginRight: 12 }}
+                        />
                         
                         <View style={styles.residentGridDetails}>
-                          {/* Author and Date Row */}
-                          <View style={styles.residentGridNameRow}>
-                            <Text style={styles.residentGridName} numberOfLines={1}>
-                              {item.author}
-                            </Text>
-                            <Text style={styles.residentGridRoleText} numberOfLines={1}>
-                              {formatDate(item.createdAt)}
-                            </Text>
-                          </View>
-                          
                           {/* Post Title */}
+                          <Text style={styles.postTitleText}>
+                            {item.postTitle}
+                          </Text>
+                          
+                          {/* Date */}
+                          <Text style={styles.postDateText}>
+                            {formatDate(item.createdAt)}
+                          </Text>
+                          
+                          {/* Author */}
                           <Text style={styles.residentGridEmail} numberOfLines={1}>
-                            On: {item.postTitle}
+                            By: {item.author}
                           </Text>
                           
                           {/* Comment Content */}
-                          <Text style={styles.residentGridAddress} numberOfLines={3}>
+                          <Text style={styles.postContentText}>
                             {item.content}
                           </Text>
                         </View>
@@ -2223,39 +2104,16 @@ const AdminScreen = () => {
                 }
               />
             )}
-          </View>
-        );
-      
-      case 'emergency':
-        return (
-          <View style={styles.tabContent}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Emergency Alerts</Text>
-            </View>
-            <FlatList
-              data={emergencyAlerts}
-              keyExtractor={(item) => item._id}
-              numColumns={2}
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-              }
-              renderItem={({ item }) => {
-                // Determine alert icon and color based on type
-                let alertIcon = 'warning';
-                let alertColor = '#f59e0b';
-                
-                if (item.type === 'Emergency') {
-                  alertIcon = 'alert-circle';
-                  alertColor = '#ef4444';
-                } else if (item.type === 'Alert') {
-                  alertIcon = 'warning';
-                  alertColor = '#f59e0b';
-                } else {
-                  alertIcon = 'information-circle';
-                  alertColor = '#3b82f6';
+            
+            {postsSubTab === 'complaints' && (
+              <FlatList
+                data={communityPosts.filter((p: any) => p.category === 'Complaint')}
+                keyExtractor={(item) => item._id}
+                numColumns={2}
+                refreshControl={
+                  <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
                 }
-
-                return (
+                renderItem={({ item }) => (
                   <Animated.View 
                     style={[
                       styles.residentGridCard,
@@ -2273,137 +2131,56 @@ const AdminScreen = () => {
                     <View style={styles.residentGridCardContent}>
                       {/* Main Info Row - Icon Left, Details Right */}
                       <View style={styles.residentGridMainInfo}>
-                        <View style={styles.residentGridAvatar}>
-                          <View style={[styles.postAvatarPlaceholder, { backgroundColor: alertColor + '20' }]}>
-                            <Ionicons name={alertIcon as any} size={24} color={alertColor} />
-                          </View>
-                        </View>
+                        <ProfileImage 
+                          source={item.authorProfileImage} 
+                          size={48}
+                          style={{ marginRight: 12 }}
+                        />
                         
                         <View style={styles.residentGridDetails}>
-                          {/* Title and Date Row */}
-                          <View style={styles.residentGridNameRow}>
-                            <Text style={styles.residentGridName} numberOfLines={2}>
-                              {item.title}
-                            </Text>
-                            <Text style={styles.residentGridRoleText} numberOfLines={1}>
-                              {formatDate(item.createdAt)}
-                            </Text>
-                          </View>
-                          
-                          {/* Category */}
-                          <Text style={styles.residentGridEmail} numberOfLines={1}>
-                            {item.category}
+                          {/* Title */}
+                          <Text style={styles.postTitleText}>
+                            {item.title}
                           </Text>
                           
-                          {/* Indicators Row - Type, Priority, and Active Status */}
-                          <View style={styles.emergencyIndicatorsRow}>
-                            {/* Type Badge */}
-                            <View style={[styles.emergencyIndicatorBadge, { 
-                              backgroundColor: item.type === 'Emergency' ? '#ef444420' : 
-                                             item.type === 'Alert' ? '#f59e0b20' : '#3b82f620'
-                            }]}>
-                              <Ionicons 
-                                name="information-circle" 
-                                size={8} 
-                                color={item.type === 'Emergency' ? '#ef4444' : 
-                                       item.type === 'Alert' ? '#f59e0b' : '#3b82f6'} 
-                              />
-                              <Text style={[styles.emergencyIndicatorText, { 
-                                color: item.type === 'Emergency' ? '#ef4444' : 
-                                       item.type === 'Alert' ? '#f59e0b' : '#3b82f6'
-                              }]} numberOfLines={1}>
-                                {item.type}
-                              </Text>
-                            </View>
-                            
-                            {/* Priority Badge */}
-                            <View style={[styles.emergencyIndicatorBadge, { 
-                              backgroundColor: item.priority === 'High' ? '#ef444420' : 
-                                             item.priority === 'Medium' ? '#f59e0b20' : '#10b98120'
-                            }]}>
-                              <Ionicons 
-                                name="flag" 
-                                size={8} 
-                                color={item.priority === 'High' ? '#ef4444' : 
-                                       item.priority === 'Medium' ? '#f59e0b' : '#10b981'} 
-                              />
-                              <Text style={[styles.emergencyIndicatorText, { 
-                                color: item.priority === 'High' ? '#ef4444' : 
-                                       item.priority === 'Medium' ? '#f59e0b' : '#10b981'
-                              }]} numberOfLines={1}>
-                                {item.priority}
-                              </Text>
-                            </View>
-                            
-                            {/* Active Status Badge */}
-                            {item.isActive && (
-                              <View style={[styles.emergencyIndicatorBadge, { 
-                                backgroundColor: '#10b98120'
-                              }]}>
-                                <Ionicons 
-                                  name="checkmark-circle" 
-                                  size={8} 
-                                  color="#10b981" 
-                                />
-                                <Text style={[styles.emergencyIndicatorText, { 
-                                  color: '#10b981'
-                                }]} numberOfLines={1}>
-                                  Active
-                                </Text>
-                              </View>
-                            )}
-                          </View>
+                          {/* Date */}
+                          <Text style={styles.postDateText}>
+                            {formatDate(item.createdAt)}
+                          </Text>
+                          
+                          {/* Author */}
+                          <Text style={styles.residentGridEmail} numberOfLines={1}>
+                            By: {item.author}
+                          </Text>
                           
                           {/* Content */}
-                          <Text style={styles.residentGridAddress} numberOfLines={3}>
+                          <Text style={styles.postContentText}>
                             {item.content}
                           </Text>
                         </View>
                       </View>
                       
-                      {/* Action Buttons */}
-                        <View style={styles.residentGridActions}>
-                          <View style={styles.boardActionButtons}>
-                           <TouchableOpacity
-                             style={[styles.boardActionButton, styles.editButton]}
-                             onPress={() => handleEditEmergencyAlert(item)}
-                           >
-                             <Ionicons name="create" size={16} color="#2563eb" />
-                             <Text style={styles.residentGridActionText}>Edit</Text>
-                           </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[styles.boardActionButton, item.isActive ? styles.deactivateButton : styles.activateButton]}
-                              onPress={() => handleToggleEmergencyActive(item)}
-                            >
-                              <Ionicons 
-                                name={item.isActive ? "pause-circle" : "play-circle"} 
-                                size={16} 
-                                color={item.isActive ? "#f59e0b" : "#10b981"} 
-                              />
-                              <Text style={[styles.residentGridActionText, { color: item.isActive ? "#f59e0b" : "#10b981" }]}>
-                                {item.isActive ? "Deactivate" : "Activate"}
-                              </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[styles.boardActionButton, styles.blockButton]}
-                              onPress={() => handleDeleteItem(item, 'emergency')}
-                            >
-                              <Ionicons name="trash" size={16} color="#ef4444" />
-                              <Text style={styles.residentGridActionText}>Delete</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
+                      {/* Action Button */}
+                      <View style={styles.residentGridActions}>
+                        <TouchableOpacity
+                          style={[styles.residentGridActionButton, styles.blockButton]}
+                          onPress={() => handleDeleteItem(item, 'post')}
+                        >
+                          <Ionicons name="trash" size={16} color="#ef4444" />
+                          <Text style={styles.residentGridActionText}>Delete</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   </Animated.View>
-                );
-              }}
-              ListEmptyComponent={
-                <View style={styles.emptyState}>
-                  <Ionicons name="warning" size={48} color="#9ca3af" />
-                  <Text style={styles.emptyStateText}>No emergency alerts found</Text>
-                </View>
-              }
-            />
+                )}
+                ListEmptyComponent={
+                  <View style={styles.emptyState}>
+                    <Ionicons name="warning-outline" size={48} color="#9ca3af" />
+                    <Text style={styles.emptyStateText}>No complaints found</Text>
+                  </View>
+                }
+              />
+            )}
           </View>
         );
       
@@ -3005,20 +2782,6 @@ const AdminScreen = () => {
           <TouchableOpacity
             style={[
               styles.folderTab, 
-              activeTab === 'emergency' && styles.activeFolderTab,
-              activeTab === 'emergency' && { borderColor: '#6366f1' }
-            ]}
-            onPress={() => setActiveTab('emergency')}
-          >
-            <Ionicons name="warning" size={20} color={activeTab === 'emergency' ? '#6366f1' : '#6b7280'} />
-            <Text style={[styles.folderTabText, activeTab === 'emergency' && styles.activeFolderTabText, activeTab === 'emergency' && { color: '#6366f1' }]}>
-              Emergency ({emergencyAlerts.length})
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[
-              styles.folderTab, 
               activeTab === 'fees' && styles.activeFolderTab,
               activeTab === 'fees' && { borderColor: '#ec4899' }
             ]}
@@ -3284,149 +3047,6 @@ const AdminScreen = () => {
           </Animated.View>
         </Modal>
 
-        {/* Emergency Alert Modal */}
-        <Modal
-          visible={showEmergencyModal}
-          transparent={true}
-          animationType="none"
-          onRequestClose={handleCancelEmergencyAlert}
-        >
-          <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
-            <Animated.View style={[
-              styles.emergencyModalContent,
-              {
-                opacity: emergencyModalOpacity,
-                transform: [{ translateY: emergencyModalTranslateY }],
-              }
-            ]}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>
-                  {isEditingEmergency ? 'Edit Emergency Alert' : 'Create Emergency Alert'}
-                </Text>
-                <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={handleCancelEmergencyAlert}
-                >
-                  <Ionicons name="close" size={24} color="#6b7280" />
-                </TouchableOpacity>
-              </View>
-              
-              <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Title *</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="Enter alert title"
-                    value={emergencyForm.title}
-                    onChangeText={(text) => setEmergencyForm(prev => ({ ...prev, title: text }))}
-                    autoCapitalize="words"
-                  />
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Content *</Text>
-                  <TextInput
-                    style={[styles.textInput, styles.textArea]}
-                    placeholder="Enter alert content"
-                    value={emergencyForm.content}
-                    onChangeText={(text) => setEmergencyForm(prev => ({ ...prev, content: text }))}
-                    multiline
-                    numberOfLines={4}
-                    textAlignVertical="top"
-                  />
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Type</Text>
-                  <View style={styles.radioGroup}>
-                    {['Emergency', 'Alert', 'Info'].map((type) => (
-                      <TouchableOpacity
-                        key={type}
-                        style={[
-                          styles.radioButton,
-                          emergencyForm.type === type && styles.radioButtonActive
-                        ]}
-                        onPress={() => setEmergencyForm(prev => ({ ...prev, type: type as any }))}
-                      >
-                        <Text style={[
-                          styles.radioButtonText,
-                          emergencyForm.type === type && styles.radioButtonTextActive
-                        ]}>
-                          {type}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Priority</Text>
-                  <View style={styles.radioGroup}>
-                    {['High', 'Medium', 'Low'].map((priority) => (
-                      <TouchableOpacity
-                        key={priority}
-                        style={[
-                          styles.radioButton,
-                          emergencyForm.priority === priority && styles.radioButtonActive
-                        ]}
-                        onPress={() => setEmergencyForm(prev => ({ ...prev, priority: priority as any }))}
-                      >
-                        <Text style={[
-                          styles.radioButtonText,
-                          emergencyForm.priority === priority && styles.radioButtonTextActive
-                        ]}>
-                          {priority}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Category</Text>
-                  <View style={styles.radioGroup}>
-                    {['Security', 'Maintenance', 'Event', 'Lost Pet', 'Other'].map((category) => (
-                      <TouchableOpacity
-                        key={category}
-                        style={[
-                          styles.radioButton,
-                          emergencyForm.category === category && styles.radioButtonActive
-                        ]}
-                        onPress={() => setEmergencyForm(prev => ({ ...prev, category: category as any }))}
-                      >
-                        <Text style={[
-                          styles.radioButtonText,
-                          emergencyForm.category === category && styles.radioButtonTextActive
-                        ]}>
-                          {category}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-              </ScrollView>
-
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={handleCancelEmergencyAlert}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.confirmButton}
-                  onPress={handleSaveEmergencyAlert}
-                >
-                  <Text style={styles.confirmButtonText}>
-                    {isEditingEmergency ? 'Update' : 'Create'} Alert
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </Animated.View>
-          </Animated.View>
-        </Modal>
-
         {/* Year Fee Modal */}
         <Modal
           visible={showYearFeeModal}
@@ -3436,7 +3056,7 @@ const AdminScreen = () => {
         >
           <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
             <Animated.View style={[
-              styles.emergencyModalContent,
+              styles.formModalContent,
               {
                 opacity: yearFeeModalOpacity,
                 transform: [{ translateY: yearFeeModalTranslateY }],
@@ -3516,7 +3136,7 @@ const AdminScreen = () => {
         >
           <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
             <Animated.View style={[
-              styles.emergencyModalContent,
+              styles.formModalContent,
               {
                 opacity: addFineModalOpacity,
                 transform: [{ translateY: addFineModalTranslateY }],
@@ -4495,8 +4115,8 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#2563eb',
   },
-  // Emergency alert styles
-  emergencyModalContent: {
+  // Form modal styles
+  formModalContent: {
     backgroundColor: '#ffffff',
     borderRadius: 20,
     width: '90%',
@@ -5552,25 +5172,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#9ca3af',
     textAlign: 'center',
-  },
-  // Emergency indicators layout
-  emergencyIndicatorsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 3,
-    marginBottom: 4,
-  },
-  emergencyIndicatorBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 6,
-    gap: 2,
-  },
-  emergencyIndicatorText: {
-    fontSize: 8,
-    fontWeight: '600',
   },
   // Poll styles
   pollOptionsContainer: {

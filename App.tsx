@@ -14,7 +14,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import BoardScreen from './src/screens/BoardScreen';
 import CommunityScreen from './src/screens/CommunityScreen';
 import CovenantsScreen from './src/screens/CovenantsScreen';
-import EmergencyScreen from './src/screens/EmergencyScreen';
+import DocumentsScreen from './src/screens/DocumentsScreen';
 import FeesScreen from './src/screens/FeesScreen';
 import BlockedAccountScreen from './src/screens/BlockedAccountScreen';
 import AdminScreen from './src/screens/AdminScreen';
@@ -54,7 +54,7 @@ const MainApp = () => {
       <Stack.Screen name="Board" component={BoardScreen} />
       <Stack.Screen name="Covenants" component={CovenantsScreen} />
       <Stack.Screen name="Community" component={CommunityScreen} />
-      <Stack.Screen name="Emergency" component={EmergencyScreen} />
+      <Stack.Screen name="Documents" component={DocumentsScreen} />
       <Stack.Screen name="Fees" component={FeesScreen} />
       {(isBoardMember || isDev) && (
         <Stack.Screen 
