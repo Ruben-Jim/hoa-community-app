@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourcompany.hoacommunityapp",
+      "bundleIdentifier": "com.Ruben-Jim.hoacommunityapp",
       "buildNumber": "1",
       "infoPlist": {
         "UIBackgroundModes": [
@@ -28,7 +28,7 @@
       }
     },
     "android": {
-      "package": "com.yourcompany.hoacommunityapp",
+      "package": "com.Ruben-Jim.hoacommunityapp",
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -58,7 +58,7 @@
       [
         "expo-router",
         {
-          "origin": "https://ruben-jim.github.io/hoa-community-app"
+          "origin": "https://sheltonsprings.homes"
         }
       ],
       [
