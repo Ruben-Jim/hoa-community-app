@@ -1,6 +1,7 @@
 {
   "expo": {
     "name": "HOA Community",
+    
     "slug": "hoa-community-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -46,7 +47,7 @@
     },
     "experiments": {
       "typedRoutes": true,
-      "baseUrl": "/hoa-community-app"
+      "baseUrl": "/"
     },
     "extra": {
       "convexUrl": "${EXPO_PUBLIC_CONVEX_URL}",
