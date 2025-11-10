@@ -16,6 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
+import { getUploadReadyImage } from '../utils/imageUpload';
 
 interface ImageEditModalProps {
   visible: boolean;
@@ -130,11 +131,10 @@ const ImageEditModal: React.FC<ImageEditModalProps> = ({
   const uploadImage = async (imageUri: string): Promise<string> => {
     try {
       const uploadUrl = await generateUploadUrl();
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
+      const { blob, mimeType } = await getUploadReadyImage(imageUri);
       const uploadResponse = await fetch(uploadUrl, {
         method: 'POST',
-        headers: { 'Content-Type': blob.type },
+        headers: { 'Content-Type': mimeType },
         body: blob,
       });
       const { storageId } = await uploadResponse.json();

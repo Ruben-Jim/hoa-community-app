@@ -8,13 +8,13 @@ import {
   TextInput,
   Alert,
   Modal,
-  Image,
   ImageBackground,
   Animated,
   Dimensions,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  FlatList,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,7 +30,8 @@ import MobileTabBar from '../components/MobileTabBar';
 import CustomAlert from '../components/CustomAlert';
 import { useCustomAlert } from '../hooks/useCustomAlert';
 import ProfileImage from '../components/ProfileImage';
-import { useStorageUrl } from '../hooks/useStorageUrl';
+import OptimizedImage from '../components/OptimizedImage';
+import { getUploadReadyImage } from '../utils/imageUpload';
 
 const CommunityScreen = () => {
   const { user } = useAuth();
@@ -118,8 +119,8 @@ const CommunityScreen = () => {
   const notificationModalTranslateY = useRef(new Animated.Value(300)).current;
   const contentAnim = useRef(new Animated.Value(1)).current;
   
-  // ScrollView ref for better control
-  const scrollViewRef = useRef<ScrollView>(null);
+  // Scroll reference for better control
+  const listRef = useRef<FlatList<any>>(null);
 
   // Listen for window size changes (only on web/desktop)
   useEffect(() => {
@@ -140,9 +141,9 @@ const CommunityScreen = () => {
       
       // Ensure scroll view is properly initialized
       setTimeout(() => {
-        if (scrollViewRef.current) {
+        if (listRef.current) {
           // Force a layout update
-          scrollViewRef.current.scrollTo({ y: 0, animated: false });
+          listRef.current.scrollToOffset({ offset: 0, animated: false });
           
           // Debug logging removed
         }
@@ -306,6 +307,19 @@ const CommunityScreen = () => {
   // Separate posts and polls for display
   const postsContent = filteredPosts.map(post => ({ ...post, type: 'post' })).sort((a, b) => b.createdAt - a.createdAt);
   const pollsContent = polls.map(poll => ({ ...poll, type: 'poll' })).sort((a, b) => b.createdAt - a.createdAt);
+
+  const [visiblePostCount, setVisiblePostCount] = useState(Math.min(10, postsContent.length || 0));
+
+  useEffect(() => {
+    if (activeSubTab === 'posts') {
+      setVisiblePostCount(Math.min(10, postsContent.length || 0));
+    }
+  }, [postsContent.length, activeSubTab]);
+
+  const postsData = useMemo(
+    () => postsContent.slice(0, visiblePostCount),
+    [postsContent, visiblePostCount]
+  );
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -542,13 +556,11 @@ const CommunityScreen = () => {
     try {
       for (const imageUri of selectedImages) {
         const uploadUrl = await generateUploadUrl();
-        
-        const response = await fetch(imageUri);
-        const blob = await response.blob();
-        
+        const { blob, mimeType } = await getUploadReadyImage(imageUri);
+
         const uploadResponse = await fetch(uploadUrl, {
           method: 'POST',
-          headers: { 'Content-Type': blob.type },
+          headers: { 'Content-Type': mimeType },
           body: blob,
         });
 
@@ -571,55 +583,27 @@ const CommunityScreen = () => {
   };
 
   // Helper component for displaying images with URL resolution
-  const PostImage = ({ storageId, index }: { storageId: string; index: number }) => {
-    // Use cached storage URL hook to reduce API calls
-    const imageUrl = useStorageUrl(storageId);
-
-    if (imageUrl === undefined) {
-      return (
-        <View style={[styles.postImageWrapper, styles.imageLoading]}>
-          <ActivityIndicator size="large" color="#9ca3af" />
-        </View>
-      );
-    }
-
-    if (!imageUrl) {
-      return null;
-    }
-
-    return (
-      <View style={styles.postImageWrapper}>
-        <Image 
-          source={{ uri: imageUrl }} 
-          style={styles.postImage}
-          resizeMode="cover"
-        />
-      </View>
-    );
-  };
+  const PostImage = ({ storageId }: { storageId: string }) => (
+    <OptimizedImage
+      storageId={storageId}
+      containerStyle={styles.postImageWrapper}
+      style={styles.postImage}
+      contentFit="cover"
+    />
+  );
 
   // Helper component for notification house images
   const HouseImage = ({ storageId, isFullScreen = false }: { storageId: string; isFullScreen?: boolean }) => {
-    // Use cached storage URL hook to reduce API calls
-    const imageUrl = useStorageUrl(storageId);
-    
-    if (imageUrl === undefined) {
-      return (
-        <View style={isFullScreen ? styles.fullImageLoading : styles.imageLoading}>
-          <Ionicons name="image" size={24} color="#9ca3af" />
-        </View>
-      );
-    }
-    
-    if (!imageUrl) {
-      return null;
-    }
-    
     return (
-      <Image 
-        source={{ uri: imageUrl }} 
+      <OptimizedImage
+        storageId={storageId}
         style={isFullScreen ? styles.fullImage : styles.cardHouseImage}
-        resizeMode={isFullScreen ? "contain" : "cover"}
+        contentFit={isFullScreen ? 'contain' : 'cover'}
+        placeholderContent={
+          <View style={isFullScreen ? styles.fullImageLoading : styles.imageLoading}>
+            <Ionicons name="image" size={24} color="#9ca3af" />
+          </View>
+        }
       />
     );
   };
@@ -663,11 +647,10 @@ const CommunityScreen = () => {
   const uploadNotificationImage = async (imageUri: string): Promise<string> => {
     try {
       const uploadUrl = await generateUploadUrl();
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
+      const { blob, mimeType } = await getUploadReadyImage(imageUri);
       const uploadResponse = await fetch(uploadUrl, {
         method: 'POST',
-        headers: { 'Content-Type': blob.type },
+        headers: { 'Content-Type': mimeType },
         body: blob,
       });
       const { storageId } = await uploadResponse.json();
@@ -892,11 +875,10 @@ const CommunityScreen = () => {
   const uploadPetImage = async (imageUri: string): Promise<string> => {
     try {
       const uploadUrl = await generateUploadUrl();
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
+      const { blob, mimeType } = await getUploadReadyImage(imageUri);
       const uploadResponse = await fetch(uploadUrl, {
         method: 'POST',
-        headers: { 'Content-Type': blob.type },
+        headers: { 'Content-Type': mimeType },
         body: blob,
       });
       const { storageId } = await uploadResponse.json();
@@ -1096,63 +1078,21 @@ const CommunityScreen = () => {
   };
 
   // Helper component for pet images
-  const PetImage = ({ storageId, isFullScreen = false }: { storageId: string; isFullScreen?: boolean }) => {
-    const imageUrl = useQuery(api.storage.getUrl, { storageId: storageId as any });
-    const pulseAnim = useRef(new Animated.Value(0.4)).current;
-    
-    useEffect(() => {
-      if (imageUrl === undefined) {
-        Animated.loop(
-          Animated.sequence([
-            Animated.timing(pulseAnim, {
-              toValue: 1,
-              duration: 1000,
-              useNativeDriver: true,
-            }),
-            Animated.timing(pulseAnim, {
-              toValue: 0.4,
-              duration: 1000,
-              useNativeDriver: true,
-            }),
-          ])
-        ).start();
+  const PetImage = ({ storageId, isFullScreen = false }: { storageId: string; isFullScreen?: boolean }) => (
+    <OptimizedImage
+      storageId={storageId}
+      style={isFullScreen ? styles.fullImage : styles.petCardImage}
+      contentFit={isFullScreen ? 'contain' : 'cover'}
+      placeholderContent={
+        <View style={isFullScreen ? styles.fullImageLoading : styles.petImageLoading}>
+          <Ionicons name="paw" size={32} color="#cbd5e1" />
+          {isFullScreen && (
+            <ActivityIndicator size="large" color="#cbd5e1" style={{ marginTop: 12 }} />
+          )}
+        </View>
       }
-    }, [imageUrl]);
-    
-    if (imageUrl === undefined) {
-      return (
-        <Animated.View 
-          style={[
-            isFullScreen ? styles.fullImageLoading : styles.petImageLoading,
-            { opacity: pulseAnim }
-          ]}
-        >
-          <View style={styles.loadingContent}>
-            <Ionicons name="paw" size={32} color="#cbd5e1" />
-            {isFullScreen && (
-              <ActivityIndicator 
-                size="large" 
-                color="#cbd5e1" 
-                style={{ marginTop: 12 }}
-              />
-            )}
-          </View>
-        </Animated.View>
-      );
-    }
-    
-    if (!imageUrl) {
-      return null;
-    }
-    
-    return (
-      <Image 
-        source={{ uri: imageUrl }} 
-        style={isFullScreen ? styles.fullImage : styles.petCardImage}
-        resizeMode={isFullScreen ? "contain" : "cover"}
-      />
-    );
-  };
+    />
+  );
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -1184,6 +1124,498 @@ const CommunityScreen = () => {
     }
   };
 
+  const renderTopContent = () => (
+    <>
+      {/* Header */}
+      <Animated.View
+        style={{
+          opacity: fadeAnim,
+        }}
+      >
+        <ImageBackground
+          source={require('../../assets/hoa-4k.jpg')}
+          style={styles.header}
+          imageStyle={styles.headerImage}
+          resizeMode="stretch"
+        >
+          <View style={styles.headerOverlay} />
+          <View style={styles.headerTop}>
+            {/* Hamburger Menu - Only when mobile nav is shown */}
+            {showMobileNav && (
+              <TouchableOpacity style={styles.menuButton} onPress={() => setIsMenuOpen(true)}>
+                <Ionicons name="menu" size={24} color="#ffffff" />
+              </TouchableOpacity>
+            )}
+
+            <View style={styles.headerLeft}>
+              <View style={styles.titleContainer}>
+                <Text style={styles.headerTitle}>Community Forum</Text>
+              </View>
+              <Text style={styles.headerSubtitle}>Connect with your neighbors and stay informed</Text>
+              <View style={styles.indicatorsContainer}>
+                <DeveloperIndicator />
+                <BoardMemberIndicator />
+              </View>
+            </View>
+          </View>
+        </ImageBackground>
+      </Animated.View>
+
+      {/* Custom Tab Bar - Only when screen is wide enough */}
+      {showDesktopNav && (
+        <Animated.View
+          style={{
+            opacity: fadeAnim,
+          }}
+        >
+          <CustomTabBar />
+        </Animated.View>
+      )}
+
+      {/* Sub-tab Selector (Posts/Notifications/Pets) */}
+      <Animated.View
+        style={[
+          styles.subTabContainer,
+          {
+            opacity: fadeAnim,
+          },
+        ]}
+      >
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.subTabContent}
+          style={styles.subTabScrollView}
+        >
+          <TouchableOpacity
+            style={[styles.subTabButton, activeSubTab === 'posts' && styles.subTabButtonActive]}
+            onPress={() => setActiveSubTab('posts')}
+          >
+            <Ionicons
+              name="chatbubbles"
+              size={18}
+              color={activeSubTab === 'posts' ? '#eab308' : '#6b7280'}
+            />
+            <Text
+              style={[
+                styles.subTabButtonText,
+                activeSubTab === 'posts' && styles.subTabButtonTextActive,
+              ]}
+            >
+              Posts
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.subTabButton, activeSubTab === 'polls' && styles.subTabButtonActive]}
+            onPress={() => setActiveSubTab('polls')}
+          >
+            <Ionicons
+              name="bar-chart"
+              size={18}
+              color={activeSubTab === 'polls' ? '#eab308' : '#6b7280'}
+            />
+            <Text
+              style={[
+                styles.subTabButtonText,
+                activeSubTab === 'polls' && styles.subTabButtonTextActive,
+              ]}
+            >
+              Polls
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.subTabButton,
+              activeSubTab === 'notifications' && styles.subTabButtonActive,
+            ]}
+            onPress={() => setActiveSubTab('notifications')}
+          >
+            <Ionicons
+              name="home"
+              size={18}
+              color={activeSubTab === 'notifications' ? '#eab308' : '#6b7280'}
+            />
+            <Text
+              style={[
+                styles.subTabButtonText,
+                activeSubTab === 'notifications' && styles.subTabButtonTextActive,
+              ]}
+            >
+              Moving/Leaving
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.subTabButton, activeSubTab === 'pets' && styles.subTabButtonActive]}
+            onPress={() => setActiveSubTab('pets')}
+          >
+            <Ionicons
+              name="paw"
+              size={18}
+              color={activeSubTab === 'pets' ? '#eab308' : '#6b7280'}
+            />
+            <Text
+              style={[
+                styles.subTabButtonText,
+                activeSubTab === 'pets' && styles.subTabButtonTextActive,
+              ]}
+            >
+              Pet Registration
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </Animated.View>
+
+      {/* Category Filter / Type Filter with Action Buttons */}
+      {activeSubTab === 'posts' ? (
+        <Animated.View
+          style={[
+            styles.categoryContainer,
+            {
+              opacity: fadeAnim,
+            },
+          ]}
+        >
+          <View style={styles.filterRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoryContent}
+              style={styles.categoryScrollView}
+            >
+              <TouchableOpacity
+                style={[styles.categoryButton, !selectedCategory && styles.categoryButtonActive]}
+                onPress={() => setSelectedCategory(null)}
+              >
+                <Text
+                  style={[
+                    styles.categoryButtonText,
+                    !selectedCategory && styles.categoryButtonTextActive,
+                  ]}
+                >
+                  All
+                </Text>
+              </TouchableOpacity>
+
+              {categories.map((category) => (
+                <TouchableOpacity
+                  key={category}
+                  style={[
+                    styles.categoryButton,
+                    selectedCategory === category && styles.categoryButtonActive,
+                  ]}
+                  onPress={() => setSelectedCategory(category)}
+                >
+                  <Text
+                    style={[
+                      styles.categoryButtonText,
+                      selectedCategory === category && styles.categoryButtonTextActive,
+                    ]}
+                  >
+                    {category}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {/* Action Buttons - Desktop Only */}
+            {showDesktopNav && (
+              <View style={styles.actionButtonsContainer}>
+                <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+                  <TouchableOpacity
+                    style={styles.newPostButton}
+                    onPress={() => {
+                      animateButtonPress();
+                      setShowNewPostModal(true);
+                      animateIn('post');
+                    }}
+                  >
+                    <Ionicons name="add" size={18} color="#ffffff" />
+                    <Text style={styles.newPostButtonText}>New Post</Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              </View>
+            )}
+          </View>
+        </Animated.View>
+      ) : activeSubTab === 'notifications' ? (
+        <Animated.View
+          style={[
+            styles.typeFilterContainer,
+            {
+              opacity: fadeAnim,
+            },
+          ]}
+        >
+          <View style={styles.filterRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.typeFilterContent}
+              style={styles.typeFilterScrollView}
+            >
+              <TouchableOpacity
+                style={[
+                  styles.typeFilterButton,
+                  !selectedNotificationType && styles.typeFilterButtonActive,
+                ]}
+                onPress={() => setSelectedNotificationType(null)}
+              >
+                <Text
+                  style={[
+                    styles.typeFilterButtonText,
+                    !selectedNotificationType && styles.typeFilterButtonTextActive,
+                  ]}
+                >
+                  All
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.typeFilterButton,
+                  selectedNotificationType === 'Selling' && styles.typeFilterButtonActive,
+                ]}
+                onPress={() => setSelectedNotificationType('Selling')}
+              >
+                <Text
+                  style={[
+                    styles.typeFilterButtonText,
+                    selectedNotificationType === 'Selling' && styles.typeFilterButtonTextActive,
+                  ]}
+                >
+                  Selling
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.typeFilterButton,
+                  selectedNotificationType === 'Moving' && styles.typeFilterButtonActive,
+                ]}
+                onPress={() => setSelectedNotificationType('Moving')}
+              >
+                <Text
+                  style={[
+                    styles.typeFilterButtonText,
+                    selectedNotificationType === 'Moving' && styles.typeFilterButtonTextActive,
+                  ]}
+                >
+                  Moving
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+
+            {/* Action Buttons - Desktop Only */}
+            {showDesktopNav && (
+              <View style={styles.actionButtonsContainer}>
+                <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+                  <TouchableOpacity style={styles.addNotificationButton} onPress={handleAddNotification}>
+                    <Ionicons name="add" size={18} color="#ffffff" />
+                    <Text style={styles.addNotificationButtonText}>Add Notification</Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              </View>
+            )}
+          </View>
+        </Animated.View>
+      ) : activeSubTab === 'pets' ? (
+        <Animated.View
+          style={[
+            styles.petsFilterContainer,
+            {
+              opacity: fadeAnim,
+            },
+          ]}
+        >
+          <View style={[styles.filterRow, styles.petsFilterRow]}>
+            {/* Action Buttons - Desktop Only */}
+            {showDesktopNav && (
+              <View style={styles.actionButtonsContainer}>
+                <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+                  <TouchableOpacity style={styles.addPetButton} onPress={handleAddPet}>
+                    <Ionicons name="add" size={18} color="#ffffff" />
+                    <Text style={styles.addPetButtonText}>Register Pet</Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              </View>
+            )}
+          </View>
+        </Animated.View>
+      ) : null}
+    </>
+  );
+
+  const canLoadMorePosts = visiblePostCount < postsContent.length;
+
+  const handleLoadMorePosts = () => {
+    if (canLoadMorePosts) {
+      setVisiblePostCount((prev) => Math.min(prev + 5, postsContent.length));
+    }
+  };
+
+  const renderPostsEmpty = () => (
+    <View style={styles.contentWrapper}>
+      <View style={styles.emptyState}>
+        <Ionicons name="chatbubbles-outline" size={48} color="#9ca3af" />
+        <Text style={styles.emptyStateText}>No posts found</Text>
+        <Text style={styles.emptyStateSubtext}>Be the first to start a conversation!</Text>
+      </View>
+    </View>
+  );
+
+  const renderPostItem = ({ item, index }: { item: any; index: number }) => (
+    <View style={styles.postItemWrapper}>
+      <Animated.View
+        style={[
+          styles.postCard,
+          {
+            borderLeftColor: borderColors[index % borderColors.length],
+            opacity: fadeAnim,
+            transform: [
+              {
+                translateY: fadeAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [50, 0],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <View style={styles.postHeader}>
+          <View style={styles.postAuthor}>
+            <ProfileImage source={item.authorProfileImage} size={40} style={{ marginRight: 8 }} />
+            <View>
+              <Text style={styles.authorName}>{item.author}</Text>
+              <Text style={styles.postTime}>{formatDate(new Date(item.createdAt).toISOString())}</Text>
+            </View>
+          </View>
+          <View style={styles.categoryBadge}>
+            <Ionicons name={getCategoryIcon(item.category) as any} size={12} color={getCategoryColor(item.category)} />
+            <Text style={[styles.categoryText, { color: getCategoryColor(item.category) }]}>{item.category}</Text>
+          </View>
+        </View>
+
+        <Text style={styles.postTitle}>{item.title}</Text>
+        <Text style={styles.postContent}>{item.content}</Text>
+
+        {item.images && item.images.length > 0 && (
+          <View style={styles.postImagesContainer}>
+            {item.images.map((imageStorageId: string, imageIndex: number) => (
+              <PostImage key={imageStorageId ?? imageIndex} storageId={imageStorageId} />
+            ))}
+          </View>
+        )}
+
+        <View style={styles.postFooter}>
+          <TouchableOpacity style={styles.actionButton} onPress={() => handleLike(item._id)}>
+            <Ionicons name="heart" size={16} color="#6b7280" />
+            <Text style={styles.actionText}>{item.likes ?? 0}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionButton} onPress={() => handleCommentPress(item)}>
+            <Ionicons name="chatbubble" size={16} color="#6b7280" />
+            <Text style={styles.actionText}>{item.comments?.length ?? 0}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {item.comments && item.comments.length > 0 && (
+          <View style={styles.commentsSection}>
+            <View style={styles.commentsHeader}>
+              <Text style={styles.commentsTitle}>Comments ({item.comments.length})</Text>
+              {item.comments.length > COMMENTS_PREVIEW_LIMIT && (
+                <TouchableOpacity style={styles.viewAllButton} onPress={() => toggleComments(item._id)}>
+                  <Text style={styles.viewAllButtonText}>
+                    {expandedComments.has(item._id) ? 'Show Less' : 'View All'}
+                  </Text>
+                  <Ionicons
+                    name={expandedComments.has(item._id) ? 'chevron-up' : 'chevron-down'}
+                    size={16}
+                    color="#2563eb"
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {item.comments.slice(0, COMMENTS_PREVIEW_LIMIT).map((comment: any, commentIndex: number) => (
+              <View key={comment._id ?? commentIndex} style={styles.commentItem}>
+                <View style={styles.commentHeader}>
+                  <View style={styles.commentAuthorInfo}>
+                    <ProfileImage source={comment.authorProfileImage} size={24} style={{ marginRight: 6 }} />
+                    <Text style={styles.commentAuthor}>{comment.author}</Text>
+                    {isCommentAuthorDeveloper(comment.author) ? (
+                      <View style={styles.developerBadge}>
+                        <Ionicons name="code-slash" size={10} color="#ffffff" />
+                        <Text style={styles.developerBadgeText}>Developer</Text>
+                      </View>
+                    ) : (
+                      isCommentAuthorBoardMember(comment.author) && (
+                        <View style={styles.boardMemberBadge}>
+                          <Ionicons name="shield" size={10} color="#ffffff" />
+                          <Text style={styles.boardMemberBadgeText}>Board Member</Text>
+                        </View>
+                      )
+                    )}
+                  </View>
+                  <Text style={styles.commentTime}>
+                    {formatDate(
+                      comment.createdAt
+                        ? new Date(comment.createdAt).toISOString()
+                        : comment.timestamp || new Date().toISOString()
+                    )}
+                  </Text>
+                </View>
+                <Text style={styles.commentContent}>{comment.content}</Text>
+              </View>
+            ))}
+
+            {expandedComments.has(item._id) && item.comments.length > COMMENTS_PREVIEW_LIMIT && (
+              <View style={styles.expandedComments}>
+                <View style={styles.commentsDivider} />
+                <ScrollView style={styles.expandedCommentsScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                  {item.comments.slice(COMMENTS_PREVIEW_LIMIT).map((comment: any, extraIndex: number) => (
+                    <View key={comment._id ?? `expanded-${extraIndex}`} style={styles.commentItem}>
+                      <View style={styles.commentHeader}>
+                        <View style={styles.commentAuthorInfo}>
+                          <ProfileImage source={comment.authorProfileImage} size={24} style={{ marginRight: 6 }} />
+                          <Text style={styles.commentAuthor}>{comment.author}</Text>
+                          {isCommentAuthorDeveloper(comment.author) ? (
+                            <View style={styles.developerBadge}>
+                              <Ionicons name="code-slash" size={10} color="#ffffff" />
+                              <Text style={styles.developerBadgeText}>Developer</Text>
+                            </View>
+                          ) : (
+                            isCommentAuthorBoardMember(comment.author) && (
+                              <View style={styles.boardMemberBadge}>
+                                <Ionicons name="shield" size={10} color="#ffffff" />
+                                <Text style={styles.boardMemberBadgeText}>Board Member</Text>
+                              </View>
+                            )
+                          )}
+                        </View>
+                        <Text style={styles.commentTime}>
+                          {formatDate(
+                            comment.createdAt
+                              ? new Date(comment.createdAt).toISOString()
+                              : comment.timestamp || new Date().toISOString()
+                          )}
+                        </Text>
+                      </View>
+                      <Text style={styles.commentContent}>{comment.content}</Text>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+          </View>
+        )}
+      </Animated.View>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
@@ -1196,354 +1628,65 @@ const CommunityScreen = () => {
       )}
       
       {/* Posts List */}
-      <ScrollView 
-        ref={scrollViewRef}
-        style={[styles.postsContainer, Platform.OS === 'web' && styles.webScrollContainer]}
-        contentContainerStyle={[styles.scrollContent, Platform.OS === 'web' && styles.webScrollContent]}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        showsVerticalScrollIndicator={true}
-        bounces={true}
-        scrollEnabled={true}
-        alwaysBounceVertical={false}
-        nestedScrollEnabled={true}
-        removeClippedSubviews={false}
-        scrollEventThrottle={16}
-        // Enhanced desktop scrolling
-        decelerationRate="normal"
-        directionalLockEnabled={true}
-        canCancelContentTouches={true}
-        // Web-specific enhancements
-        {...(Platform.OS === 'web' && {
-          onScrollBeginDrag: () => {
-            if (Platform.OS === 'web') {
+      {activeSubTab === 'posts' ? (
+        <Animated.FlatList
+          ref={listRef}
+          data={postsData}
+          keyExtractor={(item: any) => item._id}
+          renderItem={renderPostItem}
+          ListHeaderComponent={renderTopContent}
+          ListEmptyComponent={renderPostsEmpty}
+          ListFooterComponent={
+            canLoadMorePosts ? (
+              <View style={styles.listFooter}>
+                <ActivityIndicator size="small" color="#6b7280" />
+                <Text style={styles.listFooterText}>Loading more posts...</Text>
+              </View>
+            ) : (
+              <View style={styles.footerSpacer} />
+            )
+          }
+          contentContainerStyle={[
+            styles.scrollContent,
+            Platform.OS === 'web' && styles.webScrollContent,
+          ]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator
+          onEndReached={handleLoadMorePosts}
+          onEndReachedThreshold={0.4}
+          initialNumToRender={5}
+          maxToRenderPerBatch={5}
+          windowSize={5}
+          removeClippedSubviews
+        />
+      ) : (
+        <ScrollView
+          style={[styles.postsContainer, Platform.OS === 'web' && styles.webScrollContainer]}
+          contentContainerStyle={[styles.scrollContent, Platform.OS === 'web' && styles.webScrollContent]}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={true}
+          bounces={true}
+          scrollEnabled={true}
+          alwaysBounceVertical={false}
+          nestedScrollEnabled={true}
+          removeClippedSubviews={false}
+          scrollEventThrottle={16}
+          decelerationRate="normal"
+          directionalLockEnabled={true}
+          canCancelContentTouches={true}
+          {...(Platform.OS === 'web' && {
+            onScrollBeginDrag: () => {
               document.body.style.cursor = 'grabbing';
               document.body.style.userSelect = 'none';
-            }
-          },
-          onScrollEndDrag: () => {
-            if (Platform.OS === 'web') {
+            },
+            onScrollEndDrag: () => {
               document.body.style.cursor = 'grab';
               document.body.style.userSelect = 'auto';
-            }
-          },
-          onScroll: () => {
-            // Ensure scrolling is working
-          },
-        })}
-      >
-        {/* Header */}
-        <Animated.View style={{
-          opacity: fadeAnim,
-        }}>
-          <ImageBackground
-            source={require('../../assets/hoa-4k.jpg')}
-            style={styles.header}
-            imageStyle={styles.headerImage}
-            resizeMode="stretch"
-          >
-            <View style={styles.headerOverlay} />
-            <View style={styles.headerTop}>
-              {/* Hamburger Menu - Only when mobile nav is shown */}
-              {showMobileNav && (
-                <TouchableOpacity 
-                  style={styles.menuButton}
-                  onPress={() => setIsMenuOpen(true)}
-                >
-                  <Ionicons name="menu" size={24} color="#ffffff" />
-                </TouchableOpacity>
-              )}
-              
-              <View style={styles.headerLeft}>
-                <View style={styles.titleContainer}>
-                  <Text style={styles.headerTitle}>Community Forum</Text>
-                </View>
-                <Text style={styles.headerSubtitle}>
-                  Connect with your neighbors and stay informed
-                </Text>
-                <View style={styles.indicatorsContainer}>
-                  <DeveloperIndicator />
-                  <BoardMemberIndicator />
-                </View>
-              </View>
-            </View>
-          </ImageBackground>
-        </Animated.View>
-
-        {/* Custom Tab Bar - Only when screen is wide enough */}
-        {showDesktopNav && (
-          <Animated.View style={{
-            opacity: fadeAnim,
-          }}>
-            <CustomTabBar />
-          </Animated.View>
-        )}
-
-        {/* Sub-tab Selector (Posts/Notifications/Pets) */}
-        <Animated.View style={[
-          styles.subTabContainer,
-          {
-            opacity: fadeAnim,
-          }
-        ]}>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.subTabContent}
-            style={styles.subTabScrollView}
-          >
-            <TouchableOpacity
-              style={[
-                styles.subTabButton,
-                activeSubTab === 'posts' && styles.subTabButtonActive
-              ]}
-              onPress={() => setActiveSubTab('posts')}
-            >
-              <Ionicons 
-                name="chatbubbles" 
-                size={18} 
-                color={activeSubTab === 'posts' ? '#eab308' : '#6b7280'} 
-              />
-              <Text style={[
-                styles.subTabButtonText,
-                activeSubTab === 'posts' && styles.subTabButtonTextActive
-              ]}>
-                Posts
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[
-                styles.subTabButton,
-                activeSubTab === 'polls' && styles.subTabButtonActive
-              ]}
-              onPress={() => setActiveSubTab('polls')}
-            >
-              <Ionicons 
-                name="bar-chart" 
-                size={18} 
-                color={activeSubTab === 'polls' ? '#eab308' : '#6b7280'} 
-              />
-              <Text style={[
-                styles.subTabButtonText,
-                activeSubTab === 'polls' && styles.subTabButtonTextActive
-              ]}>
-                Polls
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[
-                styles.subTabButton,
-                activeSubTab === 'notifications' && styles.subTabButtonActive
-              ]}
-              onPress={() => setActiveSubTab('notifications')}
-            >
-              <Ionicons 
-                name="home" 
-                size={18} 
-                color={activeSubTab === 'notifications' ? '#eab308' : '#6b7280'} 
-              />
-              <Text style={[
-                styles.subTabButtonText,
-                activeSubTab === 'notifications' && styles.subTabButtonTextActive
-              ]}>
-                Moving/Leaving
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.subTabButton,
-                activeSubTab === 'pets' && styles.subTabButtonActive
-              ]}
-              onPress={() => setActiveSubTab('pets')}
-            >
-              <Ionicons 
-                name="paw" 
-                size={18} 
-                color={activeSubTab === 'pets' ? '#eab308' : '#6b7280'} 
-              />
-              <Text style={[
-                styles.subTabButtonText,
-                activeSubTab === 'pets' && styles.subTabButtonTextActive
-              ]}>
-                Pet Registration
-              </Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </Animated.View>
-
-        {/* Category Filter / Type Filter with Action Buttons */}
-        {activeSubTab === 'posts' ? (
-        <Animated.View style={[
-          styles.categoryContainer,
-          {
-            opacity: fadeAnim,
-          }
-        ]}>
-          <View style={styles.filterRow}>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoryContent}
-              style={styles.categoryScrollView}
-            >
-              <TouchableOpacity
-                style={[
-                  styles.categoryButton,
-                  !selectedCategory && styles.categoryButtonActive
-                ]}
-                onPress={() => setSelectedCategory(null)}
-              >
-                <Text style={[
-                  styles.categoryButtonText,
-                  !selectedCategory && styles.categoryButtonTextActive
-                ]}>
-                  All
-                </Text>
-              </TouchableOpacity>
-              
-              {categories.map((category) => (
-                <TouchableOpacity
-                  key={category}
-                  style={[
-                    styles.categoryButton,
-                    selectedCategory === category && styles.categoryButtonActive
-                  ]}
-                  onPress={() => setSelectedCategory(category)}
-                >
-                  <Text style={[
-                    styles.categoryButtonText,
-                    selectedCategory === category && styles.categoryButtonTextActive
-                  ]}>
-                    {category}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            
-              {/* Action Buttons - Desktop Only */}
-            {showDesktopNav && (
-                <View style={styles.actionButtonsContainer}>
-              <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-                <TouchableOpacity
-                  style={styles.newPostButton}
-                  onPress={() => {
-                    animateButtonPress();
-                    setShowNewPostModal(true);
-                    animateIn('post');
-                  }}
-                >
-                      <Ionicons name="add" size={18} color="#ffffff" />
-                  <Text style={styles.newPostButtonText}>New Post</Text>
-                </TouchableOpacity>
-              </Animated.View>
-                </View>
-            )}
-          </View>
-        </Animated.View>
-        ) : activeSubTab === 'notifications' ? (
-          <Animated.View style={[
-            styles.typeFilterContainer,
-            {
-              opacity: fadeAnim,
-            }
-          ]}>
-            <View style={styles.filterRow}>
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.typeFilterContent}
-                style={styles.typeFilterScrollView}
-              >
-                <TouchableOpacity
-                  style={[
-                    styles.typeFilterButton,
-                    !selectedNotificationType && styles.typeFilterButtonActive
-                  ]}
-                  onPress={() => setSelectedNotificationType(null)}
-                >
-                  <Text style={[
-                    styles.typeFilterButtonText,
-                    !selectedNotificationType && styles.typeFilterButtonTextActive
-                  ]}>
-                    All
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.typeFilterButton,
-                    selectedNotificationType === 'Selling' && styles.typeFilterButtonActive
-                  ]}
-                  onPress={() => setSelectedNotificationType('Selling')}
-                >
-                  <Text style={[
-                    styles.typeFilterButtonText,
-                    selectedNotificationType === 'Selling' && styles.typeFilterButtonTextActive
-                  ]}>
-                    Selling
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.typeFilterButton,
-                    selectedNotificationType === 'Moving' && styles.typeFilterButtonActive
-                  ]}
-                  onPress={() => setSelectedNotificationType('Moving')}
-                >
-                  <Text style={[
-                    styles.typeFilterButtonText,
-                    selectedNotificationType === 'Moving' && styles.typeFilterButtonTextActive
-                  ]}>
-                    Moving
-                  </Text>
-                </TouchableOpacity>
-              </ScrollView>
-              
-              {/* Action Buttons - Desktop Only */}
-              {showDesktopNav && (
-                <View style={styles.actionButtonsContainer}>
-                  <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-                    <TouchableOpacity
-                      style={styles.addNotificationButton}
-                      onPress={handleAddNotification}
-                    >
-                      <Ionicons name="add" size={18} color="#ffffff" />
-                      <Text style={styles.addNotificationButtonText}>Add Notification</Text>
-                    </TouchableOpacity>
-                  </Animated.View>
-                </View>
-              )}
-            </View>
-          </Animated.View>
-        ) : activeSubTab === 'pets' ? (
-          <Animated.View style={[
-            styles.petsFilterContainer,
-            {
-              opacity: fadeAnim,
-            }
-          ]}>
-            <View style={[styles.filterRow, styles.petsFilterRow]}>
-              {/* Action Buttons - Desktop Only */}
-              {showDesktopNav && (
-                <View style={styles.actionButtonsContainer}>
-                  <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-                    <TouchableOpacity
-                      style={styles.addPetButton}
-                      onPress={handleAddPet}
-                    >
-                      <Ionicons name="add" size={18} color="#ffffff" />
-                      <Text style={styles.addPetButtonText}>Register Pet</Text>
-                    </TouchableOpacity>
-                  </Animated.View>
-                </View>
-              )}
-            </View>
-          </Animated.View>
-        ) : null}
+            },
+          })}
+        >
+          {renderTopContent()}
         
         {/* Content with padding */}
         <View style={styles.contentWrapper}>
@@ -1606,7 +1749,6 @@ const CommunityScreen = () => {
                         <PostImage 
                           key={index}
                           storageId={imageStorageId} 
-                          index={index} 
                         />
                       ))}
                     </View>
@@ -2069,6 +2211,7 @@ const CommunityScreen = () => {
         {/* Additional content to ensure scrollable content */}
         <View style={styles.spacer} />
       </ScrollView>
+      )}
 
       {/* Floating Action Button for Mobile */}
       {showMobileNav && (
@@ -2881,6 +3024,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
+  postItemWrapper: {
+    paddingHorizontal: 15,
+  },
   postCard: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
@@ -3009,6 +3155,19 @@ const styles = StyleSheet.create({
   },
   expandedCommentsScroll: {
     maxHeight: 200, // Limit height for scrollable expanded comments
+  },
+  listFooter: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  listFooterText: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  footerSpacer: {
+    height: 40,
   },
   commentItem: {
     marginBottom: 12,

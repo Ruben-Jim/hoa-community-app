@@ -30,7 +30,8 @@ import DeveloperIndicator from '../components/DeveloperIndicator';
 import CustomTabBar from '../components/CustomTabBar';
 import MobileTabBar from '../components/MobileTabBar';
 import ProfileImage from '../components/ProfileImage';
-import { useStorageUrl } from '../hooks/useStorageUrl';
+import OptimizedImage from '../components/OptimizedImage';
+import { getUploadReadyImage } from '../utils/imageUpload';
 
 const AdminScreen = () => {
   const { user } = useAuth();
@@ -980,16 +981,14 @@ const AdminScreen = () => {
   const uploadImage = async (imageUri: string): Promise<string> => {
     try {
       const uploadUrl = await generateUploadUrl();
-      
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
-      
+      const { blob, mimeType } = await getUploadReadyImage(imageUri);
+
       const uploadResponse = await fetch(uploadUrl, {
         method: 'POST',
-        headers: { 'Content-Type': blob.type },
+        headers: { 'Content-Type': mimeType },
         body: blob,
       });
-      
+
       const { storageId } = await uploadResponse.json();
       return storageId;
     } catch (error) {
@@ -999,57 +998,18 @@ const AdminScreen = () => {
   };
 
   // Helper component for pet images
-  const PetImage = ({ storageId }: { storageId: string }) => {
-    // Use cached storage URL hook to reduce API calls
-    const imageUrl = useStorageUrl(storageId);
-    const pulseAnim = useRef(new Animated.Value(0.4)).current;
-    
-    useEffect(() => {
-      if (imageUrl === undefined) {
-        Animated.loop(
-          Animated.sequence([
-            Animated.timing(pulseAnim, {
-              toValue: 1,
-              duration: 1000,
-              useNativeDriver: true,
-            }),
-            Animated.timing(pulseAnim, {
-              toValue: 0.4,
-              duration: 1000,
-              useNativeDriver: true,
-            }),
-          ])
-        ).start();
+  const PetImage = ({ storageId }: { storageId: string }) => (
+    <OptimizedImage
+      storageId={storageId}
+      style={styles.petCardImage}
+      contentFit="cover"
+      placeholderContent={
+        <View style={styles.petImageLoading}>
+          <Ionicons name="paw" size={32} color="#cbd5e1" />
+        </View>
       }
-    }, [imageUrl]);
-    
-    if (imageUrl === undefined) {
-      return (
-        <Animated.View 
-          style={[
-            styles.petImageLoading,
-            { opacity: pulseAnim }
-          ]}
-        >
-          <View style={styles.loadingContent}>
-            <Ionicons name="paw" size={32} color="#cbd5e1" />
-          </View>
-        </Animated.View>
-      );
-    }
-    
-    if (!imageUrl) {
-      return null;
-    }
-    
-    return (
-      <Image 
-        source={{ uri: imageUrl }} 
-        style={styles.petCardImage}
-        resizeMode="cover"
-      />
-    );
-  };
+    />
+  );
 
   if (!isBoardMember) {
     return (

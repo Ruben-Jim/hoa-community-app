@@ -44,12 +44,6 @@ const HomeScreen = () => {
   
   // State for dynamic responsive behavior (only for web/desktop)
   const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
-  const [showIOSInstallPrompt, setShowIOSInstallPrompt] = useState(false);
-  
-  // Check if app is already installed (standalone mode)
-  const isAppInstalled = Platform.OS === 'web' && 
-    ('standalone' in window.navigator) && 
-    (window.navigator as any).standalone;
   
   // Dynamic responsive check - show mobile nav when screen is too narrow for desktop nav
   // On mobile, always show mobile nav regardless of screen size
@@ -65,7 +59,6 @@ const HomeScreen = () => {
   
   // Onboarding state
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const arrowAnim = useRef(new Animated.Value(0)).current;
   
   // ScrollView ref for better control
   const scrollViewRef = useRef<ScrollView>(null);
@@ -137,58 +130,26 @@ const HomeScreen = () => {
     }
   }, [userVotes]);
 
-  // Check if user needs onboarding (show onboarding arrow pointing to nav bar)
+  // Check if user needs onboarding (previously showed arrow towards nav bar)
   useEffect(() => {
-    const checkOnboarding = async () => {
+    const clearLegacyOnboarding = async () => {
       try {
-        const hasSeenOnboarding = await AsyncStorage.getItem(`onboarding_seen_${user?._id}`);
-        if (!hasSeenOnboarding && showMobileNav) {
-          // Show onboarding after a delay
-          setTimeout(() => {
-            setShowOnboarding(true);
-            // Start arrow animation
-            Animated.loop(
-              Animated.sequence([
-                Animated.timing(arrowAnim, {
-                  toValue: 1,
-                  duration: 800,
-                  useNativeDriver: Platform.OS !== 'web',
-                }),
-                Animated.timing(arrowAnim, {
-                  toValue: 0,
-                  duration: 800,
-                  useNativeDriver: Platform.OS !== 'web',
-                }),
-              ])
-            ).start();
-          }, 1000);
+        if (user?._id) {
+          await AsyncStorage.setItem(`onboarding_seen_${user._id}`, 'true');
         }
       } catch (error) {
-        console.error('Error checking onboarding:', error);
+        console.error('Error clearing onboarding flag:', error);
       }
+      setShowOnboarding(false);
     };
-    if (user?._id) {
-      checkOnboarding();
-    }
-  }, [user?._id, showMobileNav]);
+    clearLegacyOnboarding();
+  }, [user?._id]);
 
   const handleContact = (type: 'phone' | 'email') => {
     if (type === 'phone') {
       if (hoaInfo?.phone) Linking.openURL(`tel:${hoaInfo.phone}`);
     } else {
       if (hoaInfo?.email) Linking.openURL(`mailto:${hoaInfo.email}`);
-    }
-  };
-
-  const dismissOnboarding = async () => {
-    try {
-      if (user?._id) {
-        await AsyncStorage.setItem(`onboarding_seen_${user._id}`, 'true');
-      }
-      setShowOnboarding(false);
-      arrowAnim.stopAnimation();
-    } catch (error) {
-      console.error('Error dismissing onboarding:', error);
     }
   };
 
@@ -296,38 +257,6 @@ const HomeScreen = () => {
   };
 
 
-  // iOS Home Screen functionality
-  const handleIOSInstall = () => {
-    if (Platform.OS === 'web') {
-      // Check if it's iOS Safari
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      
-      if (isIOS) {
-        setShowIOSInstallPrompt(true);
-      } else {
-        showAlert({
-          title: 'Not Available',
-          message: 'This feature is only available on iOS Safari.',
-          buttons: [
-            { text: 'OK', onPress: () => {} }
-          ]
-        });
-      }
-    } else {
-      showAlert({
-        title: 'Not Available',
-        message: 'This feature is only available on iOS Safari.',
-        buttons: [
-          { text: 'OK', onPress: () => {} }
-        ]
-      });
-    }
-  };
-
-  const dismissIOSPrompt = () => {
-    setShowIOSInstallPrompt(false);
-  };
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
@@ -337,38 +266,6 @@ const HomeScreen = () => {
             isMenuOpen={isMenuOpen}
             onMenuClose={() => setIsMenuOpen(false)}
           />
-        )}
-        
-        {/* Onboarding Arrow */}
-        {showOnboarding && showMobileNav && (
-          <View style={styles.onboardingContainer}>
-            <Animated.View 
-              style={[
-                styles.onboardingArrow,
-                {
-                  transform: [{
-                    translateX: arrowAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, -15],
-                    })
-                  }],
-                  opacity: arrowAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.7, 1],
-                  })
-                }
-              ]}
-            >
-              <Ionicons name="arrow-back" size={48} color="#ef4444" />
-              <Text style={styles.onboardingText}>Tap menu{'\n'}to navigate</Text>
-              <TouchableOpacity 
-                style={styles.onboardingCloseButton}
-                onPress={dismissOnboarding}
-              >
-                <Ionicons name="close-circle" size={24} color="#6b7280" />
-              </TouchableOpacity>
-            </Animated.View>
-          </View>
         )}
         
         <ScrollView 
@@ -508,41 +405,6 @@ const HomeScreen = () => {
           </TouchableOpacity>
         </View>
       </Animated.View> */}
-
-       {/* iOS Install Button - Only show on iOS Safari and when app is not installed */}
-       {Platform.OS === 'web' && /iPad|iPhone|iPod/.test(navigator.userAgent) && !isAppInstalled && (
-        <Animated.View style={[
-          styles.section,
-          {
-            opacity: quickActionsAnim,
-            transform: [{
-              translateY: quickActionsAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [50, 0],
-              })
-            }]
-          }
-        ]}>
-          <View style={styles.iosInstallContainer}>
-            <View style={styles.iosInstallContent}>
-              <Ionicons name="phone-portrait" size={32} color="#007AFF" />
-              <View style={styles.iosInstallText}>
-                <Text style={styles.iosInstallTitle}>Try the App</Text>
-                <Text style={styles.iosInstallDescription}>
-                  Add to your home screen for a better experience
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={styles.iosInstallButton}
-                onPress={handleIOSInstall}
-              >
-                <Ionicons name="add-circle" size={20} color="#ffffff" />
-                <Text style={styles.iosInstallButtonText}>Install</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Animated.View>
-      )}
 
       {/* Recent Community Posts */}
       <Animated.View style={[
@@ -869,81 +731,6 @@ const HomeScreen = () => {
         
       />
 
-      {/* iOS Install Prompt Modal */}
-      {showIOSInstallPrompt && (
-        <View style={styles.iosModalOverlay}>
-          <TouchableOpacity 
-            style={styles.iosModalOverlayTouchable}
-            activeOpacity={1}
-            onPress={dismissIOSPrompt}
-          >
-            <TouchableOpacity 
-              style={styles.iosModalContainer}
-              activeOpacity={1}
-              onPress={(e) => e.stopPropagation()}
-            >
-              <View style={styles.iosModalHeader}>
-                <Ionicons name="phone-portrait" size={48} color="#007AFF" />
-                <Text style={styles.iosModalTitle}>Add to Home Screen</Text>
-                <TouchableOpacity
-                  style={styles.iosModalCloseButton}
-                  onPress={dismissIOSPrompt}
-                >
-                  <Ionicons name="close" size={24} color="#6b7280" />
-                </TouchableOpacity>
-              </View>
-            
-            <View style={styles.iosModalContent}>
-              <Text style={styles.iosModalDescription}>
-                To install this app on your iPhone:
-              </Text>
-              
-              <View style={styles.iosStepsContainer}>
-                <View style={styles.iosStep}>
-                  <View style={styles.iosStepNumber}>
-                    <Text style={styles.iosStepNumberText}>1</Text>
-                  </View>
-                  <Text style={styles.iosStepText}>
-                    Tap the <Ionicons name="share" size={16} color="#007AFF" /> Share button at the bottom of Safari
-                  </Text>
-                </View>
-                
-                <View style={styles.iosStep}>
-                  <View style={styles.iosStepNumber}>
-                    <Text style={styles.iosStepNumberText}>2</Text>
-                  </View>
-                  <Text style={styles.iosStepText}>
-                    Scroll down and tap "Add to Home Screen"
-                  </Text>
-                </View>
-                
-                <View style={styles.iosStep}>
-                  <View style={styles.iosStepNumber}>
-                    <Text style={styles.iosStepNumberText}>3</Text>
-                  </View>
-                  <Text style={styles.iosStepText}>
-                    Tap "Add" to confirm
-                  </Text>
-                </View>
-              </View>
-              
-              <Text style={styles.iosModalNote}>
-                The app will appear on your home screen like a native app!
-              </Text>
-            </View>
-            
-              <View style={styles.iosModalButtons}>
-                <TouchableOpacity
-                  style={styles.iosModalButton}
-                  onPress={dismissIOSPrompt}
-                >
-                  <Text style={styles.iosModalButtonText}>Got it!</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </View>
-      )}
     </SafeAreaView>
   );
 };
@@ -1395,198 +1182,6 @@ const styles = StyleSheet.create({
     color: '#374151',
     marginBottom: 8,
     lineHeight: 20,
-  },
-  // iOS Install Button Styles
-  iosInstallContainer: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    padding: 16,
-  },
-  iosInstallContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  iosInstallText: {
-    flex: 1,
-    marginLeft: 12,
-    marginRight: 12,
-  },
-  iosInstallTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 4,
-  },
-  iosInstallDescription: {
-    fontSize: 14,
-    color: '#6b7280',
-    lineHeight: 20,
-  },
-  iosInstallButton: {
-    backgroundColor: '#007AFF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  iosInstallButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  // iOS Install Modal Styles
-  iosModalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  iosModalOverlayTouchable: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-    height: '100%',
-  },
-  iosModalContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    margin: 20,
-    maxWidth: 400,
-    width: '90%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  iosModalHeader: {
-    alignItems: 'center',
-    paddingTop: 24,
-    paddingHorizontal: 24,
-    paddingBottom: 16,
-    position: 'relative',
-  },
-  iosModalCloseButton: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: '#f3f4f6',
-  },
-  iosModalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1f2937',
-    marginTop: 12,
-  },
-  iosModalContent: {
-    paddingHorizontal: 24,
-    paddingBottom: 16,
-  },
-  iosModalDescription: {
-    fontSize: 16,
-    color: '#374151',
-    textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 24,
-  },
-  iosStepsContainer: {
-    marginBottom: 20,
-  },
-  iosStep: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  iosStepNumber: {
-    backgroundColor: '#007AFF',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-    marginTop: 2,
-  },
-  iosStepNumberText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  iosStepText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#374151',
-    lineHeight: 20,
-  },
-  iosModalNote: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-    fontStyle: 'italic',
-    lineHeight: 20,
-  },
-  iosModalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-  },
-  iosModalButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  iosModalButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  onboardingContainer: {
-    position: 'absolute',
-    top: 60,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 10,
-    pointerEvents: 'box-none',
-  },
-  onboardingArrow: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-    position: 'relative',
-  },
-  onboardingText: {
-    marginTop: 8,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-  },
-  onboardingCloseButton: {
-    position: 'absolute',
-    top: -12,
-    right: -12,
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
   },
 });
 

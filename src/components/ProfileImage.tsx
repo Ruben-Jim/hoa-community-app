@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, StyleSheet, Image, Text } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useStorageUrl } from '../hooks/useStorageUrl';
+import OptimizedImage from './OptimizedImage';
 
 interface ProfileImageProps {
   source: string | null | undefined;
@@ -11,33 +11,27 @@ interface ProfileImageProps {
 }
 
 const ProfileImage = ({ source, size = 40, style, initials }: ProfileImageProps) => {
-  // Check if source is already a URL or needs conversion from storageId
-  const isUrl = source?.startsWith('http') ?? false;
-  const storageId = source && !isUrl ? source : null;
-  
-  // Use cached storage URL hook to reduce API calls
-  const imageUrlFromStorage = useStorageUrl(storageId);
-  
-  // Use URL directly if it's already a URL, otherwise use converted URL from storage
-  const imageUrl = isUrl ? source : imageUrlFromStorage;
-  
-  if (!imageUrl) {
-    return (
-      <View style={[styles.placeholder, { width: size, height: size, borderRadius: size / 2 }, style]}>
-        {initials ? (
-          <Text style={[styles.initials, { fontSize: size * 0.35 }]}>{initials}</Text>
-        ) : (
-          <Ionicons name="person" size={size * 0.5} color="#6b7280" />
-        )}
-      </View>
-    );
+  const radiusStyle = { width: size, height: size, borderRadius: size / 2 };
+  const placeholder = (
+    <View style={[styles.placeholder, radiusStyle, style]}>
+      {initials ? (
+        <Text style={[styles.initials, { fontSize: size * 0.35 }]}>{initials}</Text>
+      ) : (
+        <Ionicons name="person" size={size * 0.5} color="#6b7280" />
+      )}
+    </View>
+  );
+
+  if (!source) {
+    return placeholder;
   }
-  
+
   return (
-    <Image 
-      source={{ uri: imageUrl }} 
-      style={[styles.image, { width: size, height: size, borderRadius: size / 2 }, style]}
-      resizeMode="cover"
+    <OptimizedImage
+      source={source}
+      fallback={placeholder}
+      containerStyle={[radiusStyle, style]}
+      style={[styles.image, radiusStyle]}
     />
   );
 };
@@ -59,4 +53,3 @@ const styles = StyleSheet.create({
 });
 
 export default ProfileImage;
-

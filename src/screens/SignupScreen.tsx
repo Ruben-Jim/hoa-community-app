@@ -25,6 +25,7 @@ import { AuthStackParamList } from '../navigation/AuthNavigator';
 import { simpleAlert } from '../utils/webCompatibleAlert';
 import CustomAlert from '../components/CustomAlert';
 import { useCustomAlert } from '../hooks/useCustomAlert';
+import { getUploadReadyImage } from '../utils/imageUpload';
 
 type SignupScreenNavigationProp = StackNavigationProp<AuthStackParamList, 'Signup'>;
 
@@ -151,13 +152,12 @@ const SignupScreen = () => {
   const uploadImage = async (imageUri: string): Promise<string> => {
     try {
       const uploadUrl = await generateUploadUrl();
-      
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
-      
+
+      const { blob, mimeType } = await getUploadReadyImage(imageUri);
+
       const uploadResponse = await fetch(uploadUrl, {
         method: 'POST',
-        headers: { 'Content-Type': blob.type },
+        headers: { 'Content-Type': mimeType },
         body: blob,
       });
       

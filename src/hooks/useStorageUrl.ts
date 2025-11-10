@@ -1,6 +1,7 @@
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useEffect, useState, useMemo } from 'react';
+import { Image as ExpoImage } from 'expo-image';
 
 // Global cache to store URLs across all component instances
 // This prevents multiple queries for the same storageId across different renders
@@ -59,9 +60,15 @@ export const useStorageUrl = (storageId: string | null | undefined): string | un
     // When query returns, update cache and state
     if (urlFromQuery) {
       // Only update if URL changed or cache is missing/expired
-      if (!cached || cached.url !== urlFromQuery || (now - cached.timestamp) >= CACHE_DURATION) {
+      const shouldUpdateCache =
+        !cached || cached.url !== urlFromQuery || (now - cached.timestamp) >= CACHE_DURATION;
+
+      if (shouldUpdateCache) {
         urlCache.set(storageId, { url: urlFromQuery, timestamp: now });
         setCachedUrl(urlFromQuery);
+        ExpoImage.prefetch(urlFromQuery).catch(() => {
+          // Prefetch failures are non-fatal; ignore silently.
+        });
       }
     } else if (urlFromQuery === undefined && cached) {
       // Query is still loading, use cached value if available
@@ -72,7 +79,17 @@ export const useStorageUrl = (storageId: string | null | undefined): string | un
   }, [storageId, urlFromQuery]);
 
   // Return cached URL immediately if available, otherwise return query result
-  return initialCached || cachedUrl || urlFromQuery;
+  const resolvedUrl = initialCached || cachedUrl || urlFromQuery;
+
+  useEffect(() => {
+    if (resolvedUrl) {
+      ExpoImage.prefetch(resolvedUrl).catch(() => {
+        // Ignore errors during prefetch
+      });
+    }
+  }, [resolvedUrl]);
+
+  return resolvedUrl;
 };
 
 /**
