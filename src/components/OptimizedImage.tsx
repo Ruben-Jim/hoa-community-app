@@ -1,5 +1,5 @@
 import React, { ReactNode, useMemo } from 'react';
-import { View, ActivityIndicator, StyleSheet, ViewStyle } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, ViewStyle, Platform } from 'react-native';
 import { Image as ExpoImage, ImageProps as ExpoImageProps } from 'expo-image';
 import { useStorageUrl } from '../hooks/useStorageUrl';
 
@@ -29,6 +29,9 @@ const OptimizedImage = React.forwardRef<ExpoImage, OptimizedImageProps>(
       containerStyle,
       style,
       contentFit = 'cover',
+      priority,
+      recyclingKey,
+      allowDownscaling,
       onLoadStart,
       onLoadEnd,
       ...rest
@@ -68,6 +71,12 @@ const OptimizedImage = React.forwardRef<ExpoImage, OptimizedImageProps>(
       return <View style={[styles.placeholderContainer, containerStyle]}>{resolvedPlaceholder}</View>;
     }
 
+    const resolvedPriority =
+      priority ?? (Platform.OS === 'ios' || Platform.OS === 'android' ? 'high' : 'normal');
+
+    const resolvedRecyclingKey = recyclingKey ?? resolvedStorageId ?? directUri ?? undefined;
+    const resolvedAllowDownscaling = allowDownscaling ?? true;
+
     return (
       <View style={[styles.container, containerStyle]}>
         <ExpoImage
@@ -76,6 +85,9 @@ const OptimizedImage = React.forwardRef<ExpoImage, OptimizedImageProps>(
           contentFit={contentFit}
           transition={transitionDuration}
           cachePolicy={cachePolicy}
+          priority={resolvedPriority}
+          recyclingKey={resolvedRecyclingKey}
+          allowDownscaling={resolvedAllowDownscaling}
           placeholder={{ uri: `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'><rect width='10' height='10' fill='${encodeURIComponent(DEFAULT_PLACEHOLDER_COLOR)}'/></svg>` }}
           style={style}
           onLoadStart={onLoadStart}

@@ -32,6 +32,7 @@ const ProfileImage = ({ source, size = 40, style, initials }: ProfileImageProps)
       fallback={placeholder}
       containerStyle={[radiusStyle, style]}
       style={[styles.image, radiusStyle]}
+      priority="high"
     />
   );
 };

@@ -589,6 +589,7 @@ const CommunityScreen = () => {
       containerStyle={styles.postImageWrapper}
       style={styles.postImage}
       contentFit="cover"
+      priority="high"
     />
   );
 
@@ -599,6 +600,7 @@ const CommunityScreen = () => {
         storageId={storageId}
         style={isFullScreen ? styles.fullImage : styles.cardHouseImage}
         contentFit={isFullScreen ? 'contain' : 'cover'}
+        priority="high"
         placeholderContent={
           <View style={isFullScreen ? styles.fullImageLoading : styles.imageLoading}>
             <Ionicons name="image" size={24} color="#9ca3af" />
@@ -1083,6 +1085,7 @@ const CommunityScreen = () => {
       storageId={storageId}
       style={isFullScreen ? styles.fullImage : styles.petCardImage}
       contentFit={isFullScreen ? 'contain' : 'cover'}
+      priority="high"
       placeholderContent={
         <View style={isFullScreen ? styles.fullImageLoading : styles.petImageLoading}>
           <Ionicons name="paw" size={32} color="#cbd5e1" />

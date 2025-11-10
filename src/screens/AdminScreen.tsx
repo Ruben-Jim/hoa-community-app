@@ -1003,6 +1003,7 @@ const AdminScreen = () => {
       storageId={storageId}
       style={styles.petCardImage}
       contentFit="cover"
+      priority="high"
       placeholderContent={
         <View style={styles.petImageLoading}>
           <Ionicons name="paw" size={32} color="#cbd5e1" />
