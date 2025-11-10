@@ -16,7 +16,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.Ruben-Jim.hoacommunityapp",
+      "bundleIdentifier": "com.Ruben-Jim.sheltonsprings",
       "buildNumber": "1",
       "infoPlist": {
         "UIBackgroundModes": [
