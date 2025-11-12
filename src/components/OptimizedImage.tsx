@@ -46,6 +46,11 @@ const OptimizedImage = React.forwardRef<ExpoImage, OptimizedImageProps>(
       return null;
     }, [storageId, source]);
 
+    const flattenedImageStyle = useMemo(
+      () => (style ? (StyleSheet.flatten(style) as ViewStyle) : undefined),
+      [style]
+    );
+
     const directUri = source && source.startsWith('http') ? source : undefined;
     const storageUri = useStorageUrl(resolvedStorageId);
     const resolvedUri = directUri ?? storageUri;
@@ -53,11 +58,11 @@ const OptimizedImage = React.forwardRef<ExpoImage, OptimizedImageProps>(
     const resolvedPlaceholder = useMemo(() => {
       if (placeholderContent) return placeholderContent;
       return (
-        <View style={[styles.placeholder, StyleSheet.flatten(style) as ViewStyle]}>
+        <View style={[styles.placeholder, flattenedImageStyle]}>
           <ActivityIndicator size="small" color="#9ca3af" />
         </View>
       );
-    }, [placeholderContent, style]);
+    }, [placeholderContent, flattenedImageStyle]);
 
     if (!resolvedUri) {
       if (storageUri === undefined) {
@@ -68,7 +73,11 @@ const OptimizedImage = React.forwardRef<ExpoImage, OptimizedImageProps>(
         return <>{fallback}</>;
       }
 
-      return <View style={[styles.placeholderContainer, containerStyle]}>{resolvedPlaceholder}</View>;
+    return (
+      <View style={[styles.placeholderContainer, containerStyle, flattenedImageStyle]}>
+          {resolvedPlaceholder}
+        </View>
+      );
     }
 
     const resolvedPriority =
@@ -78,7 +87,12 @@ const OptimizedImage = React.forwardRef<ExpoImage, OptimizedImageProps>(
     const resolvedAllowDownscaling = allowDownscaling ?? true;
 
     return (
-      <View style={[styles.container, containerStyle]}>
+      <View style={[
+        styles.container,
+        containerStyle,
+        flattenedImageStyle,
+        flattenedImageStyle?.borderRadius !== undefined && { borderRadius: flattenedImageStyle.borderRadius }
+      ]}>
         <ExpoImage
           ref={ref}
           source={{ uri: resolvedUri }}
@@ -103,20 +117,18 @@ OptimizedImage.displayName = 'OptimizedImage';
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     overflow: 'hidden',
-    backgroundColor: DEFAULT_PLACEHOLDER_COLOR,
+    backgroundColor: 'transparent',
   },
   placeholderContainer: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: DEFAULT_PLACEHOLDER_COLOR,
   },
   placeholder: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: DEFAULT_PLACEHOLDER_COLOR,
   },
 });
 

@@ -11,7 +11,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "deploy": "gh-pages --nojekyll -d dist",
-    "predeploy": "expo export -p web && echo 'sheltonsprings.homes' > web-buildCNAME && node scripts/fix-fonts.js"
+    "predeploy": "expo export -p web && echo 'sheltonsprings.homes' && node scripts/fix-fonts.js"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
