@@ -18,8 +18,7 @@ import { AuthStackParamList } from '../navigation/AuthNavigator';
 import { simpleAlert } from '../utils/webCompatibleAlert';
 import CustomAlert from '../components/CustomAlert';
 import { useCustomAlert } from '../hooks/useCustomAlert';
-import { useQuery } from 'convex/react';
-import { api } from '../../convex/_generated/api';
+import { useQuery, api } from '../services/mockConvex';
 
 type LoginScreenNavigationProp = StackNavigationProp<AuthStackParamList, 'Login'>;
 

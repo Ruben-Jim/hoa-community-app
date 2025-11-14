@@ -1,10 +1,9 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
-import { ConvexProvider, ConvexReactClient } from 'convex/react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import AuthNavigator from './src/navigation/AuthNavigator';
@@ -66,14 +65,7 @@ const MainApp = () => {
 };
 
 export default function App() {
-  const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
-
-  const convex = useMemo(() => {
-    if (!convexUrl) return null;
-    return new ConvexReactClient(convexUrl);
-  }, [convexUrl]);
-
-  const content = (
+  return (
     <SafeAreaProvider>
       <AuthProvider>
         <NavigationContainer>
@@ -82,12 +74,6 @@ export default function App() {
         </NavigationContainer>
       </AuthProvider>
     </SafeAreaProvider>
-  );
-
-  return convex ? (
-    <ConvexProvider client={convex}>{content}</ConvexProvider>
-  ) : (
-    content
   );
 }
 

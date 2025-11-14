@@ -20,9 +20,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery, useMutation } from 'convex/react';
-import { useConvex } from 'convex/react';
-import { api } from '../../convex/_generated/api';
+import { useQuery, useMutation, api } from '../services/mockConvex';
 import { useAuth } from '../context/AuthContext';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import DeveloperIndicator from '../components/DeveloperIndicator';
@@ -31,7 +29,6 @@ import MobileTabBar from '../components/MobileTabBar';
 
 const AdminScreen = () => {
   const { user } = useAuth();
-  const convex = useConvex();
   
   // State for dynamic responsive behavior (only for web/desktop)
   const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
@@ -556,9 +553,8 @@ const AdminScreen = () => {
       
       const { storageId } = await uploadResponse.json();
       
-      // Get the proper URL from Convex
-      const imageUrl = await convex.query(api.storage.getUrl, { storageId });
-      return imageUrl || storageId;
+      // For demo: return storageId directly (no real storage URLs)
+      return storageId;
     } catch (error) {
       console.error('Error uploading image:', error);
       throw new Error('Failed to upload image');

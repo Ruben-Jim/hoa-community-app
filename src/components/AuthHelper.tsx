@@ -1,6 +1,5 @@
 import React from 'react';
-import { useQuery } from 'convex/react';
-import { api } from '../../convex/_generated/api';
+import { useQuery, api } from '../services/mockConvex';
 
 // Example component showing how to use Convex authentication
 // This is for reference - in a real app, you'd implement this pattern

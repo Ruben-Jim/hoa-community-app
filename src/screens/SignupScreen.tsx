@@ -16,9 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import * as ImagePicker from 'expo-image-picker';
-import { useMutation } from 'convex/react';
-import { api } from '../../convex/_generated/api';
-import { useConvex } from 'convex/react';
+import { useMutation, api } from '../services/mockConvex';
 import { useAuth } from '../context/AuthContext';
 import { User } from '../types';
 import { AuthStackParamList } from '../navigation/AuthNavigator';
@@ -31,7 +29,6 @@ type SignupScreenNavigationProp = StackNavigationProp<AuthStackParamList, 'Signu
 const SignupScreen = () => {
   const navigation = useNavigation<SignupScreenNavigationProp>();
   const { signUp } = useAuth();
-  const convex = useConvex();
   const generateUploadUrl = useMutation(api.storage.generateUploadUrl);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -53,27 +50,14 @@ const SignupScreen = () => {
   // ScrollView ref for better control
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Set initial cursor and cleanup on unmount (web only)
+  // Ensure scroll view is properly initialized
   useEffect(() => {
-    if (Platform.OS === 'web') {
-      // Set initial cursor
-      document.body.style.cursor = 'grab';
-      
-      // Ensure scroll view is properly initialized
-      setTimeout(() => {
-        if (scrollViewRef.current) {
-          // Force a layout update
-          scrollViewRef.current.scrollTo({ y: 0, animated: false });
-          
-          // Debug: Log scroll view properties
-          console.log('SignupScreen ScrollView initialized for web');
-        }
-      }, 100);
-      
-      return () => {
-        document.body.style.cursor = 'default';
-      };
-    }
+    // Force a layout update after mount
+    setTimeout(() => {
+      if (scrollViewRef.current) {
+        scrollViewRef.current.scrollTo({ y: 0, animated: false });
+      }
+    }, 100);
   }, []);
 
   const pickImage = async () => {
@@ -144,9 +128,8 @@ const SignupScreen = () => {
       
       const { storageId } = await uploadResponse.json();
       
-      // Get the proper URL from Convex
-      const imageUrl = await convex.query(api.storage.getUrl, { storageId });
-      return imageUrl || storageId;
+      // For demo: return storageId directly (no real storage URLs)
+      return storageId;
     } catch (error) {
       console.error('Error uploading image:', error);
       throw new Error('Failed to upload image');
@@ -254,8 +237,8 @@ const SignupScreen = () => {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView 
         ref={scrollViewRef}
-        style={[styles.scrollView, Platform.OS === 'web' && styles.webScrollContainer]}
-        contentContainerStyle={[styles.scrollContent, Platform.OS === 'web' && styles.webScrollContent]}
+        style={Platform.OS === 'web' ? [styles.scrollView, styles.webScrollView] : styles.scrollView}
+        contentContainerStyle={Platform.OS === 'web' ? [styles.scrollContent, styles.webScrollContent] : styles.scrollContent}
         showsVerticalScrollIndicator={true}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
@@ -266,26 +249,10 @@ const SignupScreen = () => {
         removeClippedSubviews={false}
         scrollEventThrottle={16}
         decelerationRate="normal"
-        directionalLockEnabled={true}
+        directionalLockEnabled={Platform.OS === 'web'}
         canCancelContentTouches={true}
-        // Web-specific enhancements
-        {...(Platform.OS === 'web' && {
-          onScrollBeginDrag: () => {
-            if (Platform.OS === 'web') {
-              document.body.style.cursor = 'grabbing';
-              document.body.style.userSelect = 'none';
-            }
-          },
-          onScrollEndDrag: () => {
-            if (Platform.OS === 'web') {
-              document.body.style.cursor = 'grab';
-              document.body.style.userSelect = 'auto';
-            }
-          },
-          onScroll: () => {
-            // Ensure scrolling is working
-          },
-        })}
+        alwaysBounceHorizontal={false}
+        horizontal={false}
       >
           {/* Header */}
           <View style={styles.header}>
@@ -544,26 +511,32 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    width: '100%',
   },
-  webScrollContainer: {
+  webScrollView: {
     ...(Platform.OS === 'web' && {
-      cursor: 'grab' as any,
-      userSelect: 'none' as any,
-      WebkitUserSelect: 'none' as any,
-      MozUserSelect: 'none' as any,
-      msUserSelect: 'none' as any,
+      overflowY: 'auto' as any,
+      overflowX: 'hidden' as any,
+      WebkitOverflowScrolling: 'touch' as any,
+      // Ensure proper height for web
+      height: '100%' as any,
+      maxHeight: '100vh' as any,
     }),
   },
   scrollContent: {
-    paddingBottom: 30,
+    flexGrow: 1,
+    paddingBottom: Platform.OS === 'web' ? 100 : 40,
+    paddingTop: Platform.OS === 'web' ? 20 : 0,
   },
   webScrollContent: {
     ...(Platform.OS === 'web' && {
-      paddingBottom: 100 as any,
+      minHeight: '100%' as any,
+      paddingBottom: 120 as any,
     }),
   },
   spacer: {
-    height: Platform.OS === 'web' ? 120 : 80,
+    height: Platform.OS === 'web' ? 100 : 60,
+    minHeight: Platform.OS === 'web' ? 100 : 60,
   },
   header: {
     alignItems: 'center',

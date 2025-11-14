@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useQuery, useMutation } from 'convex/react';
+import { useMutation, api } from '../services/mockConvex';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { api } from '../../convex/_generated/api';
 import { User, AuthState } from '../types';
 
 interface AuthContextType extends AuthState {
