@@ -58,7 +58,7 @@ src/hooks/
   "expo": {
     "ios": {
       "infoPlist": {
-        "UIBackgroundModes": ["background-fetch", "remote-notification"]
+        "UIBackgroundModes": ["remote-notification"]
       }
     },
     "android": {

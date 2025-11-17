@@ -1,7 +1,6 @@
 {
   "expo": {
     "name": "HOA Community",
-    
     "slug": "hoa-community-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -20,16 +19,13 @@
       "buildNumber": "1",
       "infoPlist": {
         "UIBackgroundModes": [
-          "background-fetch",
-          "remote-notification",
-          "background-fetch",
           "remote-notification"
         ],
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.Ruben-Jim.hoacommunityapp",
+      "package": "com.rubjim.hoacommunityapp",
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -40,7 +36,8 @@
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE",
         "android.permission.WAKE_LOCK"
-      ]
+      ],
+      "softwareKeyboardLayoutMode": "pan"
     },
     "web": {
       "favicon": "./assets/favicon.jpg"

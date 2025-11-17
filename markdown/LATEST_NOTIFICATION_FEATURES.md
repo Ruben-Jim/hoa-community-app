@@ -196,7 +196,7 @@ await latestUnifiedNotificationManager.sendInfo(
 {
   "ios": {
     "infoPlist": {
-      "UIBackgroundModes": ["background-fetch", "remote-notification"],
+      "UIBackgroundModes": ["remote-notification"],
       "NSUserNotificationAlertStyle": "alert",
       "NSUserNotificationSoundName": "default"
     }
