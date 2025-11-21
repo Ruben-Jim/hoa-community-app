@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "HOA Community",
+    "name": "Shelton Springs",
     "slug": "hoa-community-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "scheme": "hoa-community-app",
+    "icon": "./assets/icon.jpg",
+    "scheme": "sheltonsprings",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.Ruben-Jim.sheltonsprings",
+      "bundleIdentifier": "com.rubenjim.sheltonsprings",
       "buildNumber": "1",
       "infoPlist": {
         "UIBackgroundModes": [
@@ -25,10 +25,10 @@
       }
     },
     "android": {
-      "package": "com.rubjim.hoacommunityapp",
+      "package": "com.rubenjim.sheltonsprings",
       "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/icon.jpg",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
@@ -62,7 +62,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
+          "icon": "./assets/icon.jpg",
           "color": "#ffffff",
           "defaultChannel": "default"
         }
