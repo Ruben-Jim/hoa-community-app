@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Shelton Springs",
-    "slug": "hoa-community-app",
+    "slug": "shelton-springs",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.jpg",
@@ -48,8 +48,11 @@
     },
     "extra": {
       "convexUrl": "${EXPO_PUBLIC_CONVEX_URL}",
+      "router": {
+        "origin": "https://sheltonsprings.homes"
+      },
       "eas": {
-        "projectId": "a30576d8-ca43-4d96-8957-d6080ae9076d"
+        "projectId": "1e1b6e75-8ac2-4fe8-8cff-46c325df0d32"
       }
     },
     "plugins": [

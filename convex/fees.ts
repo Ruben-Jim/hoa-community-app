@@ -352,6 +352,43 @@ export const createYearFeesForAllHomeowners = mutation({
   },
 });
 
+// Update all annual fees for a specific year
+export const updateAllAnnualFees = mutation({
+  args: {
+    year: v.number(),
+    amount: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const allFees = await ctx.db.query("fees").collect();
+    
+    // Filter to get all annual fees for the specified year that are not paid
+    const annualFeesToUpdate = allFees.filter(
+      (fee) =>
+        fee.frequency === "Annually" &&
+        fee.year === args.year &&
+        fee.status !== "Paid"
+    );
+    
+    const now = Date.now();
+    let updatedCount = 0;
+    
+    // Update each fee
+    for (const fee of annualFeesToUpdate) {
+      await ctx.db.patch(fee._id, {
+        amount: args.amount,
+        updatedAt: now,
+      });
+      updatedCount++;
+    }
+    
+    return {
+      success: true,
+      updatedCount: updatedCount,
+      message: `Updated ${updatedCount} annual fee${updatedCount !== 1 ? 's' : ''} for year ${args.year} to $${args.amount.toFixed(2)}`,
+    };
+  },
+});
+
 // Add a fine to a specific property address
 export const addFineToProperty = mutation({
   args: {
@@ -428,6 +465,40 @@ export const updateFineStatus = mutation({
     return {
       success: true,
       message: `Fine status updated to ${args.status}`,
+    };
+  },
+});
+
+// Add past due amount to a resident
+export const addPastDueAmount = mutation({
+  args: {
+    userId: v.string(),
+    amount: v.number(),
+    description: v.string(),
+    dueDate: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const dueDateObj = new Date(args.dueDate);
+    const isLate = dueDateObj < new Date();
+    
+    const feeRecord = await ctx.db.insert("fees", {
+      name: `Past Due: ${args.description}`,
+      amount: args.amount,
+      frequency: "One-time",
+      dueDate: args.dueDate,
+      description: args.description,
+      isLate: isLate,
+      userId: args.userId,
+      status: "Overdue",
+      createdAt: now,
+      updatedAt: now,
+    });
+    
+    return {
+      success: true,
+      feeId: feeRecord,
+      message: `Past due amount of $${args.amount} added successfully`,
     };
   },
 });

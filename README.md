@@ -146,7 +146,7 @@ The app uses Convex as the backend database with the following tables:
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
-   cd hoa-community-app
+   cd shelton-springs
    ```
 
 2. **Install dependencies**
@@ -189,7 +189,7 @@ npm start
 ## 📁 Project Structure
 
 ```
-hoa-community-app/
+shelton-springs/
 ├── App.tsx                    # Main app component with navigation
 ├── src/
 │   ├── screens/              # Screen components

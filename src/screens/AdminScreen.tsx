@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -86,6 +86,105 @@ const AdminScreen = () => {
       });
     }
   }, [hoaInfo]);
+
+  // ========== MEMOIZED DATA CACHING - Optimize Convex DB calls ==========
+  
+  // Resident lookup map for O(1) access instead of O(n) find()
+  const residentsMap = useMemo(() => {
+    const map = new Map<string, any>();
+    residents.forEach((resident: any) => {
+      map.set(resident._id, resident);
+    });
+    return map;
+  }, [residents]);
+
+  // Filtered homeowners list (residents who are not renters)
+  const homeownersList = useMemo(() => {
+    return residents.filter((r: any) => r.isResident && !r.isRenter);
+  }, [residents]);
+
+  // Cached resident role counts
+  const residentRoleCounts = useMemo(() => {
+    return {
+      homeowners: residents.filter((r: any) => r.isResident && !r.isRenter).length,
+      renters: residents.filter((r: any) => r.isRenter).length,
+    };
+  }, [residents]);
+
+  // Fees grouped by userId for quick lookup
+  const feesByUserId = useMemo(() => {
+    const map = new Map<string, any[]>();
+    allFeesFromDatabase.forEach((fee: any) => {
+      if (fee.userId) {
+        const existing = map.get(fee.userId) || [];
+        map.set(fee.userId, [...existing, fee]);
+      }
+    });
+    return map;
+  }, [allFeesFromDatabase]);
+
+  // Fines grouped by residentId for quick lookup
+  const finesByResidentId = useMemo(() => {
+    const map = new Map<string, any[]>();
+    allFinesFromDatabase.forEach((fine: any) => {
+      if (fine.residentId) {
+        const existing = map.get(fine.residentId) || [];
+        map.set(fine.residentId, [...existing, fine]);
+      }
+    });
+    return map;
+  }, [allFinesFromDatabase]);
+
+  // Filtered fees arrays - cached to avoid repeated filtering
+  const unpaidAnnualFees = useMemo(() => {
+    return allFeesFromDatabase.filter((fee: any) => 
+      fee.frequency === 'Annually' && fee.status !== 'Paid'
+    );
+  }, [allFeesFromDatabase]);
+
+  const paidFees = useMemo(() => {
+    return allFeesFromDatabase.filter((fee: any) => fee.status === 'Paid');
+  }, [allFeesFromDatabase]);
+
+  const unpaidFees = useMemo(() => {
+    return allFeesFromDatabase.filter((fee: any) => fee.status !== 'Paid');
+  }, [allFeesFromDatabase]);
+
+  const paidFines = useMemo(() => {
+    return allFinesFromDatabase.filter((fine: any) => fine.status === 'Paid');
+  }, [allFinesFromDatabase]);
+
+  const unpaidFinesList = useMemo(() => {
+    return allFinesFromDatabase.filter((fine: any) => fine.status !== 'Paid');
+  }, [allFinesFromDatabase]);
+
+  // Homeowners with fees or fines - cached filtered list
+  const homeownersWithFeesOrFines = useMemo(() => {
+    return homeownersPaymentStatus.filter((item: any) => {
+      const hasFees = feesByUserId.has(item._id);
+      const hasFines = finesByResidentId.has(item._id);
+      return hasFees || hasFines;
+    });
+  }, [homeownersPaymentStatus, feesByUserId, finesByResidentId]);
+
+  // Fee statistics - cached counts
+  const feeStats = useMemo(() => {
+    return {
+      total: allFeesFromDatabase.length,
+      paid: paidFees.length,
+      unpaid: unpaidFees.length,
+    };
+  }, [allFeesFromDatabase.length, paidFees.length, unpaidFees.length]);
+
+  const fineStats = useMemo(() => {
+    return {
+      total: allFinesFromDatabase.length,
+      paid: paidFines.length,
+      unpaid: unpaidFinesList.length,
+    };
+  }, [allFinesFromDatabase.length, paidFines.length, unpaidFinesList.length]);
+
+  // ========== END MEMOIZED DATA CACHING ==========
   
   // Mutations
   const setBlockStatus = useMutation(api.residents.setBlockStatus);
@@ -100,6 +199,10 @@ const AdminScreen = () => {
   // Fee management mutations
   const createYearFeesForAllHomeowners = useMutation(api.fees.createYearFeesForAllHomeowners);
   const addFineToProperty = useMutation(api.fees.addFineToProperty);
+  const updateFee = useMutation(api.fees.update);
+  const createFee = useMutation(api.fees.create);
+  const addPastDueAmount = useMutation(api.fees.addPastDueAmount);
+  const updateAllAnnualFees = useMutation(api.fees.updateAllAnnualFees);
   
   // Covenant management mutations
   const createCovenant = useMutation(api.covenants.create);
@@ -125,7 +228,11 @@ const AdminScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'SheltonHOA' | 'residents' | 'board' | 'covenants' | 'Community' | 'fees'>('SheltonHOA');
   const [postsSubTab, setPostsSubTab] = useState<'posts' | 'comments' | 'polls' | 'pets' | 'complaints'>('posts');
+  const [feesSubTab, setFeesSubTab] = useState<'dues' | 'residents'>('dues');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  
+  // Accordion state for sections (collapse/expand entire sections)
+  const [isResidentsSectionExpanded, setIsResidentsSectionExpanded] = useState(true);
 
   const [showBlockModal, setShowBlockModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -148,6 +255,8 @@ const AdminScreen = () => {
   // Fee management modal state
   const [showYearFeeModal, setShowYearFeeModal] = useState(false);
   const [showAddFineModal, setShowAddFineModal] = useState(false);
+  const [showUpdateDuesModal, setShowUpdateDuesModal] = useState(false);
+  const [showPastDueModal, setShowPastDueModal] = useState(false);
   const [yearFeeForm, setYearFeeForm] = useState({
     year: new Date().getFullYear().toString(),
     amount: '300',
@@ -158,6 +267,16 @@ const AdminScreen = () => {
     amount: '',
     reason: '',
     description: '',
+  });
+  const [updateDuesForm, setUpdateDuesForm] = useState({
+    selectedFeeId: '',
+    newAmount: '',
+  });
+  const [pastDueForm, setPastDueForm] = useState({
+    selectedResidentId: '',
+    amount: '',
+    description: '',
+    dueDate: '',
   });
   
   // Covenant modal state
@@ -206,6 +325,10 @@ const AdminScreen = () => {
   const yearFeeModalTranslateY = useRef(new Animated.Value(300)).current;
   const addFineModalOpacity = useRef(new Animated.Value(0)).current;
   const addFineModalTranslateY = useRef(new Animated.Value(300)).current;
+  const updateDuesModalOpacity = useRef(new Animated.Value(0)).current;
+  const updateDuesModalTranslateY = useRef(new Animated.Value(300)).current;
+  const pastDueModalOpacity = useRef(new Animated.Value(0)).current;
+  const pastDueModalTranslateY = useRef(new Animated.Value(300)).current;
   const covenantModalOpacity = useRef(new Animated.Value(0)).current;
   const covenantModalTranslateY = useRef(new Animated.Value(300)).current;
   const pollModalOpacity = useRef(new Animated.Value(0)).current;
@@ -221,12 +344,14 @@ const AdminScreen = () => {
   const isBoardMember = user?.isBoardMember && user?.isActive;
 
   // Modern animation functions
-  const animateIn = (modalType: 'block' | 'delete' | 'boardMember' | 'yearFee' | 'addFine' | 'covenant' | 'poll') => {
+  const animateIn = (modalType: 'block' | 'delete' | 'boardMember' | 'yearFee' | 'addFine' | 'updateDues' | 'pastDue' | 'covenant' | 'poll') => {
     const opacity = modalType === 'block' ? blockModalOpacity : 
                    modalType === 'delete' ? deleteModalOpacity :
                    modalType === 'boardMember' ? boardMemberModalOpacity : 
                    modalType === 'yearFee' ? yearFeeModalOpacity : 
                    modalType === 'addFine' ? addFineModalOpacity :
+                   modalType === 'updateDues' ? updateDuesModalOpacity :
+                   modalType === 'pastDue' ? pastDueModalOpacity :
                    modalType === 'covenant' ? covenantModalOpacity :
                    pollModalOpacity;
     const translateY = modalType === 'block' ? blockModalTranslateY : 
@@ -234,6 +359,8 @@ const AdminScreen = () => {
                       modalType === 'boardMember' ? boardMemberModalTranslateY : 
                       modalType === 'yearFee' ? yearFeeModalTranslateY : 
                       modalType === 'addFine' ? addFineModalTranslateY :
+                      modalType === 'updateDues' ? updateDuesModalTranslateY :
+                      modalType === 'pastDue' ? pastDueModalTranslateY :
                       modalType === 'covenant' ? covenantModalTranslateY :
                       pollModalTranslateY;
     
@@ -257,12 +384,14 @@ const AdminScreen = () => {
     ]).start();
   };
 
-  const animateOut = (modalType: 'block' | 'delete' | 'boardMember' | 'yearFee' | 'addFine' | 'covenant' | 'poll', callback: () => void) => {
+  const animateOut = (modalType: 'block' | 'delete' | 'boardMember' | 'yearFee' | 'addFine' | 'updateDues' | 'pastDue' | 'covenant' | 'poll', callback: () => void) => {
     const opacity = modalType === 'block' ? blockModalOpacity : 
                    modalType === 'delete' ? deleteModalOpacity :
                    modalType === 'boardMember' ? boardMemberModalOpacity : 
                    modalType === 'yearFee' ? yearFeeModalOpacity : 
                    modalType === 'addFine' ? addFineModalOpacity :
+                   modalType === 'updateDues' ? updateDuesModalOpacity :
+                   modalType === 'pastDue' ? pastDueModalOpacity :
                    modalType === 'covenant' ? covenantModalOpacity :
                    pollModalOpacity;
     const translateY = modalType === 'block' ? blockModalTranslateY : 
@@ -633,6 +762,76 @@ const AdminScreen = () => {
       Alert.alert('Error', 'Failed to add fine. Please try again.');
     }
   };
+
+  const handleUpdateDues = async () => {
+    try {
+      const newAmount = parseFloat(updateDuesForm.newAmount);
+      const currentYear = new Date().getFullYear();
+      
+      if (!newAmount || newAmount <= 0) {
+        Alert.alert('Error', 'Please enter a valid amount.');
+        return;
+      }
+
+      // Call Convex mutation to update all annual fees for the current year
+      const result = await updateAllAnnualFees({
+        year: currentYear,
+        amount: newAmount,
+      });
+
+      if (result.success) {
+        Alert.alert('Success', result.message);
+      } else {
+        Alert.alert('Error', 'Failed to update dues. Please try again.');
+      }
+      
+      setShowUpdateDuesModal(false);
+      setUpdateDuesForm({
+        selectedFeeId: '',
+        newAmount: '',
+      });
+    } catch (error) {
+      console.error('Error updating dues:', error);
+      Alert.alert('Error', 'Failed to update dues amount. Please try again.');
+    }
+  };
+
+  const handleAddPastDue = async () => {
+    try {
+      const amount = parseFloat(pastDueForm.amount);
+      
+      if (!pastDueForm.selectedResidentId || !amount || amount <= 0 || !pastDueForm.description || !pastDueForm.dueDate) {
+        Alert.alert('Error', 'Please fill in all required fields.');
+        return;
+      }
+
+      // Call Convex mutation to add past due amount
+      const result = await addPastDueAmount({
+        userId: pastDueForm.selectedResidentId,
+        amount: amount,
+        description: pastDueForm.description,
+        dueDate: pastDueForm.dueDate,
+      });
+
+      if (result.success) {
+        Alert.alert('Success', result.message);
+        
+        setShowPastDueModal(false);
+        setPastDueForm({
+          selectedResidentId: '',
+          amount: '',
+          description: '',
+          dueDate: new Date().toISOString().split('T')[0],
+        });
+      } else {
+        Alert.alert('Error', 'Failed to add past due amount. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error adding past due amount:', error);
+      Alert.alert('Error', 'Failed to add past due amount. Please try again.');
+    }
+  };
+
 
   // Get unique addresses for fine selection
   const getUniqueAddresses = () => {
@@ -1157,7 +1356,7 @@ const AdminScreen = () => {
                     <Ionicons name="people" size={18} color="#10b981" />
                   </View>
                   <Text style={styles.roleStatNumber}>
-                    {residents.filter(r => r.isResident && !r.isRenter).length}
+                    {residentRoleCounts.homeowners}
                   </Text>
                   <Text style={styles.roleStatLabel}>Homeowners</Text>
                 </View>
@@ -1167,7 +1366,7 @@ const AdminScreen = () => {
                     <Ionicons name="home" size={18} color="#3b82f6" />
                   </View>
                   <Text style={styles.roleStatNumber}>
-                    {residents.filter(r => r.isRenter).length}
+                    {residentRoleCounts.renters}
                   </Text>
                   <Text style={styles.roleStatLabel}>Renters</Text>
                 </View>
@@ -1634,7 +1833,7 @@ const AdminScreen = () => {
                 style={[styles.subTab, postsSubTab === 'complaints' && styles.activeSubTab]}
                 onPress={() => setPostsSubTab('complaints')}
               >
-                <Ionicons name="warning" size={18} color={postsSubTab === 'complaints' ? '#ef4444' : '#6b7280'} />
+                <Ionicons name="warning" size={18} color={postsSubTab === 'complaints' ? '#3b82f6' : '#6b7280'} />
                 <Text style={[styles.subTabText, postsSubTab === 'complaints' && styles.activeSubTabText]}>
                   Complaints ({communityPosts.filter((p: any) => p.category === 'Complaint').length})
                 </Text>
@@ -2151,7 +2350,41 @@ const AdminScreen = () => {
         return (
           <View style={styles.tabContent}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Fees Status</Text>
+              <Text style={styles.sectionTitle}>Fees Management</Text>
+            </View>
+            
+            {/* Fees Sub-tabs */}
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={styles.subTabsContainer}
+              contentContainerStyle={styles.subTabsContent}
+            >
+              <TouchableOpacity
+                style={[styles.subTab, feesSubTab === 'dues' && styles.activeSubTab]}
+                onPress={() => setFeesSubTab('dues')}
+              >
+                <Ionicons name="card" size={18} color={feesSubTab === 'dues' ? '#ec4899' : '#6b7280'} />
+                <Text style={[styles.subTabText, feesSubTab === 'dues' && styles.activeSubTabText]}>
+                  Dues Management
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.subTab, feesSubTab === 'residents' && styles.activeSubTab]}
+                onPress={() => setFeesSubTab('residents')}
+              >
+                <Ionicons name="people" size={18} color={feesSubTab === 'residents' ? '#ec4899' : '#6b7280'} />
+                <Text style={[styles.subTabText, feesSubTab === 'residents' && styles.activeSubTabText]}>
+                  Residents
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+            
+            {feesSubTab === 'dues' && (
+              <>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Dues Management</Text>
               <View style={styles.adminFeeButtonsContainer}>
                 <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
                   <TouchableOpacity
@@ -2189,18 +2422,18 @@ const AdminScreen = () => {
                    <View style={styles.feeStatsRow}>
                      <View style={styles.feeStatCard}>
                        <Text style={styles.feeStatLabel}>Total Fees</Text>
-                       <Text style={styles.feeStatValue}>{allFeesFromDatabase.length}</Text>
+                       <Text style={styles.feeStatValue}>{feeStats.total}</Text>
                      </View>
                      <View style={styles.feeStatCard}>
                        <Text style={styles.feeStatLabel}>Paid Fees</Text>
                        <Text style={[styles.feeStatValue, { color: '#10b981' }]}>
-                         {allFeesFromDatabase.filter((fee: any) => fee.status === 'Paid').length}
+                         {feeStats.paid}
                        </Text>
                      </View>
                      <View style={styles.feeStatCard}>
                        <Text style={styles.feeStatLabel}>Unpaid Fees</Text>
                        <Text style={[styles.feeStatValue, { color: '#f59e0b' }]}>
-                         {allFeesFromDatabase.filter((fee: any) => fee.status !== 'Paid').length}
+                         {feeStats.unpaid}
                        </Text>
                      </View>
                    </View>
@@ -2209,18 +2442,18 @@ const AdminScreen = () => {
                    <View style={styles.feeStatsRow}>
                      <View style={styles.feeStatCard}>
                        <Text style={styles.feeStatLabel}>Total Fines</Text>
-                       <Text style={styles.feeStatValue}>{allFinesFromDatabase.length}</Text>
+                       <Text style={styles.feeStatValue}>{fineStats.total}</Text>
                      </View>
                      <View style={styles.feeStatCard}>
                        <Text style={styles.feeStatLabel}>Paid Fines</Text>
                        <Text style={[styles.feeStatValue, { color: '#10b981' }]}>
-                         {allFinesFromDatabase.filter((fine: any) => fine.status === 'Paid').length}
+                         {fineStats.paid}
                        </Text>
                      </View>
                      <View style={styles.feeStatCard}>
                        <Text style={styles.feeStatLabel}>Unpaid Fines</Text>
                        <Text style={[styles.feeStatValue, { color: '#dc2626' }]}>
-                         {allFinesFromDatabase.filter((fine: any) => fine.status !== 'Paid').length}
+                         {fineStats.unpaid}
                        </Text>
                      </View>
                    </View>
@@ -2238,7 +2471,7 @@ const AdminScreen = () => {
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   {pendingVenmoPayments.map((payment: any) => {
-                    const resident = residents.find((r: any) => r._id === payment.userId);
+                    const resident = residentsMap.get(payment.userId);
                     const paymentDate = new Date(payment.createdAt).toLocaleDateString();
                     
                     return (
@@ -2316,12 +2549,7 @@ const AdminScreen = () => {
             <View style={isMobileDevice || screenWidth < 768 ? styles.feesGridContainerMobile : {}}>
               <FlatList
                 key={`fees-grid-${isMobileDevice || screenWidth < 768 ? 1 : 2}`}
-                data={homeownersPaymentStatus.filter((item: any) => {
-                  // Only show homeowners who have fees or fines
-                  const hasFees = allFeesFromDatabase.some((fee: any) => fee.userId === item._id);
-                  const hasFines = allFinesFromDatabase.some((fine: any) => fine.residentId === item._id);
-                  return hasFees || hasFines;
-                })}
+                data={homeownersWithFeesOrFines}
                 keyExtractor={(item) => item._id}
                 numColumns={isMobileDevice || screenWidth < 768 ? 1 : 2}
               refreshControl={
@@ -2329,9 +2557,9 @@ const AdminScreen = () => {
               }
               renderItem={({ item }) => {
                 const homeowner = item as any;
-                // Get fees and fines for this homeowner
-                const homeownerFees = allFeesFromDatabase.filter((fee: any) => fee.userId === homeowner._id);
-                const homeownerFines = allFinesFromDatabase.filter((fine: any) => fine.residentId === homeowner._id);
+                // Get fees and fines for this homeowner from cached maps
+                const homeownerFees = feesByUserId.get(homeowner._id) || [];
+                const homeownerFines = finesByResidentId.get(homeowner._id) || [];
                   const isSingleColumn = isMobileDevice || screenWidth < 768;
                   return (
                     <Animated.View 
@@ -2567,6 +2795,276 @@ const AdminScreen = () => {
               }
             />
             </View>
+            </>
+            )}
+            
+            {feesSubTab === 'residents' && (
+              <>
+                {/* Update Current Dues Section - First */}
+                <View style={[
+                  styles.section,
+                  isMobileDevice || screenWidth < 768 ? styles.residentsSectionMobile : styles.residentsSectionDesktop
+                ]}>
+                  {/* Section Header with Button */}
+                  <View style={styles.residentsSectionHeader}>
+                    <View style={styles.residentsSectionHeaderLeft}>
+                      <Ionicons name="card-outline" size={20} color="#ec4899" />
+                      <View style={styles.residentsSectionHeaderTextContainer}>
+                        <View style={styles.residentsSectionTitleRow}>
+                          <Text style={styles.residentsSectionTitle}>Update Current Dues</Text>
+                        </View>
+                        <Text style={styles.residentsSectionSubtitle}>
+                          Update annual dues amount for all homeowners
+                          {unpaidAnnualFees.length > 0 && (
+                            <Text style={styles.residentsSectionSubtitleAmount}>
+                              {' • Current: $'}{unpaidAnnualFees[0]?.amount.toFixed(2) || '0.00'}
+                            </Text>
+                          )}
+                        </Text>
+                      </View>
+                    </View>
+                    {unpaidAnnualFees.length > 0 && (
+                      <TouchableOpacity
+                        style={styles.updateAllDuesHeaderButton}
+                        onPress={() => {
+                          const currentYear = new Date().getFullYear();
+                          const currentAmount = unpaidAnnualFees[0]?.amount || 0;
+                          setUpdateDuesForm({
+                            selectedFeeId: '',
+                            newAmount: currentAmount.toString(),
+                          });
+                          setShowUpdateDuesModal(true);
+                          animateIn('updateDues');
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="create-outline" size={18} color="#ffffff" />
+                        <Text style={styles.updateAllDuesHeaderButtonText}>Update All Dues</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  
+                  {/* Section Content - Empty State Only */}
+                  {unpaidAnnualFees.length === 0 && (
+                    <View style={styles.residentsAccordionSectionContent}>
+                      <View style={styles.residentsEmptyState}>
+                        <Ionicons name="checkmark-circle" size={64} color="#10b981" />
+                        <Text style={styles.residentsEmptyStateTitle}>All dues are up to date</Text>
+                        <Text style={styles.residentsEmptyStateSubtitle}>
+                          All residents have paid their current dues
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+
+                {/* Residents Management Section - Second */}
+                <View style={[
+                  styles.section,
+                  isMobileDevice || screenWidth < 768 ? styles.residentsSectionMobile : styles.residentsSectionDesktop
+                ]}>
+                  {/* Section Header with Button */}
+                  <View style={styles.residentsSectionHeader}>
+                    <View style={styles.residentsSectionHeaderLeft}>
+                      <Ionicons name="people" size={20} color="#ec4899" />
+                      <View style={styles.residentsSectionHeaderTextContainer}>
+                        <View style={styles.residentsSectionTitleRow}>
+                          <Text style={styles.residentsSectionTitle}>Residents Management</Text>
+                        </View>
+                        <Text style={styles.residentsSectionSubtitle}>
+                          Add past due amounts to current residents
+                        </Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.addPastDueHeaderButtonIntegrated}
+                      onPress={() => {
+                        animateButtonPress();
+                        setShowPastDueModal(true);
+                        animateIn('pastDue');
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="add-circle" size={18} color="#ffffff" />
+                      <Text style={styles.addPastDueHeaderButtonTextIntegrated}>Add Past Due</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                
+                {/* All Residents Section - Third */}
+                <View style={[
+                  styles.section,
+                  isMobileDevice || screenWidth < 768 ? styles.residentsSectionMobile : styles.residentsSectionDesktop
+                ]}>
+                  {/* Accordion Header */}
+                  <TouchableOpacity
+                    style={styles.residentsSectionHeader}
+                    onPress={() => setIsResidentsSectionExpanded(!isResidentsSectionExpanded)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.residentsSectionHeaderLeft}>
+                      <Ionicons name="people-outline" size={20} color="#ec4899" />
+                      <View style={styles.residentsSectionHeaderTextContainer}>
+                        <View style={styles.residentsSectionTitleRow}>
+                          <Text style={styles.residentsSectionTitle}>All Residents</Text>
+                          <View style={styles.residentsSectionBadge}>
+                            <Text style={styles.residentsSectionBadgeText}>{homeownersList.length}</Text>
+                          </View>
+                        </View>
+                        <Text style={styles.residentsSectionSubtitle}>
+                          View and manage all homeowner accounts
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons 
+                      name="chevron-down" 
+                      size={20} 
+                      color="#6b7280"
+                      style={{
+                        transform: [{ rotate: isResidentsSectionExpanded ? '180deg' : '0deg' }]
+                      }}
+                    />
+                  </TouchableOpacity>
+                  
+                  {/* Accordion Content */}
+                  {isResidentsSectionExpanded && (
+                    <View style={styles.residentsAccordionSectionContent}>
+                      {homeownersList.length > 0 ? (
+                        <ScrollView 
+                          horizontal 
+                          showsHorizontalScrollIndicator={false}
+                          style={styles.residentsTableScrollView}
+                          contentContainerStyle={[
+                            styles.residentsTableScrollContent,
+                            (isMobileDevice || screenWidth < 768) && { minWidth: 800 }
+                          ]}
+                        >
+                          <View style={[
+                            styles.residentsTableContainer,
+                            (isMobileDevice || screenWidth < 768) && { minWidth: 800 }
+                          ]}>
+                          {/* Table Header */}
+                          <View style={styles.residentsTableHeader}>
+                            <View style={[styles.residentsTableHeaderCell, styles.residentsTableCellName]}>
+                              <Text style={styles.residentsTableHeaderText}>Resident</Text>
+                            </View>
+                            <View style={[styles.residentsTableHeaderCell, styles.residentsTableCellAddress]}>
+                              <Text style={styles.residentsTableHeaderText}>Address</Text>
+                            </View>
+                            <View style={[styles.residentsTableHeaderCell, styles.residentsTableCellStatus]}>
+                              <Text style={styles.residentsTableHeaderText}>Status</Text>
+                            </View>
+                            <View style={[styles.residentsTableHeaderCell, styles.residentsTableCellAmount]}>
+                              <Text style={styles.residentsTableHeaderText}>Amount</Text>
+                            </View>
+                            <View style={[styles.residentsTableHeaderCell, styles.residentsTableCellAction]}>
+                              <Text style={styles.residentsTableHeaderText}>Action</Text>
+                            </View>
+                          </View>
+
+                          {/* Table Rows */}
+                          {homeownersList.map((resident: any, index: number) => {
+                            const residentFees = feesByUserId.get(resident._id) || [];
+                            const totalAmount = residentFees.reduce((sum: number, fee: any) => sum + fee.amount, 0);
+                            const unpaidCount = residentFees.filter((fee: any) => fee.status !== 'Paid').length;
+                            const hasOutstanding = unpaidCount > 0;
+                            
+                            return (
+                              <View 
+                                key={resident._id}
+                                style={[
+                                  styles.residentsTableRow,
+                                  index % 2 === 0 && styles.residentsTableRowEven
+                                ]}
+                              >
+                                {/* Name Column */}
+                                <View style={[styles.residentsTableCell, styles.residentsTableCellName]}>
+                                  <View style={styles.residentsTableNameContent}>
+                                    <ProfileImage 
+                                      source={resident.profileImage} 
+                                      size={36}
+                                      initials={`${resident.firstName.charAt(0)}${resident.lastName.charAt(0)}`}
+                                      style={styles.residentsTableProfileImage}
+                                    />
+                                    <View style={styles.residentsTableNameText}>
+                                      <Text style={styles.residentsTableName} numberOfLines={1}>
+                                        {resident.firstName} {resident.lastName}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                </View>
+
+                                {/* Address Column */}
+                                <View style={[styles.residentsTableCell, styles.residentsTableCellAddress]}>
+                                  <Text style={styles.residentsTableAddress} numberOfLines={1}>
+                                    {resident.address}{resident.unitNumber ? ` Unit ${resident.unitNumber}` : ''}
+                                  </Text>
+                                </View>
+
+                                {/* Status Column */}
+                                <View style={[styles.residentsTableCell, styles.residentsTableCellStatus]}>
+                                  {hasOutstanding ? (
+                                    <View style={styles.residentsTableStatusContent}>
+                                      <Ionicons name="alert-circle" size={16} color="#6b7280" />
+                                      <Text style={styles.residentsTableStatusText}>
+                                        {unpaidCount} unpaid
+                                      </Text>
+                                    </View>
+                                  ) : (
+                                    <View style={styles.residentsTableStatusContent}>
+                                      <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+                                      <Text style={[styles.residentsTableStatusText, { color: '#10b981' }]}>
+                                        Paid
+                                      </Text>
+                                    </View>
+                                  )}
+                                </View>
+
+                                {/* Amount Column */}
+                                <View style={[styles.residentsTableCell, styles.residentsTableCellAmount]}>
+                                  <Text style={styles.residentsTableAmount}>
+                                    ${totalAmount.toFixed(2)}
+                                  </Text>
+                                </View>
+
+                                {/* Action Column */}
+                                <View style={[styles.residentsTableCell, styles.residentsTableCellAction]}>
+                                  <TouchableOpacity
+                                    style={styles.residentsTableActionButton}
+                                    onPress={() => {
+                                      setPastDueForm({
+                                        selectedResidentId: resident._id,
+                                        amount: '',
+                                        description: '',
+                                        dueDate: new Date().toISOString().split('T')[0],
+                                      });
+                                      setShowPastDueModal(true);
+                                      animateIn('pastDue');
+                                    }}
+                                    activeOpacity={0.7}
+                                  >
+                                    <Ionicons name="add-circle-outline" size={18} color="#2563eb" />
+                                  </TouchableOpacity>
+                                </View>
+                              </View>
+                            );
+                          })}
+                          </View>
+                        </ScrollView>
+                      ) : (
+                        <View style={styles.residentsEmptyState}>
+                          <Ionicons name="people-outline" size={64} color="#9ca3af" />
+                          <Text style={styles.residentsEmptyStateTitle}>No residents found</Text>
+                          <Text style={styles.residentsEmptyStateSubtitle}>
+                            Residents will appear here once they register
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </View>
+              </>
+            )}
           </View>
         );
       
@@ -3200,6 +3698,171 @@ const AdminScreen = () => {
           </Animated.View>
         </Modal>
 
+        {/* Update Dues Modal */}
+        <Modal
+          visible={showUpdateDuesModal}
+          transparent={true}
+          animationType="none"
+          onRequestClose={() => animateOut('updateDues', () => setShowUpdateDuesModal(false))}
+        >
+          <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
+            <Animated.View style={[
+              styles.formModalContent,
+              {
+                opacity: updateDuesModalOpacity,
+                transform: [{ translateY: updateDuesModalTranslateY }],
+              }
+            ]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Update All Dues Amount</Text>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => animateOut('updateDues', () => setShowUpdateDuesModal(false))}
+                >
+                  <Ionicons name="close" size={24} color="#6b7280" />
+                </TouchableOpacity>
+              </View>
+              
+              <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>New Dues Amount ($) *</Text>
+                  <Text style={styles.inputDescription}>
+                    This will update the dues amount for all {unpaidAnnualFees.length} homeowners with unpaid annual fees.
+                  </Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Enter new amount for all homeowners"
+                    value={updateDuesForm.newAmount}
+                    onChangeText={(text) => setUpdateDuesForm(prev => ({ ...prev, newAmount: text }))}
+                    keyboardType="numeric"
+                  />
+                </View>
+
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={() => animateOut('updateDues', () => setShowUpdateDuesModal(false))}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.confirmButton}
+                    onPress={handleUpdateDues}
+                  >
+                    <Text style={styles.confirmButtonText}>Update Amount</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </Animated.View>
+          </Animated.View>
+        </Modal>
+
+        {/* Add Past Due Modal */}
+        <Modal
+          visible={showPastDueModal}
+          transparent={true}
+          animationType="none"
+          onRequestClose={() => animateOut('pastDue', () => setShowPastDueModal(false))}
+        >
+          <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
+            <Animated.View style={[
+              styles.formModalContent,
+              {
+                opacity: pastDueModalOpacity,
+                transform: [{ translateY: pastDueModalTranslateY }],
+              }
+            ]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Add Past Due Amount</Text>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => animateOut('pastDue', () => setShowPastDueModal(false))}
+                >
+                  <Ionicons name="close" size={24} color="#6b7280" />
+                </TouchableOpacity>
+              </View>
+              
+              <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Select Resident *</Text>
+                  <ScrollView style={styles.addressSelector} nestedScrollEnabled>
+                    {homeownersList.map((resident: any) => (
+                      <TouchableOpacity
+                        key={resident._id}
+                        style={[
+                          styles.addressOption,
+                          pastDueForm.selectedResidentId === resident._id && styles.addressOptionSelected
+                        ]}
+                        onPress={() => setPastDueForm(prev => ({ ...prev, selectedResidentId: resident._id }))}
+                      >
+                        <Text style={[
+                          styles.addressOptionText,
+                          pastDueForm.selectedResidentId === resident._id && styles.addressOptionTextSelected
+                        ]}>
+                          {resident.firstName} {resident.lastName}
+                        </Text>
+                        <Text style={[
+                          styles.addressOptionSubtext,
+                          pastDueForm.selectedResidentId === resident._id && styles.addressOptionSubtextSelected
+                        ]}>
+                          {resident.address} {resident.unitNumber && `Unit ${resident.unitNumber}`}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Past Due Amount ($) *</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Enter past due amount"
+                    value={pastDueForm.amount}
+                    onChangeText={(text) => setPastDueForm(prev => ({ ...prev, amount: text }))}
+                    keyboardType="numeric"
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Description *</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Enter description"
+                    value={pastDueForm.description}
+                    onChangeText={(text) => setPastDueForm(prev => ({ ...prev, description: text }))}
+                    autoCapitalize="words"
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Original Due Date *</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="YYYY-MM-DD"
+                    value={pastDueForm.dueDate}
+                    onChangeText={(text) => setPastDueForm(prev => ({ ...prev, dueDate: text }))}
+                  />
+                </View>
+
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={() => animateOut('pastDue', () => setShowPastDueModal(false))}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.confirmButton}
+                    onPress={handleAddPastDue}
+                  >
+                    <Text style={styles.confirmButtonText}>Add Past Due</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </Animated.View>
+          </Animated.View>
+        </Modal>
+
         {/* Covenant Modal */}
         <Modal
           visible={showCovenantModal}
@@ -3689,7 +4352,7 @@ const styles = StyleSheet.create({
   },
   activeSubTab: {
     backgroundColor: '#eff6ff',
-    borderColor: '#3b82f6',
+    borderColor: '#ec4899',
   },
   subTabText: {
     fontSize: 13,
@@ -3698,11 +4361,11 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   activeSubTabText: {
-    color: '#3b82f6',
+    color: '#ec4899',
     fontWeight: '600',
   },
   activeFolderTabText: {
-    color: '#2563eb',
+    color: '#ec4899',
     fontWeight: '600',
   },
   contentArea: {
@@ -3842,6 +4505,12 @@ const styles = StyleSheet.create({
     color: '#374151',
     marginBottom: 8,
   },
+  inputDescription: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginBottom: 12,
+    lineHeight: 18,
+  },
   reasonInput: {
     borderWidth: 1,
     borderColor: '#d1d5db',
@@ -3956,6 +4625,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     backgroundColor: '#f8fafc',
+    marginBottom: 5,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
@@ -5535,6 +6205,686 @@ const styles = StyleSheet.create({
   },
   spacer: {
     height: 50,
+  },
+  // Modern Residents Management Styles
+  residentsHeaderContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 16,
+    borderBottomWidth: 0,
+    borderBottomColor: 'transparent',
+  },
+  residentsHeaderContainerMobile: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: 16,
+  },
+  residentsHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  residentsHeaderIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#eff6ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  residentsHeaderText: {
+    flex: 1,
+  },
+  residentsHeaderTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: 6,
+  },
+  residentsHeaderTitleMobile: {
+    fontSize: 18,
+  },
+  residentsHeaderSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    lineHeight: 20,
+  },
+  residentsHeaderSubtitleMobile: {
+    fontSize: 13,
+  },
+  addPastDueHeaderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ec4899',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 10,
+    shadowColor: '#ec4899',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+    gap: 8,
+  },
+  addPastDueHeaderButtonMobile: {
+    width: '100%',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  addPastDueHeaderButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  addPastDueHeaderButtonIntegrated: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ec4899',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 10,
+    shadowColor: '#ec4899',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+    gap: 8,
+    flexShrink: 0,
+  },
+  addPastDueHeaderButtonTextIntegrated: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  residentsSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 16,
+    paddingBottom: 16,
+    marginBottom: 0,
+    gap: 16,
+  },
+  residentsSectionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+    minWidth: 0,
+  },
+  residentsSectionHeaderTextContainer: {
+    flex: 1,
+  },
+  residentsSectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  residentsSectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1f2937',
+  },
+  residentsSectionBadge: {
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    minWidth: 32,
+    alignItems: 'center',
+  },
+  residentsSectionBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ec4899',
+  },
+  residentsSectionDesktop: {
+    marginBottom: 32,
+    paddingBottom: 0,
+  },
+  residentsSectionMobile: {
+    marginBottom: 24,
+    paddingBottom: 0,
+  },
+  residentsListContainer: {
+    gap: 12,
+  },
+  // Table/Chart layout for better scalability
+  residentsTableScrollView: {
+    flex: 1,
+  },
+  residentsTableScrollContent: {
+    minWidth: 800,
+  },
+  residentsTableContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    overflow: 'hidden',
+    minWidth: 800,
+  },
+  residentsTableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#f9fafb',
+    borderBottomWidth: 2,
+    borderBottomColor: '#e5e7eb',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  residentsTableHeaderCell: {
+    paddingHorizontal: 8,
+  },
+  residentsTableHeaderText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  residentsTableRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  residentsTableRowEven: {
+    backgroundColor: '#fafafa',
+  },
+  residentsTableCell: {
+    paddingHorizontal: 8,
+    justifyContent: 'center',
+  },
+  residentsTableCellName: {
+    flex: 2,
+    minWidth: 180,
+  },
+  residentsTableCellAddress: {
+    flex: 2,
+    minWidth: 150,
+  },
+  residentsTableCellStatus: {
+    flex: 1.2,
+    minWidth: 100,
+  },
+  residentsTableCellAmount: {
+    flex: 1,
+    minWidth: 90,
+    alignItems: 'flex-end',
+  },
+  residentsTableCellAction: {
+    flex: 0.6,
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  residentsTableNameContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  residentsTableProfileImage: {
+    marginRight: 0,
+  },
+  residentsTableNameText: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  residentsTableName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2937',
+    flex: 1,
+  },
+  residentsTableBadge: {
+    backgroundColor: '#6b7280',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    minWidth: 20,
+    alignItems: 'center',
+  },
+  residentsTableBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  residentsTableAddress: {
+    fontSize: 13,
+    color: '#6b7280',
+  },
+  residentsTableStatusContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  residentsTableStatusText: {
+    fontSize: 13,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  residentsTableAmount: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  residentsTableActionButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#eff6ff',
+  },
+  residentsModernCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+    overflow: 'hidden',
+  },
+  residentsCardDesktop: {
+    padding: 20,
+  },
+  residentsCardMobile: {
+    padding: 16,
+  },
+  residentsCardWithOutstanding: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#dc2626',
+    backgroundColor: '#fef2f2',
+  },
+  residentsCardContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  residentsCardContentMobile: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+  },
+  residentsCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 16,
+  },
+  residentsCardLeftMobile: {
+    marginRight: 0,
+    marginBottom: 12,
+  },
+  residentsCardIcon: {
+    marginRight: 16,
+  },
+  residentsCardProfileImage: {
+    marginRight: 16,
+  },
+  residentsCardInfo: {
+    flex: 1,
+  },
+  residentsCardNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+    flexWrap: 'wrap',
+  },
+  residentsCardName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1f2937',
+  },
+  residentsCardDesc: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 8,
+  },
+  residentsCardMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  residentsCardDate: {
+    fontSize: 13,
+    color: '#6b7280',
+  },
+  residentsCardAddress: {
+    fontSize: 13,
+    color: '#6b7280',
+  },
+  residentsCardFeeStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  residentsCardFeeStatusText: {
+    fontSize: 13,
+    color: '#dc2626',
+    fontWeight: '600',
+  },
+  // Accordion styles
+  residentsAccordionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    cursor: 'pointer',
+  },
+  residentsAccordionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  residentsAccordionHeaderInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  residentsAccordionHeaderRight: {
+    marginLeft: 12,
+  },
+  residentsAccordionAmount: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#2563eb',
+    marginTop: 4,
+  },
+  residentsAccordionSummary: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginTop: 4,
+  },
+  residentsAccordionProfileImage: {
+    marginRight: 12,
+  },
+  residentsAccordionContent: {
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    paddingTop: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  residentsAccordionSectionContent: {
+    paddingTop: 20,
+  },
+  residentsSectionSubtitle: {
+    fontSize: 13,
+    color: '#6b7280',
+  },
+  residentsSectionSubtitleAmount: {
+    fontSize: 13,
+    color: '#1f2937',
+    fontWeight: '600',
+  },
+  updateAllDuesContainer: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 0,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  updateAllDuesDescription: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  updateAllDuesButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2563eb',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    gap: 8,
+  },
+  updateAllDuesButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  updateAllDuesHeaderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ec4899',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 10,
+    shadowColor: '#ec4899',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+    gap: 8,
+    flexShrink: 0,
+  },
+  updateAllDuesHeaderButtonText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  residentsCardRight: {
+    alignItems: 'flex-end',
+    gap: 12,
+  },
+  residentsCardRightMobile: {
+    alignItems: 'flex-start',
+    width: '100%',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  residentsCardAmountContainer: {
+    alignItems: 'flex-end',
+  },
+  residentsCardAmountContainerMobile: {
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  residentsCardAmountLabel: {
+    fontSize: 11,
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  residentsCardAmount: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#2563eb',
+  },
+  residentsUpdateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#2563eb',
+    gap: 6,
+    shadowColor: '#2563eb',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  residentsUpdateButtonMobile: {
+    width: '100%',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  residentsUpdateButtonText: {
+    color: '#2563eb',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  residentsAddPastDueButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#dc2626',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 8,
+    shadowColor: '#dc2626',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  residentsAddPastDueButtonMobile: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    width: '100%',
+    justifyContent: 'center',
+  },
+  residentsAddPastDueButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  residentsOutstandingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fee2e2',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  residentsOutstandingBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#dc2626',
+  },
+  residentsEmptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+  },
+  residentsEmptyStateTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  residentsEmptyStateSubtitle: {
+    fontSize: 14,
+    color: '#9ca3af',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  // Legacy styles kept for backward compatibility
+  feeListItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  feeListItemInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  feeListItemName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  feeListItemDesc: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  feeListItemAmount: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2563eb',
+  },
+  updateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2563eb',
+  },
+  updateButtonText: {
+    color: '#2563eb',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  residentListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  residentListItemInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  residentListItemName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  residentListItemAddress: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  residentListItemFees: {
+    fontSize: 12,
+    color: '#9ca3af',
+  },
+  addPastDueButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef2f2',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#dc2626',
+  },
+  addPastDueButtonText: {
+    color: '#dc2626',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
   },
 });
 
