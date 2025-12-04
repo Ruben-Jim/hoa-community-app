@@ -2361,21 +2361,21 @@ const AdminScreen = () => {
               contentContainerStyle={styles.subTabsContent}
             >
               <TouchableOpacity
-                style={[styles.subTab, feesSubTab === 'dues' && styles.activeSubTab]}
+                style={[styles.subTab, feesSubTab === 'dues' && styles.activeFeesSubTab]}
                 onPress={() => setFeesSubTab('dues')}
               >
                 <Ionicons name="card" size={18} color={feesSubTab === 'dues' ? '#ec4899' : '#6b7280'} />
-                <Text style={[styles.subTabText, feesSubTab === 'dues' && styles.activeSubTabText]}>
+                <Text style={[styles.subTabText, feesSubTab === 'dues' && styles.activeFeesSubTabText]}>
                   Dues Management
                 </Text>
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={[styles.subTab, feesSubTab === 'residents' && styles.activeSubTab]}
+                style={[styles.subTab, feesSubTab === 'residents' && styles.activeFeesSubTab]}
                 onPress={() => setFeesSubTab('residents')}
               >
                 <Ionicons name="people" size={18} color={feesSubTab === 'residents' ? '#ec4899' : '#6b7280'} />
-                <Text style={[styles.subTabText, feesSubTab === 'residents' && styles.activeSubTabText]}>
+                <Text style={[styles.subTabText, feesSubTab === 'residents' && styles.activeFeesSubTabText]}>
                   Residents
                 </Text>
               </TouchableOpacity>
@@ -4352,7 +4352,7 @@ const styles = StyleSheet.create({
   },
   activeSubTab: {
     backgroundColor: '#eff6ff',
-    borderColor: '#ec4899',
+    borderColor: '#3b82f6',
   },
   subTabText: {
     fontSize: 13,
@@ -4361,6 +4361,14 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   activeSubTabText: {
+    color: '#3b82f6',
+    fontWeight: '600',
+  },
+  activeFeesSubTab: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#ec4899',
+  },
+  activeFeesSubTabText: {
     color: '#ec4899',
     fontWeight: '600',
   },

@@ -673,7 +673,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#6b7280',
-    marginLeft: 8,
+    marginLeft: 4,
   },
   roleButtonTextActive: {
     color: '#ffffff',
