@@ -1490,6 +1490,13 @@ const AdminScreen = () => {
                             {item.email}
                           </Text>
                           
+                          {/* Phone */}
+                          {item.phone && (
+                            <Text style={styles.residentGridEmail} numberOfLines={1}>
+                              {item.phone}
+                            </Text>
+                          )}
+                          
                           {/* Address */}
                           {item.address && (
                             <Text style={styles.residentGridAddress} numberOfLines={1}>
@@ -2382,10 +2389,8 @@ const AdminScreen = () => {
             </ScrollView>
             
             {feesSubTab === 'dues' && (
-              <>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Dues Management</Text>
-              <View style={styles.adminFeeButtonsContainer}>
+              <View style={[styles.feesSubTabContent, Platform.OS !== 'web' && styles.feesSubTabContentMobile]}>
+                <View style={styles.adminFeeButtonsContainer}>
                 <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
                   <TouchableOpacity
                     style={styles.adminFeeButton}
@@ -2413,7 +2418,6 @@ const AdminScreen = () => {
                   </TouchableOpacity>
                 </Animated.View>
               </View>
-            </View>
             
                {/* Fee Statistics */}
                <View style={styles.feeStatsContainer}>
@@ -2795,11 +2799,11 @@ const AdminScreen = () => {
               }
             />
             </View>
-            </>
+              </View>
             )}
             
             {feesSubTab === 'residents' && (
-              <>
+              <View style={[styles.feesSubTabContent, Platform.OS !== 'web' && styles.feesSubTabContentMobile]}>
                 {/* Update Current Dues Section - First */}
                 <View style={[
                   styles.section,
@@ -3063,7 +3067,7 @@ const AdminScreen = () => {
                     </View>
                   )}
                 </View>
-              </>
+              </View>
             )}
           </View>
         );
@@ -4331,7 +4335,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
-    maxHeight: 50, // Limit height
+    maxHeight: 150, // Limit height
+    paddingBottom: 3,
+    paddingTop: 3,
+    //marginBottom: Platform.OS === 'web' ? 0 : 12, // Add spacing on mobile to prevent overlap
   },
   subTabsContent: {
     flexDirection: 'row',
@@ -4851,7 +4858,8 @@ const styles = StyleSheet.create({
   },
   // Fee management styles
   feeStatsContainer: {
-    marginBottom: 24,
+    marginBottom: 14,
+    marginTop: 14,
   },
   feeStatsSection: {
     backgroundColor: '#ffffff',
@@ -5092,10 +5100,18 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   // Admin fee management buttons
+  feesSubTabContent: {
+    marginTop: 0,
+  },
+  feesSubTabContentMobile: {
+    marginTop: Platform.OS !== 'web' ? 12 : 0,
+    paddingTop: Platform.OS !== 'web' ? 4 : 0,
+  },
   adminFeeButtonsContainer: {
     flexDirection: 'row',
     gap: 12,
     marginTop: 16,
+    paddingHorizontal: 20,
   },
   adminFeeButton: {
     flexDirection: 'row',

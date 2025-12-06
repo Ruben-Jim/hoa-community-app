@@ -25,7 +25,7 @@ const OptimizedImage = React.forwardRef<ExpoImage, OptimizedImageProps>(
       fallback,
       placeholderContent,
       transitionDuration = 200,
-      cachePolicy = 'memory-disk',
+      cachePolicy = 'memory-disk', // Check memory cache first, then disk cache, then fetch from network
       containerStyle,
       style,
       contentFit = 'cover',
@@ -40,7 +40,9 @@ const OptimizedImage = React.forwardRef<ExpoImage, OptimizedImageProps>(
   ) => {
     const resolvedStorageId = useMemo(() => {
       if (storageId) return storageId;
-      if (source && !source.startsWith('http')) {
+      // Only treat as storageId if it doesn't look like a URI
+      // URIs typically have protocols (http, https, file) or path separators
+      if (source && !source.startsWith('http') && !source.startsWith('file://') && !source.includes('/') && !source.includes('://')) {
         return source;
       }
       return null;
@@ -51,7 +53,16 @@ const OptimizedImage = React.forwardRef<ExpoImage, OptimizedImageProps>(
       [style]
     );
 
-    const directUri = source && source.startsWith('http') ? source : undefined;
+    // Handle direct URIs (http/https for remote, file:// or paths for local)
+    // Local URIs from image picker might be file:// or just paths
+    const isDirectUri = source && (
+      source.startsWith('http') || 
+      source.startsWith('https') || 
+      source.startsWith('file://') ||
+      source.startsWith('data:') ||
+      (source.includes('/') && !source.includes('://') && source.length > 20) // Likely a local file path
+    );
+    const directUri = isDirectUri ? source : undefined;
     const storageUri = useStorageUrl(resolvedStorageId);
     const resolvedUri = directUri ?? storageUri;
 

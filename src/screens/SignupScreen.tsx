@@ -305,7 +305,7 @@ const SignupScreen = () => {
       >
           {/* Header */}
           <View style={styles.header}>
-            <Ionicons name="home" size={48} color="#2563eb" />
+            <Ionicons name="home" size={Platform.OS === 'web' ? 40 : 36} color="#2563eb" />
             <Text style={styles.title}>Welcome to HOA Community</Text>
             <Text style={styles.subtitle}>Create your account to get started</Text>
           </View>
@@ -314,7 +314,7 @@ const SignupScreen = () => {
           <View style={styles.form}>
             {/* Profile Image */}
             <View style={styles.profileImageSection}>
-              <Text style={styles.label}>Profile Picture (Optional)</Text>
+              <Text style={[styles.label, styles.profileImageLabel]}>Profile Picture (Optional)</Text>
               <View style={styles.profileImageContainer}>
                 {profileImage ? (
                   <View style={styles.profileImageWrapper}>
@@ -328,7 +328,7 @@ const SignupScreen = () => {
                   </View>
                 ) : (
                   <View style={styles.profileImagePlaceholder}>
-                    <Ionicons name="person" size={40} color="#9ca3af" />
+                    <Ionicons name="person" size={Platform.OS === 'web' ? 36 : 32} color="#9ca3af" />
                   </View>
                 )}
               </View>
@@ -460,13 +460,15 @@ const SignupScreen = () => {
               >
                 <Ionicons 
                   name="home" 
-                  size={20} 
+                  size={Platform.OS === 'web' ? 20 : 18} 
                   color={formData.isResident && !formData.isRenter ? '#ffffff' : '#6b7280'} 
                 />
-                <Text style={[
-                  styles.roleButtonText,
-                  formData.isResident && !formData.isRenter && styles.roleButtonTextActive
-                ]}>
+                <Text 
+                  style={[
+                    styles.roleButtonText,
+                    formData.isResident && !formData.isRenter && styles.roleButtonTextActive
+                  ]}
+                >
                   Homeowner
                 </Text>
               </TouchableOpacity>
@@ -483,13 +485,15 @@ const SignupScreen = () => {
               >
                 <Ionicons 
                   name="key" 
-                  size={20} 
+                  size={Platform.OS === 'web' ? 20 : 18} 
                   color={formData.isRenter ? '#ffffff' : '#6b7280'} 
                 />
-                <Text style={[
-                  styles.roleButtonText,
-                  formData.isRenter && styles.roleButtonTextActive
-                ]}>
+                <Text 
+                  style={[
+                    styles.roleButtonText,
+                    formData.isRenter && styles.roleButtonTextActive
+                  ]}
+                >
                   Renter
                 </Text>
               </TouchableOpacity>
@@ -503,13 +507,15 @@ const SignupScreen = () => {
               >
                 <Ionicons 
                   name="people" 
-                  size={20} 
+                  size={Platform.OS === 'web' ? 20 : 18} 
                   color={formData.isBoardMember ? '#ffffff' : '#6b7280'} 
                 />
-                <Text style={[
-                  styles.roleButtonText,
-                  formData.isBoardMember && styles.roleButtonTextActive
-                ]}>
+                <Text 
+                  style={[
+                    styles.roleButtonText,
+                    formData.isBoardMember && styles.roleButtonTextActive
+                  ]}
+                >
                   Board Member
                 </Text>
               </TouchableOpacity>
@@ -593,20 +599,20 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: Platform.OS === 'web' ? 24 : 20,
     paddingHorizontal: 20,
   },
   title: {
-    fontSize: 28,
+    fontSize: Platform.OS === 'web' ? 28 : 24,
     fontWeight: 'bold',
     color: '#1f2937',
-    marginTop: 16,
+    marginTop: Platform.OS === 'web' ? 12 : 8,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: Platform.OS === 'web' ? 16 : 14,
     color: '#6b7280',
-    marginTop: 8,
+    marginTop: Platform.OS === 'web' ? 6 : 4,
     textAlign: 'center',
   },
   form: {
@@ -656,24 +662,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: Platform.OS === 'web' ? 16 : 14,
+    paddingHorizontal: Platform.OS === 'web' ? 16 : 12,
     borderRadius: 12,
     backgroundColor: '#f3f4f6',
     borderWidth: 2,
     borderColor: 'transparent',
     flex: 1,
-    minWidth: '30%',
+    minWidth: Platform.OS === 'web' ? 120 : 100,
   },
   roleButtonActive: {
     backgroundColor: '#2563eb',
     borderColor: '#2563eb',
   },
   roleButtonText: {
-    fontSize: 16,
+    fontSize: Platform.OS === 'web' ? 16 : 14,
     fontWeight: '600',
     color: '#6b7280',
-    marginLeft: 4,
+    marginLeft: Platform.OS === 'web' ? 4 : 3,
+    textAlign: 'center',
   },
   roleButtonTextActive: {
     color: '#ffffff',
@@ -712,26 +719,29 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   profileImageSection: {
-    marginBottom: 20,
+    marginBottom: 16,
     alignItems: 'center',
   },
+  profileImageLabel: {
+    marginTop: Platform.OS === 'web' ? 20 : 12,
+  },
   profileImageContainer: {
-    marginBottom: 12,
+    marginBottom: 8,
   },
   profileImageWrapper: {
     position: 'relative',
   },
   profileImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: Platform.OS === 'web' ? 90 : 80,
+    height: Platform.OS === 'web' ? 90 : 80,
+    borderRadius: Platform.OS === 'web' ? 45 : 40,
     borderWidth: 3,
     borderColor: '#e5e7eb',
   },
   profileImagePlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: Platform.OS === 'web' ? 90 : 80,
+    height: Platform.OS === 'web' ? 90 : 80,
+    borderRadius: Platform.OS === 'web' ? 45 : 40,
     backgroundColor: '#f3f4f6',
     borderWidth: 2,
     borderColor: '#e5e7eb',

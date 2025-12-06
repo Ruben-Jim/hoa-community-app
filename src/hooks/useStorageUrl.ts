@@ -22,26 +22,27 @@ const CACHE_DURATION = 55 * 60 * 1000; // 55 minutes (slightly less than Convex'
 export const useStorageUrl = (storageId: string | null | undefined): string | undefined => {
   const [cachedUrl, setCachedUrl] = useState<string | undefined>(undefined);
   
-  // Skip query if no storageId
-  const shouldSkip = !storageId;
+  // Check cache FIRST synchronously - this is our primary check
+  const cachedResult = useMemo(() => {
+    if (!storageId) return { url: undefined, isValid: false };
+    const cached = urlCache.get(storageId);
+    const now = Date.now();
+    if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+      return { url: cached.url, isValid: true };
+    }
+    return { url: undefined, isValid: false };
+  }, [storageId]);
 
-  // Use Convex query - it automatically deduplicates queries with the same args
-  // So if 100 ProfileImages use the same storageId, only 1 API call is made
+  // Only call Convex if we DON'T have a valid cached URL
+  // This prevents unnecessary API calls - cache is checked FIRST
+  const shouldSkip = !storageId || cachedResult.isValid;
+
+  // Use Convex query ONLY if cache is missing/expired
+  // Convex's useQuery automatically deduplicates queries with the same args
   const urlFromQuery = useQuery(
     api.storage.getUrl,
     shouldSkip ? "skip" : { storageId: storageId as any }
   );
-
-  // Check cache synchronously on first render to avoid unnecessary queries
-  const initialCached = useMemo(() => {
-    if (!storageId) return undefined;
-    const cached = urlCache.get(storageId);
-    const now = Date.now();
-    if (cached && (now - cached.timestamp) < CACHE_DURATION) {
-      return cached.url;
-    }
-    return undefined;
-  }, [storageId]);
 
   useEffect(() => {
     if (!storageId) {
@@ -49,45 +50,43 @@ export const useStorageUrl = (storageId: string | null | undefined): string | un
       return;
     }
 
-    const now = Date.now();
-    const cached = urlCache.get(storageId);
-    
-    // If we have a valid cached URL, use it immediately
-    if (cached && (now - cached.timestamp) < CACHE_DURATION) {
-      setCachedUrl(cached.url);
+    // If we have a valid cached URL, use it immediately and skip Convex query
+    if (cachedResult.isValid && cachedResult.url) {
+      setCachedUrl(cachedResult.url);
+      // Prefetch to expo-image cache for disk caching
+      ExpoImage.prefetch(cachedResult.url).catch(() => {
+        // Prefetch failures are non-fatal; ignore silently.
+      });
+      return; // Don't proceed with query logic - cache is valid
     }
     
-    // When query returns, update cache and state
+    // Only update from query if we don't have cache
     if (urlFromQuery) {
-      // Only update if URL changed or cache is missing/expired
+      const now = Date.now();
+      const cached = urlCache.get(storageId);
+      
+      // Update cache if URL changed or cache is missing/expired
       const shouldUpdateCache =
         !cached || cached.url !== urlFromQuery || (now - cached.timestamp) >= CACHE_DURATION;
 
       if (shouldUpdateCache) {
         urlCache.set(storageId, { url: urlFromQuery, timestamp: now });
         setCachedUrl(urlFromQuery);
+        // Prefetch to expo-image cache for disk caching
         ExpoImage.prefetch(urlFromQuery).catch(() => {
           // Prefetch failures are non-fatal; ignore silently.
         });
-      }
-    } else if (urlFromQuery === undefined && cached) {
-      // Query is still loading, use cached value if available
-      if ((now - cached.timestamp) < CACHE_DURATION) {
+      } else if (cached) {
+        // Use existing cache
         setCachedUrl(cached.url);
       }
     }
-  }, [storageId, urlFromQuery]);
+  }, [storageId, urlFromQuery, cachedResult.isValid, cachedResult.url]);
 
-  // Return cached URL immediately if available, otherwise return query result
-  const resolvedUrl = initialCached || cachedUrl || urlFromQuery;
-
-  useEffect(() => {
-    if (resolvedUrl) {
-      ExpoImage.prefetch(resolvedUrl).catch(() => {
-        // Ignore errors during prefetch
-      });
-    }
-  }, [resolvedUrl]);
+  // Return cached URL immediately if available (cache checked FIRST), 
+  // otherwise return from state or query result
+  // Priority: cachedResult (sync check) > cachedUrl (state) > urlFromQuery (async)
+  const resolvedUrl = cachedResult.url || cachedUrl || urlFromQuery;
 
   return resolvedUrl;
 };

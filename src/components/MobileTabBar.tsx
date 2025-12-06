@@ -40,7 +40,7 @@ interface MobileTabBarProps {
 const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTabBarProps) => {
   const navigation = useNavigation();
   const route = useRoute();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { alertState, showAlert, hideAlert } = useCustomAlert();
   const [internalMenuOpen, setInternalMenuOpen] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -352,6 +352,17 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
     }
   };
 
+  const handleSignOut = () => {
+    showAlert({
+      title: 'Sign Out',
+      message: 'Are you sure you want to sign out?',
+      buttons: [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign Out', style: 'destructive', onPress: signOut }
+      ]
+    });
+  };
+
   return (
     <>
       {/* Mobile Navigation Modal */}
@@ -502,7 +513,7 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
               ]}
             >
               <View style={styles.profileModalHeader}>
-                <Text style={styles.profileModalTitle}>Edit Profile Image</Text>
+                <Text style={styles.profileModalTitle}>Profile Settings</Text>
                 <TouchableOpacity
                   onPress={() => {
                     if (!uploading && !removing) {
@@ -519,85 +530,91 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
               </View>
 
               <ScrollView style={styles.profileModalBody} showsVerticalScrollIndicator={false}>
-                <View style={styles.imagePickerContainer}>
-                  {/* Show current profile image if exists */}
-                  {displayImageUrl && !profileImage ? (
-                    <View style={styles.imagePreviewContainer}>
-                      <Image source={{ uri: displayImageUrl }} style={styles.imagePreview} resizeMode="cover" />
-                    </View>
-                  ) : profileImage ? (
-                    <View style={styles.imagePreviewContainer}>
-                      <Image source={{ uri: profileImage }} style={styles.imagePreview} resizeMode="cover" />
-                      <TouchableOpacity
-                        style={styles.removeImageButton}
-                        onPress={() => setProfileImage(null)}
-                      >
-                        <Ionicons name="close-circle" size={24} color="#ef4444" />
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <View style={styles.emptyImageContainer}>
-                      <Ionicons name="person" size={64} color="#d1d5db" />
-                      <Text style={styles.emptyImageText}>No Profile Image</Text>
-                    </View>
-                  )}
-
-                  {/* Show add buttons only if no image exists */}
-                  {!profileImage && !displayImageUrl && (
-                    <>
-                      <TouchableOpacity
-                        style={styles.imagePickerButton}
-                        onPress={pickImage}
-                        disabled={removing || uploading}
-                      >
-                        <Ionicons name="image" size={32} color="#6b7280" />
-                        <Text style={styles.imagePickerText}>Choose from Gallery</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={styles.cameraButton}
-                        onPress={takePhoto}
-                        disabled={removing || uploading}
-                      >
-                        <Ionicons name="camera" size={32} color="#6b7280" />
-                        <Text style={styles.imagePickerText}>Take Photo</Text>
-                      </TouchableOpacity>
-                    </>
-                  )}
+                {/* Large Profile Image Display */}
+                <View style={styles.profileImageDisplayContainer}>
+                  <ProfileImage 
+                    source={profileImage ? profileImage : currentUser?.profileImage} 
+                    size={120}
+                    style={styles.largeProfileImage}
+                    initials={currentUser ? `${currentUser.firstName?.[0] || ''}${currentUser.lastName?.[0] || ''}` : undefined}
+                  />
                 </View>
 
-                {/* Show remove button if there's a current image and no new image selected */}
-                {displayImageUrl && !profileImage && (
-                  <TouchableOpacity
-                    style={[styles.removeButton, (removing || uploading) && styles.removeButtonDisabled]}
-                    onPress={handleRemoveProfileImage}
-                    disabled={removing || uploading}
-                  >
-                    {(removing || uploading) ? (
-                      <ActivityIndicator size="small" color="#ffffff" />
-                    ) : (
-                      <>
-                        <Ionicons name="trash-outline" size={20} color="#ffffff" />
-                        <Text style={styles.removeButtonText}>Remove Profile Image</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
+                {/* Image Editing Controls */}
+                {displayImageUrl && !profileImage ? (
+                  // If there's an existing profile image, only show remove button (cannot add new image)
+                  <View style={styles.imagePickerContainer}>
+                    <TouchableOpacity
+                      style={[styles.removeButton, (removing || uploading) && styles.removeButtonDisabled]}
+                      onPress={handleRemoveProfileImage}
+                      disabled={removing || uploading}
+                    >
+                      {(removing || uploading) ? (
+                        <ActivityIndicator size="small" color="#ffffff" />
+                      ) : (
+                        <>
+                          <Ionicons name="trash-outline" size={20} color="#ffffff" />
+                          <Text style={styles.removeButtonText}>Remove Profile Image</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                ) : !displayImageUrl && !profileImage ? (
+                  // If no profile image exists, show add buttons (can add new image)
+                  <View style={styles.imagePickerContainer}>
+                    <TouchableOpacity
+                      style={styles.imagePickerButton}
+                      onPress={pickImage}
+                      disabled={removing || uploading}
+                    >
+                      <Ionicons name="image" size={32} color="#6b7280" />
+                      <Text style={styles.imagePickerText}>Choose from Gallery</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.cameraButton}
+                      onPress={takePhoto}
+                      disabled={removing || uploading}
+                    >
+                      <Ionicons name="camera" size={32} color="#6b7280" />
+                      <Text style={styles.imagePickerText}>Take Photo</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+
+                {/* Show save and cancel buttons if there's a new image selected */}
+                {profileImage && (
+                  <View style={styles.imagePickerContainer}>
+                    <TouchableOpacity
+                      style={[styles.cancelButton, uploading && styles.cancelButtonDisabled]}
+                      onPress={() => setProfileImage(null)}
+                      disabled={uploading}
+                    >
+                      <Text style={styles.cancelButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.saveButton, uploading && styles.saveButtonDisabled]}
+                      onPress={handleSaveProfileImage}
+                      disabled={uploading}
+                    >
+                      {uploading ? (
+                        <ActivityIndicator size="small" color="#ffffff" />
+                      ) : (
+                        <Text style={styles.saveButtonText}>Save</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
                 )}
 
-                {/* Show save button if there's a new image selected */}
-                {profileImage && (
-                  <TouchableOpacity
-                    style={[styles.saveButton, uploading && styles.saveButtonDisabled]}
-                    onPress={handleSaveProfileImage}
-                    disabled={uploading}
-                  >
-                    {uploading ? (
-                      <ActivityIndicator size="small" color="#ffffff" />
-                    ) : (
-                      <Text style={styles.saveButtonText}>Save</Text>
-                    )}
-                  </TouchableOpacity>
-                )}
+                {/* Logout Button */}
+                <TouchableOpacity
+                  style={styles.logoutButton}
+                  onPress={handleSignOut}
+                  disabled={uploading || removing}
+                >
+                  <Ionicons name="log-out-outline" size={20} color="#ef4444" />
+                  <Text style={styles.logoutButtonText}>Sign Out</Text>
+                </TouchableOpacity>
               </ScrollView>
             </Animated.View>
           </Animated.View>
@@ -787,6 +804,21 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     paddingBottom: 20,
   },
+  profileImageDisplayContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 24,
+    marginBottom: 16,
+  },
+  largeProfileImage: {
+    borderWidth: 4,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
   imagePickerContainer: {
     gap: 16,
     marginBottom: 20,
@@ -881,13 +913,48 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
-    marginTop: 8,
+    flex: 1,
   },
   saveButtonDisabled: {
     backgroundColor: '#9ca3af',
   },
   saveButtonText: {
     color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  cancelButton: {
+    backgroundColor: '#f3f4f6',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    flex: 1,
+    marginRight: 8,
+  },
+  cancelButtonDisabled: {
+    opacity: 0.6,
+  },
+  cancelButtonText: {
+    color: '#374151',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fef2f2',
+    borderRadius: 12,
+    padding: 16,
+    gap: 8,
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  logoutButtonText: {
+    color: '#ef4444',
     fontSize: 16,
     fontWeight: '600',
   },

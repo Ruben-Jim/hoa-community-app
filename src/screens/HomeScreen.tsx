@@ -31,7 +31,7 @@ import { useCustomAlert } from '../hooks/useCustomAlert';
 import ProfileImage from '../components/ProfileImage';
 
 const HomeScreen = () => {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const navigation = useNavigation();
   const hoaInfo = useQuery(api.hoaInfo.get);
   const communityPosts = useQuery(api.communityPosts.getAll);
@@ -237,17 +237,6 @@ const HomeScreen = () => {
     }
   };
 
-  const handleSignOut = () => {
-    showAlert({
-      title: 'Sign Out',
-      message: 'Are you sure you want to sign out?',
-      buttons: [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign Out', style: 'destructive', onPress: signOut }
-      ]
-    });
-  };
-
   const formatDate = (dateString: string) => {
     try {
       return new Date(dateString).toLocaleDateString();
@@ -331,13 +320,6 @@ const HomeScreen = () => {
             <Text style={styles.hoaName}>{hoaInfo?.name ?? 'Shelton Springs'}</Text>
             <Text style={styles.subtitle}>Your Community Connection</Text>
           </View>
-          
-          <TouchableOpacity
-            style={styles.signOutButton}
-            onPress={handleSignOut}
-          >
-            <Ionicons name="log-out-outline" size={24} color="#ffffff" />
-          </TouchableOpacity>
         </View>
               
         {user && (
@@ -810,12 +792,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingHorizontal: 10,
-  },
-  signOutButton: {
-    padding: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 8,
-    marginLeft: 12,
   },
   userInfo: {
     marginTop: 5,
