@@ -8,6 +8,7 @@ import {
   TextInput,
   Alert,
   Modal,
+  Image,
   ImageBackground,
   Animated,
   Dimensions,
@@ -15,10 +16,12 @@ import {
   Platform,
   ActivityIndicator,
   FlatList,
+  Pressable,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRoute } from '@react-navigation/native';
 import { useQuery, useMutation } from 'convex/react';
 import { useConvex } from 'convex/react';
 import { api } from '../../convex/_generated/api';
@@ -35,6 +38,7 @@ import { getUploadReadyImage } from '../utils/imageUpload';
 
 const CommunityScreen = () => {
   const { user } = useAuth();
+  const route = useRoute();
   const { alertState, showAlert, hideAlert } = useCustomAlert();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<'posts' | 'polls' | 'notifications' | 'pets'>('posts');
@@ -43,7 +47,12 @@ const CommunityScreen = () => {
   const [selectedPostForComment, setSelectedPostForComment] = useState<any>(null);
   const [newComment, setNewComment] = useState('');
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+  const [loadedComments, setLoadedComments] = useState<{[postId: string]: any[]}>({});
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  
+  // Pagination state
+  const [postsLimit, setPostsLimit] = useState(20);
+  const [pollsLimit, setPollsLimit] = useState(20);
   const [newPost, setNewPost] = useState({
     title: '',
     content: '',
@@ -86,6 +95,16 @@ const CommunityScreen = () => {
   // Poll voting state
   const [selectedPollVotes, setSelectedPollVotes] = useState<{[pollId: string]: number[]}>({});
   
+  // Poll creation state
+  const [showPollModal, setShowPollModal] = useState(false);
+  const [pollForm, setPollForm] = useState({
+    title: '',
+    description: '',
+    options: ['', ''],
+    allowMultipleVotes: false,
+    expiresAt: '',
+  });
+  
   // Image upload state
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [uploadingImages, setUploadingImages] = useState(false);
@@ -117,6 +136,8 @@ const CommunityScreen = () => {
   const commentModalTranslateY = useRef(new Animated.Value(400)).current;
   const notificationModalOpacity = useRef(new Animated.Value(0)).current;
   const notificationModalTranslateY = useRef(new Animated.Value(300)).current;
+  const pollModalOpacity = useRef(new Animated.Value(0)).current;
+  const pollModalTranslateY = useRef(new Animated.Value(300)).current;
   const contentAnim = useRef(new Animated.Value(1)).current;
   
   // Scroll reference for better control
@@ -158,14 +179,31 @@ const CommunityScreen = () => {
   const buttonScale = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current; // Start at 1 to avoid flash on tab click
 
-  // Convex queries
-  const posts = useQuery(api.communityPosts.getAll) ?? [];
-  const polls = useQuery(api.polls.getAll) ?? [];
+  // Convex queries - using paginated queries
+  const postsData = useQuery(api.communityPosts.getPaginated, { limit: postsLimit, offset: 0 });
+  const posts = postsData?.items ?? [];
+  const postsTotal = postsData?.total ?? 0;
+  
+  const pollsData = useQuery(api.polls.getPaginated, { limit: pollsLimit, offset: 0 });
+  const polls = pollsData?.items ?? [];
+  const pollsTotal = pollsData?.total ?? 0;
+  
   const userVotes = useQuery(api.polls.getAllUserVotes, user ? { userId: user._id } : "skip");
+  
+  // Lazy load comments for posts when expanded
+  const postsWithComments = posts.map((post: any) => {
+    const postId = post._id;
+    const hasLoadedComments = loadedComments[postId] !== undefined;
+    const comments = hasLoadedComments ? loadedComments[postId] : (post.comments || []);
+    return { ...post, comments };
+  });
   const notifications = useQuery(api.residentNotifications.getAllActive);
   const residents = useQuery(api.residents.getAll);
   const pets = useQuery(api.pets.getAll) ?? [];
 
+  // Check if current user is a board member
+  const isBoardMember = user?.isBoardMember && user?.isActive;
+  
   // Helper function to check if a comment author is a board member
   const isCommentAuthorBoardMember = (authorName: string) => {
     if (!residents || !authorName) return false;
@@ -191,6 +229,7 @@ const CommunityScreen = () => {
   const addComment = useMutation(api.communityPosts.addComment);
   const likePost = useMutation(api.communityPosts.like);
   const voteOnPoll = useMutation(api.polls.vote);
+  const createPoll = useMutation(api.polls.create);
   const generateUploadUrl = useMutation(api.storage.generateUploadUrl);
   const deleteStorageFile = useMutation(api.storage.deleteStorageFile);
   const createNotification = useMutation(api.residentNotifications.create);
@@ -288,6 +327,14 @@ const CommunityScreen = () => {
   //   }).start();
   // }, []);
 
+  // Handle route params to set active sub-tab
+  useEffect(() => {
+    const params = route.params as { activeSubTab?: 'posts' | 'polls' | 'notifications' | 'pets' } | undefined;
+    if (params?.activeSubTab) {
+      setActiveSubTab(params.activeSubTab);
+    }
+  }, [route.params]);
+
   // Update selectedPollVotes when userVotes data is available
   useEffect(() => {
     if (userVotes) {
@@ -295,7 +342,27 @@ const CommunityScreen = () => {
     }
   }, [userVotes]);
 
-  const filteredPosts = posts.filter((post: any) => {
+  // Handle poll modal animation when visibility changes
+  useEffect(() => {
+    if (showPollModal) {
+      pollModalOpacity.setValue(1);
+      pollModalTranslateY.setValue(0);
+      pollModalTranslateY.setValue(50);
+      Animated.spring(pollModalTranslateY, {
+        toValue: 0,
+        tension: 100,
+        friction: 8,
+        useNativeDriver: Platform.OS !== 'web',
+      }).start();
+      overlayOpacity.setValue(1);
+    } else {
+      pollModalOpacity.setValue(0);
+      pollModalTranslateY.setValue(300);
+      overlayOpacity.setValue(0);
+    }
+  }, [showPollModal]);
+
+  const filteredPosts = postsWithComments.filter((post: any) => {
     // Exclude complaint posts from regular users - only admins see them in AdminScreen
     if (post.category === 'Complaint') {
       return false;
@@ -308,18 +375,18 @@ const CommunityScreen = () => {
   const postsContent = filteredPosts.map(post => ({ ...post, type: 'post' })).sort((a, b) => b.createdAt - a.createdAt);
   const pollsContent = polls.map(poll => ({ ...poll, type: 'poll' })).sort((a, b) => b.createdAt - a.createdAt);
 
-  const [visiblePostCount, setVisiblePostCount] = useState(Math.min(10, postsContent.length || 0));
+  // Pagination: show all posts/polls up to the limit, with "Load More" button
+  const hasMorePosts = postsTotal > postsLimit;
+  const hasMorePolls = pollsTotal > pollsLimit;
+  
+  const loadMorePosts = () => {
+    setPostsLimit(prev => prev + 20);
+  };
+  
+  const loadMorePolls = () => {
+    setPollsLimit(prev => prev + 20);
+  };
 
-  useEffect(() => {
-    if (activeSubTab === 'posts') {
-      setVisiblePostCount(Math.min(10, postsContent.length || 0));
-    }
-  }, [postsContent.length, activeSubTab]);
-
-  const postsData = useMemo(
-    () => postsContent.slice(0, visiblePostCount),
-    [postsContent, visiblePostCount]
-  );
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -340,6 +407,53 @@ const CommunityScreen = () => {
     }
   };
 
+  // Lazy load comments for expanded posts - load comments when post is expanded
+  // We'll load comments on-demand when toggleComments is called
+
+  // Lazy load comments: Query comments for posts that are expanded
+  // We'll query for up to 5 expanded posts at a time to limit concurrent queries
+  const expandedPostIds = Array.from(expandedComments);
+  const postsNeedingComments = expandedPostIds
+    .filter(postId => !loadedComments[postId])
+    .slice(0, 5); // Limit to 5 concurrent comment queries
+  
+  // Query comments for posts that need them
+  const comment1 = useQuery(
+    api.communityPosts.getCommentsByPost,
+    postsNeedingComments[0] ? { postId: postsNeedingComments[0] as any } : "skip"
+  );
+  const comment2 = useQuery(
+    api.communityPosts.getCommentsByPost,
+    postsNeedingComments[1] ? { postId: postsNeedingComments[1] as any } : "skip"
+  );
+  const comment3 = useQuery(
+    api.communityPosts.getCommentsByPost,
+    postsNeedingComments[2] ? { postId: postsNeedingComments[2] as any } : "skip"
+  );
+  const comment4 = useQuery(
+    api.communityPosts.getCommentsByPost,
+    postsNeedingComments[3] ? { postId: postsNeedingComments[3] as any } : "skip"
+  );
+  const comment5 = useQuery(
+    api.communityPosts.getCommentsByPost,
+    postsNeedingComments[4] ? { postId: postsNeedingComments[4] as any } : "skip"
+  );
+  
+  const commentResults = [comment1, comment2, comment3, comment4, comment5];
+  
+  // Update loadedComments when comments are fetched
+  React.useEffect(() => {
+    postsNeedingComments.forEach((postId, index) => {
+      const comments = commentResults[index];
+      if (comments && !loadedComments[postId]) {
+        setLoadedComments(prev => ({
+          ...prev,
+          [postId]: comments
+        }));
+      }
+    });
+  }, [postsNeedingComments.join(','), commentResults.map(c => c ? 'loaded' : 'pending').join(',')]);
+  
   const toggleComments = (postId: string) => {
     setExpandedComments(prev => {
       const newSet = new Set(prev);
@@ -519,6 +633,88 @@ const CommunityScreen = () => {
     }
   };
 
+  // Poll creation handlers
+  const handleCreatePoll = async () => {
+    if (!user) {
+      Alert.alert('Error', 'Please sign in to create a poll');
+      return;
+    }
+
+    try {
+      if (!pollForm.title || pollForm.options.filter(opt => opt.trim()).length < 2) {
+        Alert.alert('Error', 'Please provide a title and at least 2 options.');
+        return;
+      }
+
+      const validOptions = pollForm.options.filter(opt => opt.trim());
+      
+      await createPoll({
+        title: pollForm.title,
+        description: pollForm.description || undefined,
+        options: validOptions,
+        allowMultipleVotes: pollForm.allowMultipleVotes,
+        expiresAt: pollForm.expiresAt ? new Date(pollForm.expiresAt).getTime() : undefined,
+        createdBy: `${user.firstName} ${user.lastName}`,
+      });
+
+      Alert.alert('Success', 'Poll created successfully!');
+      
+      setShowPollModal(false);
+      setPollForm({
+        title: '',
+        description: '',
+        options: ['', ''],
+        allowMultipleVotes: false,
+        expiresAt: '',
+      });
+      pollModalOpacity.setValue(0);
+      pollModalTranslateY.setValue(300);
+      overlayOpacity.setValue(0);
+    } catch (error) {
+      console.error('Error creating poll:', error);
+      Alert.alert('Error', 'Failed to create poll. Please try again.');
+    }
+  };
+
+  const handleCancelPoll = () => {
+    setShowPollModal(false);
+    setPollForm({
+      title: '',
+      description: '',
+      options: ['', ''],
+      allowMultipleVotes: false,
+      expiresAt: '',
+    });
+    pollModalOpacity.setValue(0);
+    pollModalTranslateY.setValue(300);
+    overlayOpacity.setValue(0);
+  };
+
+  const addPollOption = () => {
+    if (pollForm.options.length < 10) {
+      setPollForm(prev => ({
+        ...prev,
+        options: [...prev.options, '']
+      }));
+    }
+  };
+
+  const removePollOption = (index: number) => {
+    if (pollForm.options.length > 2) {
+      setPollForm(prev => ({
+        ...prev,
+        options: prev.options.filter((_, i) => i !== index)
+      }));
+    }
+  };
+
+  const updatePollOption = (index: number, value: string) => {
+    setPollForm(prev => ({
+      ...prev,
+      options: prev.options.map((opt, i) => i === index ? value : opt)
+    }));
+  };
+
   const pickImage = async () => {
     if (selectedImages.length >= 5) {
       Alert.alert('Limit Reached', 'You can only add up to 5 images per post.');
@@ -527,7 +723,7 @@ const CommunityScreen = () => {
 
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: 'images' as any,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -555,27 +751,44 @@ const CommunityScreen = () => {
 
     try {
       for (const imageUri of selectedImages) {
-        const uploadUrl = await generateUploadUrl();
-        const { blob, mimeType } = await getUploadReadyImage(imageUri);
+        try {
+          const uploadUrl = await generateUploadUrl();
+          const { blob, mimeType } = await getUploadReadyImage(imageUri);
 
-        const uploadResponse = await fetch(uploadUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': mimeType },
-          body: blob,
-        });
+          const uploadResponse = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': mimeType },
+            body: blob,
+          });
 
-        if (!uploadResponse.ok) {
-          throw new Error('Upload failed');
+          if (!uploadResponse.ok) {
+            throw new Error('Upload failed');
+          }
+
+          const { storageId } = await uploadResponse.json();
+          uploadedUrls.push(storageId);
+        } catch (imageError: any) {
+          console.error('Error uploading individual image:', imageError);
+          console.error('Image URI:', imageUri);
+          console.error('Error details:', {
+            message: imageError?.message,
+            stack: imageError?.stack,
+            name: imageError?.name,
+          });
+          // Continue with other images even if one fails
+          throw imageError;
         }
-
-        const { storageId } = await uploadResponse.json();
-        uploadedUrls.push(storageId);
       }
 
       return uploadedUrls;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading images:', error);
-      Alert.alert('Error', 'Failed to upload images. Please try again.');
+      console.error('Error details:', {
+        message: error?.message,
+        stack: error?.stack,
+        name: error?.name,
+      });
+      Alert.alert('Error', `Failed to upload images: ${error?.message || 'Unknown error'}`);
       return [];
     } finally {
       setUploadingImages(false);
@@ -631,7 +844,7 @@ const CommunityScreen = () => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: 'images' as any,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -858,7 +1071,7 @@ const CommunityScreen = () => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: 'images' as any,
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.6,
@@ -1131,12 +1344,15 @@ const CommunityScreen = () => {
     <>
       {/* Header */}
       <Animated.View
-        style={{
-          opacity: fadeAnim,
-        }}
+        style={[
+          {
+            opacity: fadeAnim,
+          },
+          Platform.OS === 'ios' && styles.headerContainerIOS
+        ]}
       >
         <ImageBackground
-          source={require('../../assets/hoa-4k.jpg')}
+          source={Platform.OS === 'ios' ? require('../../assets/hoa-1k.jpg') : require('../../assets/hoa-2k.jpg')}
           style={styles.header}
           imageStyle={styles.headerImage}
           resizeMode="stretch"
@@ -1282,6 +1498,10 @@ const CommunityScreen = () => {
           ]}
         >
           <View style={styles.filterRow}>
+            <View style={styles.filterLabelContainer}>
+              <Ionicons name="filter" size={16} color="#6b7280" style={styles.filterIcon} />
+              <Text style={styles.filterLabel}>Filter:</Text>
+            </View>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -1451,11 +1671,19 @@ const CommunityScreen = () => {
     </>
   );
 
-  const canLoadMorePosts = visiblePostCount < postsContent.length;
+  const canLoadMorePosts = hasMorePosts;
 
   const handleLoadMorePosts = () => {
     if (canLoadMorePosts) {
-      setVisiblePostCount((prev) => Math.min(prev + 5, postsContent.length));
+      loadMorePosts();
+    }
+  };
+  
+  const canLoadMorePolls = hasMorePolls;
+  
+  const handleLoadMorePolls = () => {
+    if (canLoadMorePolls) {
+      loadMorePolls();
     }
   };
 
@@ -1620,7 +1848,7 @@ const CommunityScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <View style={styles.container}>
       {/* Mobile Navigation - Only when screen is narrow */}
       {showMobileNav && (
@@ -1634,7 +1862,7 @@ const CommunityScreen = () => {
       {activeSubTab === 'posts' ? (
         <Animated.FlatList
           ref={listRef}
-          data={postsData}
+          data={postsContent}
           keyExtractor={(item: any) => item._id}
           renderItem={renderPostItem}
           ListHeaderComponent={renderTopContent}
@@ -1649,9 +1877,10 @@ const CommunityScreen = () => {
               <View style={styles.footerSpacer} />
             )
           }
+          style={[styles.postsContainer, Platform.OS === 'web' && styles.webScrollContainer]}
           contentContainerStyle={[
             styles.scrollContent,
-            Platform.OS === 'web' && styles.webScrollContent,
+            Platform.OS === 'web' && { paddingBottom: 100 },
           ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator
@@ -1660,7 +1889,8 @@ const CommunityScreen = () => {
           initialNumToRender={5}
           maxToRenderPerBatch={5}
           windowSize={5}
-          removeClippedSubviews
+          removeClippedSubviews={false}
+          nestedScrollEnabled={true}
         />
       ) : (
         <ScrollView
@@ -1693,313 +1923,135 @@ const CommunityScreen = () => {
         
         {/* Content with padding */}
         <View style={styles.contentWrapper}>
-          {activeSubTab === 'posts' ? (
-            postsContent.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="chatbubbles-outline" size={48} color="#9ca3af" />
-              <Text style={styles.emptyStateText}>No posts found</Text>
-              <Text style={styles.emptyStateSubtext}>
-                Be the first to start a conversation!
-              </Text>
-            </View>
-          ) : (
-            postsContent.map((item: any, index: number) => (
-            <Animated.View 
-              key={item._id} 
-              style={[
-                styles.postCard,
-                {
-                  borderLeftColor: borderColors[index % borderColors.length],
-                  opacity: fadeAnim,
-                  transform: [{
-                    translateY: fadeAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [50, 0],
-                    })
-                  }]
-                }
-              ]}
-            >
-              {/* Render post */}
-              <>
-                <View style={styles.postHeader}>
-                    <View style={styles.postAuthor}>
-                      <ProfileImage source={item.authorProfileImage} size={40} style={{ marginRight: 8 }} />
-                      <View>
-                        <Text style={styles.authorName}>{item.author}</Text>
-                        <Text style={styles.postTime}>{formatDate(new Date(item.createdAt).toISOString())}</Text>
-                      </View>
-                    </View>
-                    <View style={styles.categoryBadge}>
-                      <Ionicons 
-                        name={getCategoryIcon(item.category) as any} 
-                        size={12} 
-                        color={getCategoryColor(item.category)} 
-                      />
-                      <Text style={[styles.categoryText, { color: getCategoryColor(item.category) }]}>
-                        {item.category}
-                      </Text>
-                    </View>
-                  </View>
-                  
-                  <Text style={styles.postTitle}>{item.title}</Text>
-                  <Text style={styles.postContent}>{item.content}</Text>
-                  
-                  {/* Post Images */}
-                  {item.images && item.images.length > 0 && (
-                    <View style={styles.postImagesContainer}>
-                      {item.images.map((imageStorageId: string, index: number) => (
-                        <PostImage 
-                          key={index}
-                          storageId={imageStorageId} 
-                        />
-                      ))}
-                    </View>
-                  )}
-                  
-                  <View style={styles.postFooter}>
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={() => handleLike(item._id)}
-                    >
-                      <Ionicons name="heart" size={16} color="#6b7280" />
-                      <Text style={styles.actionText}>{item.likes ?? 0}</Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity 
-                      style={styles.actionButton}
-                      onPress={() => handleCommentPress(item)}
-                    >
-                      <Ionicons name="chatbubble" size={16} color="#6b7280" />
-                      <Text style={styles.actionText}>{item.comments?.length ?? 0}</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Comments */}
-                  {item.comments && item.comments.length > 0 && (
-                    <View style={styles.commentsSection}>
-                      <View style={styles.commentsHeader}>
-                        <Text style={styles.commentsTitle}>
-                          Comments ({item.comments.length})
-                        </Text>
-                        {item.comments.length > COMMENTS_PREVIEW_LIMIT && (
-                          <TouchableOpacity
-                            style={styles.viewAllButton}
-                            onPress={() => toggleComments(item._id)}
-                          >
-                            <Text style={styles.viewAllButtonText}>
-                              {expandedComments.has(item._id) ? 'Show Less' : 'View All'}
-                            </Text>
-                            <Ionicons 
-                              name={expandedComments.has(item._id) ? 'chevron-up' : 'chevron-down'} 
-                              size={16} 
-                              color="#2563eb" 
-                            />
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                      
-                      {/* Preview Comments (always visible) */}
-                      {item.comments.slice(0, COMMENTS_PREVIEW_LIMIT).map((comment: any, index: number) => (
-                        <View key={comment._id ?? index} style={styles.commentItem}>
-                          <View style={styles.commentHeader}>
-                            <View style={styles.commentAuthorInfo}>
-                              <ProfileImage 
-                              source={comment.authorProfileImage} 
-                              size={24} 
-                              style={{ marginRight: 6 }}
-                            />
-                              <Text style={styles.commentAuthor}>{comment.author}</Text>
-                              {isCommentAuthorDeveloper(comment.author) ? (
-                                <View style={styles.developerBadge}>
-                                  <Ionicons name="code-slash" size={10} color="#ffffff" />
-                                  <Text style={styles.developerBadgeText}>Developer</Text>
-                                </View>
-                              ) : isCommentAuthorBoardMember(comment.author) && (
-                                <View style={styles.boardMemberBadge}>
-                                  <Ionicons name="shield" size={10} color="#ffffff" />
-                                  <Text style={styles.boardMemberBadgeText}>Board Member</Text>
-                                </View>
-                              )}
-                            </View>
-                            <Text style={styles.commentTime}>
-                              {formatDate(comment.createdAt ? new Date(comment.createdAt).toISOString() : comment.timestamp || new Date().toISOString())}
-                            </Text>
-                          </View>
-                          <Text style={styles.commentContent}>{comment.content}</Text>
+          {activeSubTab === 'polls' ? (
+            pollsContent.length > 0 ? (
+              <View style={styles.postsContainer}>
+                {pollsContent.map((poll: any, index: number) => (
+                  <Animated.View 
+                    key={poll._id} 
+                    style={[
+                      styles.postCard,
+                      {
+                        borderLeftColor: borderColors[index % borderColors.length],
+                        opacity: contentAnim,
+                        transform: [{
+                          translateY: contentAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [50, 0],
+                          })
+                        }]
+                      }
+                    ]}
+                  >
+                    <View style={styles.postHeader}>
+                      <View style={styles.postAuthor}>
+                        <View style={styles.avatar}>
+                          <Ionicons name="bar-chart" size={20} color="#2563eb" />
                         </View>
-                      ))}
-                      
-                      {/* Expanded Comments (when toggled) */}
-                      {expandedComments.has(item._id) && item.comments.length > COMMENTS_PREVIEW_LIMIT && (
-                        <View style={styles.expandedComments}>
-                          <View style={styles.commentsDivider} />
-                          <ScrollView 
-                            style={styles.expandedCommentsScroll}
-                            showsVerticalScrollIndicator={false}
-                            nestedScrollEnabled={true}
+                        <View>
+                          <Text style={styles.authorName}>Community Poll</Text>
+                          <Text style={styles.postTime}>
+                            {formatDate(new Date(poll.createdAt).toISOString())}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                    
+                    <Text style={styles.postTitle}>{poll.title}</Text>
+                    {poll.description && (
+                      <Text style={styles.postContent}>{poll.description}</Text>
+                    )}
+                    
+                    {/* Poll Options */}
+                    <View style={styles.pollOptionsContainer}>
+                      {poll.options.map((option: string, optionIndex: number) => {
+                        const isSelected = selectedPollVotes[poll._id]?.includes(optionIndex) || false;
+                        const voteCount = poll.optionVotes?.[optionIndex] || 0;
+                        const totalVotes = poll.totalVotes || 0;
+                        const percentage = totalVotes > 0 ? (voteCount / totalVotes) * 100 : 0;
+                        const isWinningOption = !poll.isActive && poll.winningOption && poll.winningOption.tiedIndices?.includes(optionIndex);
+                        const isTied = isWinningOption && poll.winningOption?.isTied;
+                        
+                        return (
+                          <TouchableOpacity
+                            key={optionIndex}
+                            style={[
+                              styles.pollOption,
+                              isSelected && styles.pollOptionSelected,
+                              !poll.isActive && styles.pollOptionDisabled,
+                              isWinningOption && styles.pollWinningOption
+                            ]}
+                            onPress={() => poll.isActive ? handleVoteOnPoll(poll._id, optionIndex) : null}
+                            disabled={!poll.isActive}
                           >
-                            {item.comments.slice(COMMENTS_PREVIEW_LIMIT).map((comment: any, index: number) => (
-                              <View key={comment._id ?? `expanded-${index}`} style={styles.commentItem}>
-                                <View style={styles.commentHeader}>
-                            <View style={styles.commentAuthorInfo}>
-                              <ProfileImage 
-                                source={comment.authorProfileImage} 
-                                size={24} 
-                                style={{ marginRight: 6 }}
-                              />
-                              <Text style={styles.commentAuthor}>{comment.author}</Text>
-                              {isCommentAuthorDeveloper(comment.author) ? (
-                                <View style={styles.developerBadge}>
-                                  <Ionicons name="code-slash" size={10} color="#ffffff" />
-                                  <Text style={styles.developerBadgeText}>Developer</Text>
-                                </View>
-                              ) : isCommentAuthorBoardMember(comment.author) && (
-                                <View style={styles.boardMemberBadge}>
-                                  <Ionicons name="shield" size={10} color="#ffffff" />
-                                  <Text style={styles.boardMemberBadgeText}>Board Member</Text>
-                                </View>
-                              )}
+                            <View style={styles.pollOptionContent}>
+                              <Text style={[
+                                styles.pollOptionText,
+                                isSelected && styles.pollOptionTextSelected,
+                                isWinningOption && styles.pollWinningOptionText
+                              ]}>
+                                {option}
+                              </Text>
+                              <Text style={[
+                                styles.pollVoteCount,
+                                isWinningOption && styles.pollWinningVoteCount
+                              ]}>
+                                {voteCount} votes ({percentage.toFixed(1)}%)
+                              </Text>
                             </View>
-                                  <Text style={styles.commentTime}>
-                                    {formatDate(comment.createdAt ? new Date(comment.createdAt).toISOString() : comment.timestamp || new Date().toISOString())}
+                            <View style={styles.pollOptionActions}>
+                              {isSelected && (
+                                <Ionicons name="checkmark-circle" size={20} color="#2563eb" />
+                              )}
+                              {isWinningOption && (
+                                <View style={styles.winningBadge}>
+                                  <Ionicons name="trophy" size={16} color="#ffffff" />
+                                  <Text style={styles.winningBadgeText}>
+                                    {isTied ? 'Tied' : 'Most Voted'}
                                   </Text>
                                 </View>
-                                <Text style={styles.commentContent}>{comment.content}</Text>
-                              </View>
-                            ))}
-                          </ScrollView>
+                              )}
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                    
+                    <View style={styles.postFooter}>
+                      <View style={styles.actionButton}>
+                        <Ionicons name="people" size={16} color="#6b7280" />
+                        <Text style={styles.actionText}>{poll.totalVotes || 0} total votes</Text>
+                      </View>
+                      
+                      {poll.allowMultipleVotes && (
+                        <View style={styles.actionButton}>
+                          <Ionicons name="checkmark-done" size={16} color="#6b7280" />
+                          <Text style={styles.actionText}>Multiple votes allowed</Text>
                         </View>
                       )}
                     </View>
-                  )}
-                </>
-            </Animated.View>
-            ))
-            )
-          ) : activeSubTab === 'polls' ? (
-            pollsContent.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="bar-chart-outline" size={48} color="#9ca3af" />
-              <Text style={styles.emptyStateText}>No polls found</Text>
-              <Text style={styles.emptyStateSubtext}>
-                Be the first to create a community poll!
-              </Text>
-            </View>
-          ) : (
-            pollsContent.map((item: any, index: number) => (
-            <Animated.View 
-              key={item._id} 
-              style={[
-                styles.postCard,
-                {
-                  borderLeftColor: borderColors[index % borderColors.length],
-                  opacity: fadeAnim,
-                  transform: [{
-                    translateY: fadeAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [50, 0],
-                    })
-                  }]
-                }
-              ]}
-            >
-              {/* Render poll */}
-              <>
-                <View style={styles.postHeader}>
-                  <View style={styles.postAuthor}>
-                    <View style={styles.avatar}>
-                      <Ionicons name="bar-chart" size={20} color="#eab308" />
-                    </View>
-                    <View>
-                      <Text style={styles.authorName}>Community Poll</Text>
-                      <Text style={styles.postTime}>{formatDate(new Date(item.createdAt).toISOString())}</Text>
-                    </View>
+                  </Animated.View>
+                ))}
+                {canLoadMorePolls && (
+                  <View style={styles.listFooter}>
+                    <TouchableOpacity 
+                      style={styles.loadMoreButton}
+                      onPress={handleLoadMorePolls}
+                    >
+                      <Text style={styles.loadMoreButtonText}>Load More Polls</Text>
+                      <Ionicons name="chevron-down" size={16} color="#2563eb" />
+                    </TouchableOpacity>
                   </View>
-                  <View style={styles.categoryBadge}>
-                    <Ionicons name="checkmark-circle" size={12} color={item.isActive ? '#10b981' : '#ef4444'} />
-                    <Text style={[styles.categoryText, { color: item.isActive ? '#10b981' : '#ef4444' }]}>
-                      {item.isActive ? 'Active' : 'inActive'}
-                    </Text>
-                  </View>
-                </View>
-                
-                <Text style={styles.postTitle}>{item.title}</Text>
-                {item.description && (
-                  <Text style={styles.postContent}>{item.description}</Text>
                 )}
-                
-                {/* Poll Options */}
-                <View style={styles.pollOptionsContainer}>
-                  {item.options.map((option: string, optionIndex: number) => {
-                    const isSelected = selectedPollVotes[item._id]?.includes(optionIndex) || false;
-                    const voteCount = item.optionVotes?.[optionIndex] || 0;
-                    const totalVotes = item.totalVotes || 0;
-                    const percentage = totalVotes > 0 ? (voteCount / totalVotes) * 100 : 0;
-                    const isWinningOption = !item.isActive && item.winningOption && item.winningOption.tiedIndices?.includes(optionIndex);
-                    const isTied = isWinningOption && item.winningOption?.isTied;
-                    
-                    return (
-                      <TouchableOpacity
-                        key={optionIndex}
-                        style={[
-                          styles.pollOption,
-                          isSelected && styles.pollOptionSelected,
-                          !item.isActive && styles.pollOptionDisabled,
-                          isWinningOption && styles.pollWinningOption
-                        ]}
-                        onPress={() => item.isActive ? handleVoteOnPoll(item._id, optionIndex) : null}
-                        disabled={!item.isActive}
-                      >
-                        <View style={styles.pollOptionContent}>
-                          <Text style={[
-                            styles.pollOptionText,
-                            isSelected && styles.pollOptionTextSelected,
-                            isWinningOption && styles.pollWinningOptionText
-                          ]}>
-                            {option}
-                          </Text>
-                          <Text style={[
-                            styles.pollVoteCount,
-                            isWinningOption && styles.pollWinningVoteCount
-                          ]}>
-                            {voteCount} votes ({percentage.toFixed(1)}%)
-                          </Text>
-                        </View>
-                        <View style={styles.pollOptionActions}>
-                          {isSelected && (
-                            <Ionicons name="checkmark-circle" size={20} color="#2563eb" />
-                          )}
-                          {isWinningOption && (
-                            <View style={styles.winningBadge}>
-                              <Ionicons name="trophy" size={16} color="#ffffff" />
-                              <Text style={styles.winningBadgeText}>
-                                {isTied ? 'Tied' : 'Most Voted'}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-                
-                <View style={styles.postFooter}>
-                  <View style={styles.actionButton}>
-                    <Ionicons name="people" size={16} color="#6b7280" />
-                    <Text style={styles.actionText}>{item.totalVotes || 0} total votes</Text>
-                  </View>
-                  
-                  {item.allowMultipleVotes && (
-                    <View style={styles.actionButton}>
-                      <Ionicons name="checkmark-done" size={16} color="#6b7280" />
-                      <Text style={styles.actionText}>Multiple votes allowed</Text>
-                    </View>
-                  )}
-                </View>
-              </>
-            </Animated.View>
-            ))
+              </View>
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="bar-chart-outline" size={64} color="#9ca3af" />
+                <Text style={styles.emptyStateText}>No polls yet</Text>
+                <Text style={styles.emptyStateSubtext}>
+                  Board members can create polls to gather community feedback
+                </Text>
+              </View>
             )
           ) : activeSubTab === 'notifications' ? (
             notificationCards && notificationCards.length > 0 ? (
@@ -2218,22 +2270,33 @@ const CommunityScreen = () => {
 
       {/* Floating Action Button for Mobile */}
       {showMobileNav && (
-        <TouchableOpacity
-          style={styles.floatingActionButton}
-          onPress={() => {
-            animateButtonPress();
-            if (activeSubTab === 'posts') {
-            setShowNewPostModal(true);
-            animateIn('post');
-            } else if (activeSubTab === 'notifications') {
-              handleAddNotification();
-            } else if (activeSubTab === 'pets') {
-              handleAddPet();
-            }
-          }}
-        >
-          <Ionicons name="add" size={28} color="#ffffff" />
-        </TouchableOpacity>
+        ((activeSubTab === 'polls' && isBoardMember) || 
+         (activeSubTab !== 'polls')) && (
+          <View pointerEvents="box-none" style={{ position: 'absolute', bottom: 150, right: 20, zIndex: 1000, elevation: 10 }}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.floatingActionButton,
+                pressed && { opacity: 0.8 }
+              ]}
+              onPress={() => {
+                animateButtonPress();
+                if (activeSubTab === 'posts') {
+                  setShowNewPostModal(true);
+                  animateIn('post');
+                } else if (activeSubTab === 'polls' && isBoardMember) {
+                  setShowPollModal(true);
+                } else if (activeSubTab === 'notifications') {
+                  handleAddNotification();
+                } else if (activeSubTab === 'pets') {
+                  handleAddPet();
+                }
+              }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="add" size={28} color="#ffffff" />
+            </Pressable>
+          </View>
+        )
       )}
 
       {/* New Post Modal */}
@@ -2321,7 +2384,7 @@ const CommunityScreen = () => {
                   <Ionicons 
                     name="camera" 
                     size={24} 
-                    color={uploadingImages ? "#9ca3af" : "#2563eb"} 
+                    color={uploadingImages ? "#9ca3af" : "#eab308"} 
                   />
                   <Text style={[
                     styles.addImageText,
@@ -2461,7 +2524,11 @@ const CommunityScreen = () => {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+              <ScrollView 
+                style={styles.modalContent} 
+                contentContainerStyle={styles.modalContentContainer}
+                showsVerticalScrollIndicator={false}
+              >
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>Resident *</Text>
                   <ScrollView style={styles.picker} nestedScrollEnabled>
@@ -2723,7 +2790,11 @@ const CommunityScreen = () => {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+              <ScrollView 
+                style={styles.modalContent} 
+                contentContainerStyle={styles.modalContentContainer}
+                showsVerticalScrollIndicator={false}
+              >
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>Pet Name *</Text>
                   <TextInput
@@ -2822,6 +2893,143 @@ const CommunityScreen = () => {
           </KeyboardAvoidingView>
         </Animated.View>
       </Modal>
+
+      {/* Poll Modal */}
+      <Modal
+        key={`poll-modal-${showPollModal}`}
+        visible={showPollModal}
+        transparent={true}
+        animationType="none"
+        onRequestClose={handleCancelPoll}
+      >
+        <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
+          <Animated.View style={[
+            styles.boardMemberModalContent,
+            {
+              opacity: pollModalOpacity,
+              transform: [{ translateY: pollModalTranslateY }],
+            }
+          ]}
+          pointerEvents="box-none"
+          >
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                Create Poll
+              </Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={handleCancelPoll}
+              >
+                <Ionicons name="close" size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView 
+              style={styles.modalForm} 
+              contentContainerStyle={styles.modalFormContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Poll Title *</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Enter poll title"
+                  value={pollForm.title}
+                  onChangeText={(text) => setPollForm(prev => ({ ...prev, title: text }))}
+                  autoCapitalize="words"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Description</Text>
+                <TextInput
+                  style={[styles.textInput, styles.textArea]}
+                  placeholder="Enter poll description (optional)"
+                  value={pollForm.description}
+                  onChangeText={(text) => setPollForm(prev => ({ ...prev, description: text }))}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Poll Options *</Text>
+                {pollForm.options.map((option, index) => (
+                  <View key={index} style={styles.pollOptionInput}>
+                    <TextInput
+                      style={[styles.textInput, styles.pollOptionTextInput]}
+                      placeholder={`Option ${index + 1}`}
+                      value={option}
+                      onChangeText={(text) => updatePollOption(index, text)}
+                    />
+                    {pollForm.options.length > 2 && (
+                      <TouchableOpacity
+                        style={styles.removeOptionButton}
+                        onPress={() => removePollOption(index)}
+                      >
+                        <Ionicons name="close-circle" size={20} color="#ef4444" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+                
+                {pollForm.options.length < 10 && (
+                  <TouchableOpacity
+                    style={styles.addOptionButton}
+                    onPress={addPollOption}
+                  >
+                    <Ionicons name="add-circle" size={20} color="#2563eb" />
+                    <Text style={styles.addOptionText}>Add Option</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Settings</Text>
+                
+                <TouchableOpacity
+                  style={styles.checkboxContainer}
+                  onPress={() => setPollForm(prev => ({ ...prev, allowMultipleVotes: !prev.allowMultipleVotes }))}
+                >
+                  <View style={[styles.checkbox, pollForm.allowMultipleVotes && styles.checkboxChecked]}>
+                    {pollForm.allowMultipleVotes && (
+                      <Ionicons name="checkmark" size={16} color="#ffffff" />
+                    )}
+                  </View>
+                  <Text style={styles.checkboxLabel}>Allow multiple votes</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Expiration Date (Optional)</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="YYYY-MM-DD"
+                  value={pollForm.expiresAt}
+                  onChangeText={(text) => setPollForm(prev => ({ ...prev, expiresAt: text }))}
+                />
+              </View>
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={handleCancelPoll}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={styles.createButton}
+                  onPress={handleCreatePoll}
+                >
+                  <Text style={styles.createButtonText}>Create Poll</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
       </View>
       
       {/* Custom Alert */}
@@ -2846,6 +3054,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f3f4f6',
   },
+  headerContainerIOS: {
+    width: Dimensions.get('window').width,
+    alignSelf: 'stretch',
+    overflow: 'hidden',
+  },
   header: {
     height: 240,
     padding: 20,
@@ -2853,10 +3066,18 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     position: 'relative',
     justifyContent: 'space-between',
+    width: '100%',
+    alignSelf: 'stretch',
   },
   headerImage: {
     borderRadius: 0,
-    width: '100%',
+    width: Platform.OS === 'ios' ? Dimensions.get('window').width + 40 : '100%',
+    height: 240,
+    position: 'absolute',
+    left: Platform.OS === 'ios' ? -20 : 0,
+    right: Platform.OS === 'ios' ? -20 : 0,
+    top: 0,
+    bottom: 0,
   },
   headerOverlay: {
     position: 'absolute',
@@ -2928,7 +3149,7 @@ const styles = StyleSheet.create({
   },
   floatingActionButton: {
     position: 'absolute',
-    bottom: 150,
+    bottom: -150,
     right: 20,
     width: 56,
     height: 56,
@@ -2944,10 +3165,15 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   categoryContainer: {
-    backgroundColor: '#ffffff',
-    paddingVertical: 10,
-    paddingBottom: -20,
-    paddingTop: -40, 
+    backgroundColor: '#f9fafb',
+    paddingVertical: 12,
+    paddingTop: Platform.OS === 'ios' ? 12 : 12,
+    paddingBottom: Platform.OS === 'ios' ? 12 : 12,
+    marginTop: Platform.OS === 'ios' ? 8 : 0,
+    marginBottom: 16,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#e5e7eb',
   },
   filterRow: {
     flexDirection: 'row',
@@ -2955,11 +3181,29 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 15,
   },
+  filterLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 12,
+    paddingRight: 12,
+    borderRightWidth: 1,
+    borderRightColor: '#e5e7eb',
+  },
+  filterIcon: {
+    marginRight: 6,
+  },
+  filterLabel: {
+    fontSize: 13,
+    color: '#6b7280',
+    fontWeight: '600',
+  },
   categoryScrollView: {
     flex: 1,
+    marginLeft: 0,
   },
   categoryContent: {
     paddingHorizontal: 0,
+    alignItems: 'center',
   },
   categoryButton: {
     paddingHorizontal: 16,
@@ -2986,7 +3230,7 @@ const styles = StyleSheet.create({
     padding: 15,
   },
   webScrollContainer: {
-    ...(Platform.OS === 'web' && {
+    ...(Platform.OS === 'web' ? {
       cursor: 'grab' as any,
       userSelect: 'none' as any,
       WebkitUserSelect: 'none' as any,
@@ -2996,18 +3240,18 @@ const styles = StyleSheet.create({
       height: '100vh' as any,
       maxHeight: '100vh' as any,
       position: 'relative' as any,
-    }),
-  },
+    } : {}),
+  } as any,
   scrollContent: {
     paddingBottom: 20,
   },
   webScrollContent: {
-    ...(Platform.OS === 'web' && {
+    ...(Platform.OS === 'web' ? {
       minHeight: '100vh' as any,
       flexGrow: 1,
       paddingBottom: 100 as any,
-    }),
-  },
+    } : {}),
+  } as any,
   spacer: {
     height: Platform.OS === 'web' ? 120 : 80,
   },
@@ -3162,6 +3406,21 @@ const styles = StyleSheet.create({
   listFooter: {
     paddingVertical: 16,
     alignItems: 'center',
+  },
+  loadMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    gap: 8,
+  },
+  loadMoreButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2563eb',
     justifyContent: 'center',
   },
   listFooterText: {
@@ -3240,10 +3499,18 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
+    ...(Platform.OS === 'web' ? {
+      position: 'fixed' as any,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: 1000,
+    } : {}),
+  } as any,
   modalContainer: {
     backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
@@ -3252,39 +3519,40 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 24,
     padding: 0,
     width: '90%',
-    maxHeight: '90%',
-    minHeight: '70%',
+    maxWidth: Platform.OS === 'web' ? 600 : undefined,
+    maxHeight: Platform.OS === 'web' ? '90vh' : '90%',
+    minHeight: Platform.OS === 'web' ? undefined : '70%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 20,
     elevation: 15,
-  },
+    ...(Platform.OS === 'web' ? {
+      position: 'relative' as any,
+      zIndex: 1002,
+      overflow: 'hidden' as any,
+    } : {}),
+  } as any,
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-    paddingTop: 24,
+    padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
-    backgroundColor: '#f8fafc',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#1f2937',
-    flex: 1,
-    textAlign: 'center',
-    marginRight: 24, // Account for close button width
   },
   modalContent: {
     flex: 1,
     paddingHorizontal: 24,
     paddingVertical: 20,
+    paddingBottom: 20,
+  },
+  modalContentContainer: {
     paddingBottom: 20,
   },
   inputLabel: {
@@ -3308,7 +3576,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f3f4f6',
   },
   categoryOptionActive: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#eab308',
   },
   categoryOptionText: {
     fontSize: 12,
@@ -3373,9 +3641,9 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 16,
     borderRadius: 12,
-    backgroundColor: '#2563eb',
+    backgroundColor: '#eab308',
     alignItems: 'center',
-    shadowColor: '#2563eb',
+    shadowColor: '#eab308',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
@@ -3547,7 +3815,7 @@ const styles = StyleSheet.create({
   },
   addImageText: {
     fontSize: 12,
-    color: '#2563eb',
+    color: '#eab308',
     fontWeight: '600',
     marginTop: 4,
   },
@@ -3861,7 +4129,11 @@ const styles = StyleSheet.create({
     width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-  },
+    ...(Platform.OS === 'web' ? {
+      position: 'relative' as any,
+      zIndex: 1001,
+    } : {}),
+  } as any,
   closeButton: {
     padding: 4,
   },
@@ -3907,7 +4179,7 @@ const styles = StyleSheet.create({
     color: '#374151',
   },
   pickerOptionTextSelected: {
-    color: '#2563eb',
+    color: '#eab308',
     fontWeight: '600',
   },
   typeSelector: {
@@ -3924,7 +4196,7 @@ const styles = StyleSheet.create({
   },
   typeButtonSelected: {
     backgroundColor: '#eff6ff',
-    borderColor: '#2563eb',
+    borderColor: '#eab308',
   },
   typeButtonText: {
     fontSize: 14,
@@ -3932,15 +4204,21 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   typeButtonTextSelected: {
-    color: '#2563eb',
+    color: '#eab308',
     fontWeight: '600',
   },
   submitButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
-    padding: 16,
+    backgroundColor: '#eab308',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
     alignItems: 'center',
     marginTop: 20,
+    shadowColor: '#eab308',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   submitButtonText: {
     color: '#ffffff',
@@ -4122,6 +4400,82 @@ const styles = StyleSheet.create({
   petImagePreview: {
     width: '100%',
     height: '100%',
+  },
+  // Poll modal styles
+  pollOptionInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  pollOptionTextInput: {
+    flex: 1,
+    marginRight: 8,
+  },
+  removeOptionButton: {
+    padding: 4,
+  },
+  addOptionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#e0e7ff',
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  addOptionText: {
+    fontSize: 14,
+    color: '#2563eb',
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#d1d5db',
+    marginRight: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: '#2563eb',
+    borderColor: '#2563eb',
+  },
+  checkboxLabel: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  // Board member modal content style (matching AdminScreen)
+  boardMemberModalContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    width: '90%',
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  // Poll modal styles (matching AdminScreen)
+  modalForm: {
+    maxHeight: 400,
+    padding: 20,
+  },
+  modalFormContent: {
+    paddingBottom: 20,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
   },
 });
 

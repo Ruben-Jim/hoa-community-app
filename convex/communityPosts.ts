@@ -22,36 +22,102 @@ export const getAll = query({
       residentsByName.set(fullName, resident);
     });
     
-    // Get comments for each post with author profile images
-    const postsWithComments = await Promise.all(
-      posts.map(async (post) => {
-        const comments = await ctx.db
-          .query("comments")
-          .withIndex("by_post", (q) => q.eq("postId", post._id))
-          .order("asc")
-          .collect();
-        
-        // Get author profile image for each comment
-        const commentsWithProfileImages = comments.map(comment => {
-          const authorResident = residentsByName.get(comment.author);
-          return {
-            ...comment,
-            authorProfileImage: authorResident?.profileImage || null
-          };
-        });
-        
-        // Get author profile image for the post
-        const authorResident = residentsByName.get(post.author);
-        
-        return { 
-          ...post, 
-          comments: commentsWithProfileImages,
+    // Batch fetch all comments for all posts at once
+    const postIds = posts.map(post => post._id);
+    const allComments = await ctx.db
+      .query("comments")
+      .collect();
+    
+    // Group comments by postId
+    const commentsByPostId = new Map();
+    allComments.forEach(comment => {
+      if (postIds.includes(comment.postId)) {
+        if (!commentsByPostId.has(comment.postId)) {
+          commentsByPostId.set(comment.postId, []);
+        }
+        commentsByPostId.get(comment.postId).push(comment);
+      }
+    });
+    
+    // Sort comments within each post and add profile images
+    const postsWithComments = posts.map((post) => {
+      const comments = (commentsByPostId.get(post._id) || [])
+        .sort((a: any, b: any) => a.createdAt - b.createdAt); // Order ascending
+      
+      // Get author profile image for each comment
+      const commentsWithProfileImages = comments.map((comment: any) => {
+        const authorResident = residentsByName.get(comment.author);
+        return {
+          ...comment,
           authorProfileImage: authorResident?.profileImage || null
         };
-      })
-    );
+      });
+      
+      // Get author profile image for the post
+      const authorResident = residentsByName.get(post.author);
+      
+      return { 
+        ...post, 
+        comments: commentsWithProfileImages,
+        authorProfileImage: authorResident?.profileImage || null
+      };
+    });
     
     return postsWithComments;
+  },
+});
+
+// Get paginated posts (without comments for lazy loading)
+export const getPaginated = query({
+  args: {
+    limit: v.optional(v.number()),
+    offset: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 20;
+    const offset = args.offset ?? 0;
+    
+    // Get total count
+    const allPosts = await ctx.db
+      .query("communityPosts")
+      .collect();
+    const total = allPosts.length;
+    
+    // Get paginated posts
+    const posts = await ctx.db
+      .query("communityPosts")
+      .order("desc")
+      .collect();
+    
+    const paginatedPosts = posts.slice(offset, offset + limit);
+    
+    // Get all active residents once for profile image lookup
+    const residents = await ctx.db
+      .query("residents")
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+    
+    // Create a map for quick lookup by full name
+    const residentsByName = new Map();
+    residents.forEach(resident => {
+      const fullName = `${resident.firstName} ${resident.lastName}`;
+      residentsByName.set(fullName, resident);
+    });
+    
+    // Get author profile image for each post (no comments loaded)
+    const postsWithProfileImages = paginatedPosts.map((post) => {
+      const authorResident = residentsByName.get(post.author);
+      return { 
+        ...post, 
+        comments: [], // Empty comments array for lazy loading
+        authorProfileImage: authorResident?.profileImage || null
+      };
+    });
+    
+    return {
+      items: postsWithProfileImages,
+      total,
+    };
   },
 });
 
@@ -83,33 +149,46 @@ export const getByCategory = query({
       residentsByName.set(fullName, resident);
     });
     
-    const postsWithComments = await Promise.all(
-      posts.map(async (post) => {
-        const comments = await ctx.db
-          .query("comments")
-          .withIndex("by_post", (q) => q.eq("postId", post._id))
-          .order("asc")
-          .collect();
-        
-        // Get author profile image for each comment
-        const commentsWithProfileImages = comments.map(comment => {
-          const authorResident = residentsByName.get(comment.author);
-          return {
-            ...comment,
-            authorProfileImage: authorResident?.profileImage || null
-          };
-        });
-        
-        // Get author profile image for the post
-        const authorResident = residentsByName.get(post.author);
-        
-        return { 
-          ...post, 
-          comments: commentsWithProfileImages,
+    // Batch fetch all comments for all posts at once
+    const postIds = posts.map(post => post._id);
+    const allComments = await ctx.db
+      .query("comments")
+      .collect();
+    
+    // Group comments by postId
+    const commentsByPostId = new Map();
+    allComments.forEach(comment => {
+      if (postIds.includes(comment.postId)) {
+        if (!commentsByPostId.has(comment.postId)) {
+          commentsByPostId.set(comment.postId, []);
+        }
+        commentsByPostId.get(comment.postId).push(comment);
+      }
+    });
+    
+    // Sort comments within each post and add profile images
+    const postsWithComments = posts.map((post) => {
+      const comments = (commentsByPostId.get(post._id) || [])
+        .sort((a: any, b: any) => a.createdAt - b.createdAt); // Order ascending
+      
+      // Get author profile image for each comment
+      const commentsWithProfileImages = comments.map((comment: any) => {
+        const authorResident = residentsByName.get(comment.author);
+        return {
+          ...comment,
           authorProfileImage: authorResident?.profileImage || null
         };
-      })
-    );
+      });
+      
+      // Get author profile image for the post
+      const authorResident = residentsByName.get(post.author);
+      
+      return { 
+        ...post, 
+        comments: commentsWithProfileImages,
+        authorProfileImage: authorResident?.profileImage || null
+      };
+    });
     
     return postsWithComments;
   },
@@ -234,6 +313,42 @@ export const removeComment = mutation({
   args: { id: v.id("comments") },
   handler: async (ctx, args) => {
     await ctx.db.delete(args.id);
+  },
+});
+
+// Get comments for a specific post (for lazy loading)
+export const getCommentsByPost = query({
+  args: { postId: v.id("communityPosts") },
+  handler: async (ctx, args) => {
+    const comments = await ctx.db
+      .query("comments")
+      .withIndex("by_post", (q) => q.eq("postId", args.postId))
+      .order("asc")
+      .collect();
+    
+    // Get all active residents once for profile image lookup
+    const residents = await ctx.db
+      .query("residents")
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+    
+    // Create a map for quick lookup by full name
+    const residentsByName = new Map();
+    residents.forEach(resident => {
+      const fullName = `${resident.firstName} ${resident.lastName}`;
+      residentsByName.set(fullName, resident);
+    });
+    
+    // Get author profile image for each comment
+    const commentsWithProfileImages = comments.map(comment => {
+      const authorResident = residentsByName.get(comment.author);
+      return {
+        ...comment,
+        authorProfileImage: authorResident?.profileImage || null
+      };
+    });
+    
+    return commentsWithProfileImages;
   },
 });
 

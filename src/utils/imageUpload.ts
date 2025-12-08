@@ -1,5 +1,5 @@
-import { Image } from 'react-native';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { Platform } from 'react-native';
 
 export interface OptimizeImageOptions {
   maxDimension?: number;
@@ -13,54 +13,35 @@ const DEFAULT_OPTIONS: Required<OptimizeImageOptions> = {
   format: ImageManipulator.SaveFormat.JPEG,
 };
 
-const getImageSizeAsync = (uri: string): Promise<{ width: number; height: number }> => {
-  return new Promise((resolve, reject) => {
-    Image.getSize(
-      uri,
-      (width, height) => resolve({ width, height }),
-      (error) => reject(error)
-    );
-  });
-};
-
 export const optimizeImageForUpload = async (
   uri: string,
   options: OptimizeImageOptions = {}
 ): Promise<ImageManipulator.ImageResult> => {
   const { maxDimension, compress, format } = { ...DEFAULT_OPTIONS, ...options };
 
-  let resizeWidth: number | undefined;
-  let resizeHeight: number | undefined;
-
   try {
-    const { width, height } = await getImageSizeAsync(uri);
-    const largestDimension = Math.max(width, height);
-
-    if (largestDimension > maxDimension) {
-      const scale = maxDimension / largestDimension;
-      resizeWidth = Math.round(width * scale);
-      resizeHeight = Math.round(height * scale);
-    }
-  } catch (error) {
-    // If we fail to get the image size, fall back to resizing by width.
-    resizeWidth = maxDimension;
-  }
-
-  const actions: ImageManipulator.Action[] = [];
-
-  if (resizeWidth || resizeHeight) {
-    actions.push({
-      resize: {
-        width: resizeWidth,
-        height: resizeHeight,
+    // Always resize to maxDimension to ensure consistent image sizes
+    // ImageManipulator will maintain aspect ratio when only width is specified
+    const actions: ImageManipulator.Action[] = [
+      {
+        resize: {
+          width: maxDimension,
+        },
       },
+    ];
+
+    return await ImageManipulator.manipulateAsync(uri, actions, {
+      compress,
+      format,
+    });
+  } catch (error) {
+    console.error('Error optimizing image:', error);
+    // If manipulation fails, try without resizing
+    return await ImageManipulator.manipulateAsync(uri, [], {
+      compress,
+      format,
     });
   }
-
-  return ImageManipulator.manipulateAsync(uri, actions, {
-    compress,
-    format,
-  });
 };
 
 export interface UploadReadyImage {
@@ -73,6 +54,40 @@ export const getUploadReadyImage = async (
   uri: string,
   options?: OptimizeImageOptions
 ): Promise<UploadReadyImage> => {
+  // For web, handle image upload differently (direct blob conversion)
+  if (Platform.OS === 'web') {
+    try {
+      // On web, the URI might be a blob URL or data URL
+      // Try to fetch it directly
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      
+      // Determine mime type
+      const mimeType = blob.type || (options?.format === ImageManipulator.SaveFormat.PNG ? 'image/png' : 'image/jpeg');
+      
+      return {
+        blob,
+        mimeType,
+        optimizedUri: uri,
+      };
+    } catch (error) {
+      console.error('Error handling web image upload:', error);
+      // Fallback: try to create blob from data URL if fetch fails
+      if (uri.startsWith('data:')) {
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        const mimeType = blob.type || 'image/jpeg';
+        return {
+          blob,
+          mimeType,
+          optimizedUri: uri,
+        };
+      }
+      throw error;
+    }
+  }
+  
+  // For iOS and other platforms, use ImageManipulator for optimization
   const optimized = await optimizeImageForUpload(uri, options);
   const response = await fetch(optimized.uri);
   const blob = await response.blob();

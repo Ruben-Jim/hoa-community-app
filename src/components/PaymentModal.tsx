@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Platform,
   ScrollView,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import VenmoCheckout from './VenmoCheckout';
@@ -65,9 +66,14 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       animationType="slide"
       transparent={true}
       onRequestClose={handleClose}
+      presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : undefined}
     >
       <View style={styles.overlay}>
-        <View style={styles.modalContainer}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardView}
+        >
+          <View style={styles.modalContainer}>
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Complete Payment</Text>
@@ -76,7 +82,11 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <ScrollView 
+            style={styles.content} 
+            contentContainerStyle={styles.contentContainer}
+            showsVerticalScrollIndicator={false}
+          >
             {/* Payment Summary */}
             <View style={styles.summaryCard}>
               <Text style={styles.summaryLabel}>Payment Summary</Text>
@@ -127,7 +137,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
               />
             )}
           </ScrollView>
-        </View>
+          </View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
@@ -139,19 +150,27 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: Platform.OS === 'ios' ? 20 : 20,
+  },
+  keyboardView: {
+    width: '100%',
+    maxWidth: 500,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalContainer: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
-    width: '100%',
+    width: Platform.OS === 'ios' ? '95%' : '100%',
     maxWidth: 500,
-    maxHeight: '90%',
+    maxHeight: Platform.OS === 'ios' ? '85%' : '90%',
+    height: Platform.OS === 'ios' ? '85%' : undefined,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+    overflow: 'hidden',
   },
   header: {
     flexDirection: 'row',
@@ -171,6 +190,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  contentContainer: {
+    flexGrow: 1,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 0,
   },
   summaryCard: {
     margin: 20,

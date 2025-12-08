@@ -177,9 +177,14 @@ const BoardScreen = () => {
         })}
       >
         {/* Header */}
-        <Animated.View style={{
-          opacity: fadeAnim,
-        }}>
+        <Animated.View
+          style={[
+            {
+              opacity: fadeAnim,
+            },
+            Platform.OS === 'ios' && styles.headerContainerIOS
+          ]}
+        >
           <ImageBackground
             source={require('../../assets/hoa-4k.jpg')}
             style={styles.header}
@@ -424,6 +429,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f3f4f6',
   },
+  headerContainerIOS: {
+    width: Dimensions.get('window').width,
+    alignSelf: 'stretch',
+    overflow: 'hidden',
+  },
   header: {
     height: 240,
     padding: 20,
@@ -431,10 +441,18 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     position: 'relative',
     justifyContent: 'space-between',
+    width: '100%',
+    alignSelf: 'stretch',
   },
   headerImage: {
     borderRadius: 0,
-    width: '100%',
+    width: Platform.OS === 'ios' ? Dimensions.get('window').width + 40 : '100%',
+    height: 240,
+    position: 'absolute',
+    left: Platform.OS === 'ios' ? -20 : 0,
+    right: Platform.OS === 'ios' ? -20 : 0,
+    top: 0,
+    bottom: 0,
   },
   headerOverlay: {
     position: 'absolute',

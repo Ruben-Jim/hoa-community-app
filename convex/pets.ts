@@ -10,20 +10,34 @@ export const getAll = query({
       .order("desc")
       .collect();
     
-    // Join with resident data to get full information
-    const petsWithResidentInfo = await Promise.all(
-      pets.map(async (pet) => {
-        const resident = await ctx.db.get(pet.residentId);
-        return {
-          ...pet,
-          residentName: resident ? `${resident.firstName} ${resident.lastName}` : 'Unknown',
-          residentAddress: resident 
-            ? `${resident.address}${resident.unitNumber ? ` #${resident.unitNumber}` : ''}` 
-            : '',
-          profileImage: resident?.profileImage || null,
-        };
-      })
+    // Batch fetch all unique resident IDs
+    const residentIds = [...new Set(pets.map(pet => pet.residentId))];
+    
+    // Fetch all residents in parallel
+    const residents = await Promise.all(
+      residentIds.map(id => ctx.db.get(id))
     );
+    
+    // Create a map for quick lookup by ID
+    const residentsById = new Map();
+    residents.forEach(resident => {
+      if (resident) {
+        residentsById.set(resident._id, resident);
+      }
+    });
+    
+    // Join with resident data using the map
+    const petsWithResidentInfo = pets.map((pet) => {
+      const resident = residentsById.get(pet.residentId);
+      return {
+        ...pet,
+        residentName: resident ? `${resident.firstName} ${resident.lastName}` : 'Unknown',
+        residentAddress: resident 
+          ? `${resident.address}${resident.unitNumber ? ` #${resident.unitNumber}` : ''}` 
+          : '',
+        profileImage: resident?.profileImage || null,
+      };
+    });
     
     return petsWithResidentInfo;
   },

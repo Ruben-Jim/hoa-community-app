@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   Text,
   Animated,
@@ -67,7 +68,6 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
   const slideAnim = useRef(new Animated.Value(-300)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const profileModalOpacity = useRef(new Animated.Value(0)).current;
-  const profileModalOverlayOpacity = useRef(new Animated.Value(0)).current;
   const profileModalTranslateY = useRef(new Animated.Value(300)).current;
 
   const isBoardMember = user?.isBoardMember && user?.isActive;
@@ -84,6 +84,27 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
       }
     }
   }, [externalIsMenuOpen]);
+
+  // Handle profile modal animation when visibility changes
+  useEffect(() => {
+    if (showProfileModal) {
+      // Make content visible immediately
+      profileModalOpacity.setValue(1);
+      profileModalTranslateY.setValue(0);
+      // Optional: Add a subtle animation
+      profileModalTranslateY.setValue(50);
+      Animated.spring(profileModalTranslateY, {
+        toValue: 0,
+        tension: 100,
+        friction: 8,
+        useNativeDriver: Platform.OS !== 'web',
+      }).start();
+    } else {
+      // Reset animation values when closing
+      profileModalOpacity.setValue(0);
+      profileModalTranslateY.setValue(300);
+    }
+  }, [showProfileModal]);
 
   // Rainbow colors for tabs
   const borderColors = [
@@ -132,7 +153,10 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
     ]).start();
   };
 
-  const closeMenu = () => {
+  const closeMenu = (callback?: () => void) => {
+    // Ensure callback is actually a function, not an event object
+    const safeCallback = typeof callback === 'function' ? callback : undefined;
+    
     Animated.parallel([
       Animated.timing(slideAnim, {
         toValue: -300,
@@ -150,6 +174,10 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
       } else if (onMenuClose) {
         onMenuClose();
       }
+      // Execute callback after menu is fully closed
+      if (safeCallback) {
+        safeCallback();
+      }
     });
   };
 
@@ -162,7 +190,7 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: 'images' as any,
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.6,
@@ -219,11 +247,6 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
 
   const animateProfileModalIn = () => {
     Animated.parallel([
-      Animated.timing(profileModalOverlayOpacity, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: Platform.OS !== 'web',
-      }),
       Animated.timing(profileModalOpacity, {
         toValue: 1,
         duration: 300,
@@ -238,13 +261,8 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
     ]).start();
   };
 
-  const animateProfileModalOut = (callback: () => void) => {
+  const animateProfileModalOut = (callback?: () => void) => {
     Animated.parallel([
-      Animated.timing(profileModalOverlayOpacity, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: Platform.OS !== 'web',
-      }),
       Animated.timing(profileModalOpacity, {
         toValue: 0,
         duration: 250,
@@ -255,7 +273,11 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
         duration: 250,
         useNativeDriver: Platform.OS !== 'web',
       }),
-    ]).start(callback);
+    ]).start(() => {
+      if (callback && typeof callback === 'function') {
+        callback();
+      }
+    });
   };
 
   const handleRemoveProfileImage = async () => {
@@ -370,13 +392,13 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
         visible={isMenuOpen}
         transparent={true}
         animationType="none"
-        onRequestClose={closeMenu}
+        onRequestClose={() => closeMenu()}
       >
         <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
           <TouchableOpacity 
             style={styles.overlayTouchable}
             activeOpacity={1}
-            onPress={closeMenu}
+            onPress={() => closeMenu()}
           />
           <Animated.View style={[styles.sideMenu, { transform: [{ translateX: slideAnim }] }]}>
             {/* Menu Header */}
@@ -389,7 +411,7 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
                 />
                 <Text style={styles.menuTitle}>Shelton Springs</Text>
               </View>
-              <TouchableOpacity onPress={closeMenu}>
+              <TouchableOpacity onPress={() => closeMenu()}>
                 <Ionicons name="close" size={24} color="#374151" />
               </TouchableOpacity>
             </View>
@@ -442,14 +464,14 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
 
             {/* User Info */}
             {user && (
-              <View style={styles.userSection}>
-                <View style={styles.userInfo}>
+              <View style={styles.userSection} pointerEvents="box-none">
+                <View style={styles.userInfo} pointerEvents="box-none">
                   <ProfileImage 
                     source={currentUser?.profileImage} 
                     size={40}
                     style={{ marginRight: 12 }}
                   />
-                  <View style={styles.userDetails}>
+                  <View style={styles.userDetails} pointerEvents="none">
                     <Text style={styles.userName}>
                       {user.firstName} {user.lastName}
                     </Text>
@@ -457,15 +479,24 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
                       {(user.isDev ?? false) ? 'Developer' : user.isBoardMember ? 'Board Member' : user.isRenter ? 'Renter' : 'Resident'}
                     </Text>
                   </View>
-                  <TouchableOpacity
-                    style={styles.settingsButton}
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.settingsButton,
+                      pressed && styles.settingsButtonPressed
+                    ]}
                     onPress={() => {
-                      setShowProfileModal(true);
-                      animateProfileModalIn();
+                      // Close the side menu first, then open profile modal when closed
+                      closeMenu(() => {
+                        // Wait longer for iOS to fully close the first modal and cleanup
+                        setTimeout(() => {
+                          setShowProfileModal(true);
+                        }, 500);
+                      });
                     }}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
                     <Ionicons name="settings-outline" size={20} color="#6b7280" />
-                  </TouchableOpacity>
+                  </Pressable>
                 </View>
               </View>
             )}
@@ -475,43 +506,52 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
 
       {/* Profile Image Edit Modal */}
       <Modal
+        key={`profile-modal-${showProfileModal ? 'open' : 'closed'}`}
         visible={showProfileModal}
         transparent={true}
         animationType="none"
         onRequestClose={() => {
-          animateProfileModalOut(() => setShowProfileModal(false));
+          if (!uploading && !removing) {
+            animateProfileModalOut(() => {
+              setShowProfileModal(false);
+              setProfileImage(null);
+            });
+          }
         }}
+        presentationStyle="overFullScreen"
+        statusBarTranslucent={true}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.profileModalKeyboardView}
-        >
-          <Animated.View style={[
-            styles.profileModalOverlay,
-            { opacity: profileModalOverlayOpacity }
-          ]}>
-            <TouchableOpacity
-              style={styles.profileModalOverlayTouchable}
-              activeOpacity={1}
-              onPress={() => {
-                if (!uploading && !removing) {
-                  animateProfileModalOut(() => {
-                    setShowProfileModal(false);
-                    setProfileImage(null);
-                  });
-                }
-              }}
-              disabled={uploading || removing}
-            />
-            <Animated.View
-              style={[
-                styles.profileModalContent,
-                {
-                  opacity: profileModalOpacity,
-                  transform: [{ translateY: profileModalTranslateY }],
-                }
-              ]}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.profileModalKeyboardView}
+          >
+            <View 
+              style={styles.profileModalOverlay}
+              pointerEvents="auto"
             >
+              <TouchableOpacity
+                style={styles.profileModalOverlayTouchable}
+                activeOpacity={1}
+                onPress={() => {
+                  if (!uploading && !removing) {
+                    animateProfileModalOut(() => {
+                      setShowProfileModal(false);
+                      setProfileImage(null);
+                    });
+                  }
+                }}
+                disabled={uploading || removing}
+              />
+              <Animated.View
+                style={[
+                  styles.profileModalContent,
+                  {
+                    opacity: profileModalOpacity,
+                    transform: [{ translateY: profileModalTranslateY }],
+                  }
+                ]}
+                pointerEvents="box-none"
+              >
               <View style={styles.profileModalHeader}>
                 <Text style={styles.profileModalTitle}>Profile Settings</Text>
                 <TouchableOpacity
@@ -616,8 +656,8 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
                   <Text style={styles.logoutButtonText}>Sign Out</Text>
                 </TouchableOpacity>
               </ScrollView>
-            </Animated.View>
-          </Animated.View>
+              </Animated.View>
+            </View>
         </KeyboardAvoidingView>
       </Modal>
 
@@ -691,6 +731,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
     position: 'relative',
+    ...(Platform.OS === 'ios' && {
+      justifyContent: 'center',
+    }),
   },
   activeMenuItem: {
     backgroundColor: '#f0f9ff',
@@ -714,12 +757,20 @@ const styles = StyleSheet.create({
   activeIndicator: {
     position: 'absolute',
     right: 20,
-    top: '50%',
-    marginTop: -4,
     width: 8,
     height: 8,
     borderRadius: 4,
     backgroundColor: '#2563eb',
+    ...(Platform.OS === 'ios' 
+      ? {
+          top: '50%',
+          transform: [{ translateY: 13 }],
+        }
+      : {
+          top: '50%',
+          marginTop: -4,
+        }
+    ),
   },
   userSection: {
     padding: 20,
@@ -748,6 +799,16 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 8,
     backgroundColor: '#f3f4f6',
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    elevation: 10,
+  },
+  settingsButtonPressed: {
+    backgroundColor: '#e5e7eb',
+    opacity: 0.8,
   },
   profileModalKeyboardView: {
     flex: 1,

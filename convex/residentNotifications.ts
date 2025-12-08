@@ -11,20 +11,34 @@ export const getAllActive = query({
       .order("desc")
       .collect();
     
-    // Join with resident data to get full information
-    const notificationsWithResidentInfo = await Promise.all(
-      notifications.map(async (notification) => {
-        const resident = await ctx.db.get(notification.residentId);
-        return {
-          ...notification,
-          residentName: resident ? `${resident.firstName} ${resident.lastName}` : 'Unknown',
-          residentAddress: resident 
-            ? `${resident.address}${resident.unitNumber ? ` #${resident.unitNumber}` : ''}` 
-            : '',
-          profileImage: resident?.profileImage || null,
-        };
-      })
+    // Batch fetch all unique resident IDs
+    const residentIds = [...new Set(notifications.map(notification => notification.residentId))];
+    
+    // Fetch all residents in parallel
+    const residents = await Promise.all(
+      residentIds.map(id => ctx.db.get(id))
     );
+    
+    // Create a map for quick lookup by ID
+    const residentsById = new Map();
+    residents.forEach(resident => {
+      if (resident) {
+        residentsById.set(resident._id, resident);
+      }
+    });
+    
+    // Join with resident data using the map
+    const notificationsWithResidentInfo = notifications.map((notification) => {
+      const resident = residentsById.get(notification.residentId);
+      return {
+        ...notification,
+        residentName: resident ? `${resident.firstName} ${resident.lastName}` : 'Unknown',
+        residentAddress: resident 
+          ? `${resident.address}${resident.unitNumber ? ` #${resident.unitNumber}` : ''}` 
+          : '',
+        profileImage: resident?.profileImage || null,
+      };
+    });
     
     return notificationsWithResidentInfo;
   },

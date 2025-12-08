@@ -199,7 +199,9 @@ const FeesScreen = () => {
   const displayProfileImage = currentUser?.profileImage || user?.profileImage;
 
   // Get all fees from database and filter for current user
-  const allFeesFromDatabase = useQuery(api.fees.getAll) ?? [];
+  const [feesLimit, setFeesLimit] = useState(50);
+  const feesData = useQuery(api.fees.getPaginated, { limit: feesLimit, offset: 0 });
+  const allFeesFromDatabase = feesData?.items ?? [];
   
   // Filter fees for the current user if they are a homeowner
   const fees = user && (user.isResident && !user.isRenter) 
@@ -265,13 +267,19 @@ const FeesScreen = () => {
           })}
         >
         {/* Header */}
-        <Animated.View style={{
-          opacity: fadeAnim,
-        }}>
+        <Animated.View
+          style={[
+            {
+              opacity: fadeAnim,
+            },
+            Platform.OS === 'ios' && styles.headerContainerIOS
+          ]}
+        >
           <ImageBackground
             source={require('../../assets/hoa-4k.jpg')}
             style={styles.header}
             imageStyle={styles.headerImage}
+            resizeMode="stretch"
           >
             <View style={styles.headerOverlay} />
             <View style={styles.headerTop}>
@@ -671,6 +679,11 @@ const styles = StyleSheet.create({
   spacer: {
     height: Platform.OS === 'web' ? 200 : 100,
   },
+  headerContainerIOS: {
+    width: Dimensions.get('window').width,
+    alignSelf: 'stretch',
+    overflow: 'hidden',
+  },
   header: {
     height: 240,
     padding: 20,
@@ -678,11 +691,19 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     position: 'relative',
     justifyContent: 'space-between',
+    width: '100%',
+    alignSelf: 'stretch',
   },
   headerImage: {
     borderRadius: 0,
     resizeMode: 'stretch',
-    width: '100%',
+    width: Platform.OS === 'ios' ? Dimensions.get('window').width + 40 : '100%',
+    height: 240,
+    position: 'absolute',
+    left: Platform.OS === 'ios' ? -20 : 0,
+    right: Platform.OS === 'ios' ? -20 : 0,
+    top: 0,
+    bottom: 0,
   },
   headerOverlay: {
     position: 'absolute',

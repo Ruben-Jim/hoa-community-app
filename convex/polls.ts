@@ -10,55 +10,159 @@ export const getAll = query({
       .order("desc")
       .collect();
     
-    // Get vote counts for each poll
-    const pollsWithVotes = await Promise.all(
-      polls.map(async (poll) => {
-        const votes = await ctx.db
-          .query("pollVotes")
-          .withIndex("by_poll", (q) => q.eq("pollId", poll._id))
-          .collect();
-        
-        // Calculate vote counts for each option
-        const optionVotes = poll.options.map((_, index) => {
-          return votes.filter(vote => vote.selectedOptions.includes(index)).length;
-        });
-        
-        const totalVotes = votes.length;
-        
-        // Calculate winning option(s) - handle ties
-        let winningOption = null;
-        let isTied = false;
-        if (totalVotes > 0) {
-          const maxVotes = Math.max(...optionVotes);
-          const winningIndices = optionVotes.map((votes, index) => votes === maxVotes ? index : -1).filter(index => index !== -1);
-          
-          if (winningIndices.length > 0) {
-            // Check if there's a tie (multiple options with same max votes)
-            isTied = winningIndices.length > 1;
-            
-            // For ties, we'll show the first winning option but mark it as tied
-            const winningIndex = winningIndices[0];
-            winningOption = {
-              index: winningIndex,
-              option: poll.options[winningIndex],
-              votes: maxVotes,
-              percentage: (maxVotes / totalVotes) * 100,
-              isTied: isTied,
-              tiedIndices: winningIndices
-            };
-          }
+    // Batch fetch all votes for all polls at once
+    const pollIds = polls.map(poll => poll._id);
+    const allVotes = await ctx.db
+      .query("pollVotes")
+      .collect();
+    
+    // Group votes by pollId
+    const votesByPollId = new Map();
+    allVotes.forEach(vote => {
+      if (pollIds.includes(vote.pollId)) {
+        if (!votesByPollId.has(vote.pollId)) {
+          votesByPollId.set(vote.pollId, []);
         }
+        votesByPollId.get(vote.pollId).push(vote);
+      }
+    });
+    
+    // Calculate vote counts for each poll using the grouped votes
+    const pollsWithVotes = polls.map((poll) => {
+      const votes = votesByPollId.get(poll._id) || [];
+      
+      // Calculate vote counts for each option
+      const optionVotes = poll.options.map((_, index) => {
+        return votes.filter((vote: any) => vote.selectedOptions.includes(index)).length;
+      });
+      
+      const totalVotes = votes.length;
+      
+      // Calculate winning option(s) - handle ties
+      let winningOption = null;
+      let isTied = false;
+      if (totalVotes > 0) {
+        const maxVotes = Math.max(...optionVotes);
+        const winningIndices = optionVotes.map((votes, index) => votes === maxVotes ? index : -1).filter(index => index !== -1);
         
-        return {
-          ...poll,
-          optionVotes,
-          totalVotes,
-          winningOption,
-        };
-      })
-    );
+        if (winningIndices.length > 0) {
+          // Check if there's a tie (multiple options with same max votes)
+          isTied = winningIndices.length > 1;
+          
+          // For ties, we'll show the first winning option but mark it as tied
+          const winningIndex = winningIndices[0];
+          winningOption = {
+            index: winningIndex,
+            option: poll.options[winningIndex],
+            votes: maxVotes,
+            percentage: (maxVotes / totalVotes) * 100,
+            isTied: isTied,
+            tiedIndices: winningIndices
+          };
+        }
+      }
+      
+      return {
+        ...poll,
+        optionVotes,
+        totalVotes,
+        winningOption,
+      };
+    });
     
     return pollsWithVotes;
+  },
+});
+
+// Get paginated polls
+export const getPaginated = query({
+  args: {
+    limit: v.optional(v.number()),
+    offset: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 20;
+    const offset = args.offset ?? 0;
+    
+    // Get total count
+    const allPolls = await ctx.db
+      .query("polls")
+      .order("desc")
+      .collect();
+    const total = allPolls.length;
+    
+    // Get paginated polls
+    const polls = await ctx.db
+      .query("polls")
+      .order("desc")
+      .collect();
+    
+    const paginatedPolls = polls.slice(offset, offset + limit);
+    
+    // Batch fetch all votes for all paginated polls at once
+    const pollIds = paginatedPolls.map(poll => poll._id);
+    const allVotes = await ctx.db
+      .query("pollVotes")
+      .collect();
+    
+    // Group votes by pollId
+    const votesByPollId = new Map();
+    allVotes.forEach(vote => {
+      if (pollIds.includes(vote.pollId)) {
+        if (!votesByPollId.has(vote.pollId)) {
+          votesByPollId.set(vote.pollId, []);
+        }
+        votesByPollId.get(vote.pollId).push(vote);
+      }
+    });
+    
+    // Calculate vote counts for each poll using the grouped votes
+    const pollsWithVotes = paginatedPolls.map((poll) => {
+      const votes = votesByPollId.get(poll._id) || [];
+      
+      // Calculate vote counts for each option
+      const optionVotes = poll.options.map((_, index) => {
+        return votes.filter((vote: any) => vote.selectedOptions.includes(index)).length;
+      });
+      
+      const totalVotes = votes.length;
+      
+      // Calculate winning option(s) - handle ties
+      let winningOption = null;
+      let isTied = false;
+      if (totalVotes > 0) {
+        const maxVotes = Math.max(...optionVotes);
+        const winningIndices = optionVotes.map((votes, index) => votes === maxVotes ? index : -1).filter(index => index !== -1);
+        
+        if (winningIndices.length > 0) {
+          // Check if there's a tie (multiple options with same max votes)
+          isTied = winningIndices.length > 1;
+          
+          // For ties, we'll show the first winning option but mark it as tied
+          const winningIndex = winningIndices[0];
+          winningOption = {
+            index: winningIndex,
+            option: poll.options[winningIndex],
+            votes: maxVotes,
+            percentage: (maxVotes / totalVotes) * 100,
+            isTied: isTied,
+            tiedIndices: winningIndices
+          };
+        }
+      }
+      
+      return {
+        ...poll,
+        optionVotes,
+        totalVotes,
+        winningOption,
+      };
+    });
+    
+    return {
+      items: pollsWithVotes,
+      total,
+    };
   },
 });
 
@@ -78,53 +182,65 @@ export const getActive = query({
       !poll.expiresAt || poll.expiresAt > now
     );
     
-    // Get vote counts for each poll
-    const pollsWithVotes = await Promise.all(
-      activePolls.map(async (poll) => {
-        const votes = await ctx.db
-          .query("pollVotes")
-          .withIndex("by_poll", (q) => q.eq("pollId", poll._id))
-          .collect();
-        
-        // Calculate vote counts for each option
-        const optionVotes = poll.options.map((_, index) => {
-          return votes.filter(vote => vote.selectedOptions.includes(index)).length;
-        });
-        
-        const totalVotes = votes.length;
-        
-        // Calculate winning option(s) - handle ties
-        let winningOption = null;
-        let isTied = false;
-        if (totalVotes > 0) {
-          const maxVotes = Math.max(...optionVotes);
-          const winningIndices = optionVotes.map((votes, index) => votes === maxVotes ? index : -1).filter(index => index !== -1);
-          
-          if (winningIndices.length > 0) {
-            // Check if there's a tie (multiple options with same max votes)
-            isTied = winningIndices.length > 1;
-            
-            // For ties, we'll show the first winning option but mark it as tied
-            const winningIndex = winningIndices[0];
-            winningOption = {
-              index: winningIndex,
-              option: poll.options[winningIndex],
-              votes: maxVotes,
-              percentage: (maxVotes / totalVotes) * 100,
-              isTied: isTied,
-              tiedIndices: winningIndices
-            };
-          }
+    // Batch fetch all votes for all active polls at once
+    const pollIds = activePolls.map(poll => poll._id);
+    const allVotes = await ctx.db
+      .query("pollVotes")
+      .collect();
+    
+    // Group votes by pollId
+    const votesByPollId = new Map();
+    allVotes.forEach(vote => {
+      if (pollIds.includes(vote.pollId)) {
+        if (!votesByPollId.has(vote.pollId)) {
+          votesByPollId.set(vote.pollId, []);
         }
+        votesByPollId.get(vote.pollId).push(vote);
+      }
+    });
+    
+    // Calculate vote counts for each poll using the grouped votes
+    const pollsWithVotes = activePolls.map((poll) => {
+      const votes = votesByPollId.get(poll._id) || [];
+      
+      // Calculate vote counts for each option
+      const optionVotes = poll.options.map((_, index) => {
+        return votes.filter((vote: any) => vote.selectedOptions.includes(index)).length;
+      });
+      
+      const totalVotes = votes.length;
+      
+      // Calculate winning option(s) - handle ties
+      let winningOption = null;
+      let isTied = false;
+      if (totalVotes > 0) {
+        const maxVotes = Math.max(...optionVotes);
+        const winningIndices = optionVotes.map((votes, index) => votes === maxVotes ? index : -1).filter(index => index !== -1);
         
-        return {
-          ...poll,
-          optionVotes,
-          totalVotes,
-          winningOption,
-        };
-      })
-    );
+        if (winningIndices.length > 0) {
+          // Check if there's a tie (multiple options with same max votes)
+          isTied = winningIndices.length > 1;
+          
+          // For ties, we'll show the first winning option but mark it as tied
+          const winningIndex = winningIndices[0];
+          winningOption = {
+            index: winningIndex,
+            option: poll.options[winningIndex],
+            votes: maxVotes,
+            percentage: (maxVotes / totalVotes) * 100,
+            isTied: isTied,
+            tiedIndices: winningIndices
+          };
+        }
+      }
+      
+      return {
+        ...poll,
+        optionVotes,
+        totalVotes,
+        winningOption,
+      };
+    });
     
     return pollsWithVotes;
   },

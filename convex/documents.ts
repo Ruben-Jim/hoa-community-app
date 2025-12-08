@@ -12,6 +12,33 @@ export const getAll = query({
   },
 });
 
+// Get paginated documents
+export const getPaginated = query({
+  args: {
+    limit: v.optional(v.number()),
+    offset: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 20;
+    const offset = args.offset ?? 0;
+    
+    // Get total count
+    const allDocuments = await ctx.db
+      .query("documents")
+      .order("desc")
+      .collect();
+    const total = allDocuments.length;
+    
+    // Get paginated documents
+    const documents = allDocuments.slice(offset, offset + limit);
+    
+    return {
+      items: documents,
+      total,
+    };
+  },
+});
+
 export const getByType = query({
   args: { type: v.union(v.literal("Minutes"), v.literal("Financial")) },
   handler: async (ctx, args) => {

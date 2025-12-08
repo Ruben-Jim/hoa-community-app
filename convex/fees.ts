@@ -8,6 +8,30 @@ export const getAll = query({
   },
 });
 
+// Get paginated fees
+export const getPaginated = query({
+  args: {
+    limit: v.optional(v.number()),
+    offset: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 20;
+    const offset = args.offset ?? 0;
+    
+    // Get total count
+    const allFees = await ctx.db.query("fees").order("desc").collect();
+    const total = allFees.length;
+    
+    // Get paginated fees
+    const fees = allFees.slice(offset, offset + limit);
+    
+    return {
+      items: fees,
+      total,
+    };
+  },
+});
+
 export const create = mutation({
   args: {
     name: v.string(),

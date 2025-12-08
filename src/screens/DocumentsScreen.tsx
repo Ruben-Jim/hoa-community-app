@@ -132,7 +132,9 @@ const DocumentsScreen = () => {
   };
 
   // Convex queries
-  const allDocuments = useQuery(api.documents.getAll) ?? [];
+  const [documentsLimit, setDocumentsLimit] = useState(50);
+  const documentsData = useQuery(api.documents.getPaginated, { limit: documentsLimit, offset: 0 });
+  const allDocuments = documentsData?.items ?? [];
   const documents = allDocuments.filter((doc: any) => doc.type === activeType);
 
   // Convex mutations
@@ -328,11 +330,17 @@ const DocumentsScreen = () => {
           })}
         >
           {/* Header */}
-          <Animated.View style={{ opacity: fadeAnim }}>
+          <Animated.View
+            style={[
+              { opacity: fadeAnim },
+              Platform.OS === 'ios' && styles.headerContainerIOS
+            ]}
+          >
             <ImageBackground
               source={require('../../assets/hoa-4k.jpg')}
               style={styles.header}
               imageStyle={styles.headerImage}
+              resizeMode="stretch"
             >
               <View style={styles.headerOverlay} />
               <View style={styles.headerTop}>
@@ -661,6 +669,11 @@ const styles = StyleSheet.create({
   spacer: {
     height: Platform.OS === 'web' ? 200 : 100,
   },
+  headerContainerIOS: {
+    width: Dimensions.get('window').width,
+    alignSelf: 'stretch',
+    overflow: 'hidden',
+  },
   header: {
     height: 240,
     padding: 20,
@@ -668,11 +681,19 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     position: 'relative',
     justifyContent: 'space-between',
+    width: '100%',
+    alignSelf: 'stretch',
   },
   headerImage: {
     borderRadius: 0,
     resizeMode: 'stretch',
-    width: '100%',
+    width: Platform.OS === 'ios' ? Dimensions.get('window').width + 40 : '100%',
+    height: 240,
+    position: 'absolute',
+    left: Platform.OS === 'ios' ? -20 : 0,
+    right: Platform.OS === 'ios' ? -20 : 0,
+    top: 0,
+    bottom: 0,
   },
   headerOverlay: {
     position: 'absolute',

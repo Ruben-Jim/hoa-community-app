@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Pressable,
   Alert,
   Modal,
   TextInput,
@@ -57,16 +58,24 @@ const AdminScreen = () => {
     }
   }, []);
 
-  // Data queries
+  // Pagination state for large lists
+  const [covenantsLimit, setCovenantsLimit] = useState(50);
+  const [postsLimit, setPostsLimit] = useState(50);
+  const [pollsLimit, setPollsLimit] = useState(50);
+  
+  // Data queries - using paginated queries for large lists
   const residents = useQuery(api.residents.getAll) ?? [];
   const boardMembers = useQuery(api.boardMembers.getAll) ?? [];
-  const covenants = useQuery(api.covenants.getAll) ?? [];
-  const communityPosts = useQuery(api.communityPosts.getAll) ?? [];
+  const covenantsData = useQuery(api.covenants.getPaginated, { limit: covenantsLimit, offset: 0 });
+  const covenants = covenantsData?.items ?? [];
+  const communityPostsData = useQuery(api.communityPosts.getPaginated, { limit: postsLimit, offset: 0 });
+  const communityPosts = communityPostsData?.items ?? [];
   const comments = useQuery(api.communityPosts.getAllComments) ?? [];
   const homeownersPaymentStatus = useQuery(api.fees.getAllHomeownersPaymentStatus) ?? [];
   const allFeesFromDatabase = useQuery(api.fees.getAll) ?? [];
   const allFinesFromDatabase = useQuery(api.fees.getAllFines) ?? [];
-  const polls = useQuery(api.polls.getAll) ?? [];
+  const pollsData = useQuery(api.polls.getPaginated, { limit: pollsLimit, offset: 0 });
+  const polls = pollsData?.items ?? [];
   const pendingVenmoPayments = useQuery(api.payments.getPendingVenmoPayments) ?? [];
   const pets = useQuery(api.pets.getAll) ?? [];
   const hoaInfo = useQuery(api.hoaInfo.get) ?? null;
@@ -340,6 +349,27 @@ const AdminScreen = () => {
   const fadeAnim = useRef(new Animated.Value(0)).current; // Start at 0 for individual item animations
   const scrollViewRef = useRef<ScrollView>(null);
 
+  // Handle poll modal animation when visibility changes
+  useEffect(() => {
+    if (showPollModal) {
+      // Make content visible immediately and start animation
+      pollModalOpacity.setValue(1);
+      pollModalTranslateY.setValue(0);
+      // Start from slightly below and animate up
+      pollModalTranslateY.setValue(50);
+      Animated.spring(pollModalTranslateY, {
+        toValue: 0,
+        tension: 100,
+        friction: 8,
+        useNativeDriver: Platform.OS !== 'web',
+      }).start();
+    } else {
+      // Reset animation values when closing
+      pollModalOpacity.setValue(0);
+      pollModalTranslateY.setValue(300);
+    }
+  }, [showPollModal]);
+
   // Check if current user is a board member
   const isBoardMember = user?.isBoardMember && user?.isActive;
 
@@ -532,6 +562,10 @@ const AdminScreen = () => {
         case 'pet':
           await deletePet({ id: selectedItem._id });
           Alert.alert('Success', 'Pet registration deleted successfully.');
+          break;
+        case 'poll':
+          await deletePoll({ id: selectedItem._id });
+          Alert.alert('Success', 'Poll deleted successfully.');
           break;
         default:
           Alert.alert('Error', 'Unknown item type.');
@@ -1003,7 +1037,6 @@ const AdminScreen = () => {
       expiresAt: poll.expiresAt ? new Date(poll.expiresAt).toISOString().split('T')[0] : '',
     });
     setShowPollModal(true);
-    animateIn('poll');
   };
 
   const handleUpdatePoll = async () => {
@@ -1044,7 +1077,7 @@ const AdminScreen = () => {
   };
 
   const handleDeletePoll = (poll: any) => {
-    setSelectedItem(poll);
+    setSelectedItem({ ...poll, type: 'poll' });
     setShowDeleteModal(true);
     animateIn('delete');
   };
@@ -1139,7 +1172,7 @@ const AdminScreen = () => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: 'images' as any,
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
@@ -1394,153 +1427,148 @@ const AdminScreen = () => {
             </View>
 
             {/* Residents Grid */}
-            <FlatList
-              data={residents}
-              keyExtractor={(item) => item._id}
-              numColumns={2}
-              scrollEnabled={false}
-              nestedScrollEnabled={false}
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-              }
-              renderItem={({ item }) => {
-                // Determine primary role
-                let primaryRole = 'Resident';
-                let roleIcon = 'person';
-                let roleColor = '#6b7280';
-                
-                if (item.isBlocked) {
-                  primaryRole = 'Blocked';
-                  roleIcon = 'ban';
-                  roleColor = '#ef4444';
-                } else if (item.isBoardMember) {
-                  primaryRole = 'Board Member';
-                  roleIcon = 'shield';
-                  roleColor = '#f59e0b';
-                } else if (item.isRenter) {
-                  primaryRole = 'Renter';
-                  roleIcon = 'home';
-                  roleColor = '#3b82f6';
-                } else if (item.isResident) {
-                  primaryRole = 'Homeowner';
-                  roleIcon = 'people';
-                  roleColor = '#10b981';
-                }
+            {residents.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="people" size={48} color="#9ca3af" />
+                <Text style={styles.emptyStateText}>No residents found</Text>
+                <Text style={styles.emptyStateSubtext}>
+                  Residents will appear here once they register in the system
+                </Text>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                {residents.map((item: any) => {
+                  // Determine primary role
+                  let primaryRole = 'Resident';
+                  let roleIcon = 'person';
+                  let roleColor = '#6b7280';
+                  
+                  if (item.isBlocked) {
+                    primaryRole = 'Blocked';
+                    roleIcon = 'ban';
+                    roleColor = '#ef4444';
+                  } else if (item.isBoardMember) {
+                    primaryRole = 'Board Member';
+                    roleIcon = 'shield';
+                    roleColor = '#f59e0b';
+                  } else if (item.isRenter) {
+                    primaryRole = 'Renter';
+                    roleIcon = 'home';
+                    roleColor = '#3b82f6';
+                  } else if (item.isResident) {
+                    primaryRole = 'Homeowner';
+                    roleIcon = 'people';
+                    roleColor = '#10b981';
+                  }
 
-                return (
-                  <Animated.View 
-                    style={[
-                      styles.residentGridCard,
-                      {
-                        opacity: fadeAnim,
-                        transform: [{
-                          translateY: fadeAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [50, 0],
-                          })
-                        }]
-                      }
-                    ]}
-                  >
-                    <View style={styles.residentGridCardContent}>
-                      {/* Main Info Row - Avatar Left, Details Right */}
-                      <View style={styles.residentGridMainInfo}>
-                        <ProfileImage 
-                          source={item.profileImage} 
-                          size={48}
-                          initials={`${item.firstName.charAt(0)}${item.lastName.charAt(0)}`}
-                          style={{ marginRight: 8 }}
-                        />
-                        
-                        <View style={styles.residentGridDetails}>
-                          {/* Name and Role Row */}
-                          <View style={styles.residentGridNameRow}>
-                            <Text style={styles.residentGridName} numberOfLines={1}>
-                              {item.firstName} {item.lastName}
-                            </Text>
-                            <View style={styles.residentGridRoleBadgesContainer}>
-                              <View style={[styles.residentGridRoleBadge, { backgroundColor: roleColor + '20' }]}>
-                                <Ionicons name={roleIcon as any} size={Platform.OS === 'web' ? 12 : 13} color={roleColor} />
-                                <Text style={[styles.residentGridRoleText, { color: roleColor }]} numberOfLines={1}>
-                                  {primaryRole}
+                  return (
+                    <View key={item._id} style={{ width: '50%', padding: 8 }}>
+                      <Animated.View 
+                        style={[
+                          styles.residentGridCard,
+                          {
+                            opacity: fadeAnim,
+                            transform: [{
+                              translateY: fadeAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [50, 0],
+                              })
+                            }]
+                          }
+                        ]}
+                      >
+                        <View style={styles.residentGridCardContent}>
+                          {/* Main Info Row - Avatar Left, Details Right */}
+                          <View style={styles.residentGridMainInfo}>
+                            <ProfileImage 
+                              source={item.profileImage} 
+                              size={40}
+                              initials={`${item.firstName.charAt(0)}${item.lastName.charAt(0)}`}
+                              style={{ marginRight: 6 }}
+                            />
+                            
+                            <View style={styles.residentGridDetails}>
+                              {/* Name and Role Row */}
+                              <View style={styles.residentGridNameRow}>
+                                <Text style={styles.residentGridName} numberOfLines={1}>
+                                  {item.firstName} {item.lastName}
                                 </Text>
+                                <View style={styles.residentGridRoleBadgesContainer}>
+                                  <View style={[styles.residentGridRoleBadge, { backgroundColor: roleColor + '20' }]}>
+                                    <Ionicons name={roleIcon as any} size={Platform.OS === 'web' ? 12 : 13} color={roleColor} />
+                                    <Text style={[styles.residentGridRoleText, { color: roleColor }]} numberOfLines={1}>
+                                      {primaryRole}
+                                    </Text>
+                                  </View>
+                                  {/* Additional indicators for board members */}
+                                  {item.isBoardMember && item.isResident && (
+                                    <View style={[styles.residentGridRoleBadge, { backgroundColor: '#10b98120' }]}>
+                                      <Ionicons name="people" size={Platform.OS === 'web' ? 10 : 11} color="#10b981" />
+                                      <Text style={[styles.residentGridRoleText, { color: '#10b981' }]} numberOfLines={1}>
+                                        Resident
+                                      </Text>
+                                    </View>
+                                  )}
+                                  {item.isBoardMember && item.isRenter && (
+                                    <View style={[styles.residentGridRoleBadge, { backgroundColor: '#3b82f620' }]}>
+                                      <Ionicons name="home" size={Platform.OS === 'web' ? 10 : 11} color="#3b82f6" />
+                                      <Text style={[styles.residentGridRoleText, { color: '#3b82f6' }]} numberOfLines={1}>
+                                        Renter
+                                      </Text>
+                                    </View>
+                                  )}
+                                </View>
                               </View>
-                              {/* Additional indicators for board members */}
-                              {item.isBoardMember && item.isResident && (
-                                <View style={[styles.residentGridRoleBadge, { backgroundColor: '#10b98120' }]}>
-                                  <Ionicons name="people" size={Platform.OS === 'web' ? 10 : 11} color="#10b981" />
-                                  <Text style={[styles.residentGridRoleText, { color: '#10b981' }]} numberOfLines={1}>
-                                    Resident
-                                  </Text>
-                                </View>
+                              
+                              {/* Email */}
+                              <Text style={styles.residentGridEmail} numberOfLines={1}>
+                                {item.email}
+                              </Text>
+                              
+                              {/* Phone */}
+                              {item.phone && (
+                                <Text style={styles.residentGridEmail} numberOfLines={1}>
+                                  {item.phone}
+                                </Text>
                               )}
-                              {item.isBoardMember && item.isRenter && (
-                                <View style={[styles.residentGridRoleBadge, { backgroundColor: '#3b82f620' }]}>
-                                  <Ionicons name="home" size={Platform.OS === 'web' ? 10 : 11} color="#3b82f6" />
-                                  <Text style={[styles.residentGridRoleText, { color: '#3b82f6' }]} numberOfLines={1}>
-                                    Renter
-                                  </Text>
-                                </View>
+                              
+                              {/* Address */}
+                              {item.address && (
+                                <Text style={styles.residentGridAddress} numberOfLines={1}>
+                                  {item.address}{item.unitNumber && `, Unit ${item.unitNumber}`}
+                                </Text>
                               )}
+                              
                             </View>
                           </View>
                           
-                          {/* Email */}
-                          <Text style={styles.residentGridEmail} numberOfLines={2}>
-                            {item.email}
-                          </Text>
-                          
-                          {/* Phone */}
-                          {item.phone && (
-                            <Text style={styles.residentGridEmail} numberOfLines={1}>
-                              {item.phone}
-                            </Text>
-                          )}
-                          
-                          {/* Address */}
-                          {item.address && (
-                            <Text style={styles.residentGridAddress} numberOfLines={1}>
-                              {item.address}{item.unitNumber && `, Unit ${item.unitNumber}`}
-                            </Text>
-                          )}
-                          
+                          {/* Action Button */}
+                          <View style={styles.residentGridActions}>
+                            {item.isBlocked ? (
+                              <TouchableOpacity
+                                style={[styles.residentGridActionButton, styles.unblockButton]}
+                                onPress={() => handleUnblockResident(item)}
+                              >
+                                <Ionicons name="checkmark-circle" size={14} color="#10b981" />
+                                <Text style={styles.residentGridActionText}>Unblock</Text>
+                              </TouchableOpacity>
+                            ) : (
+                              <TouchableOpacity
+                                style={[styles.residentGridActionButton, styles.blockButton]}
+                                onPress={() => handleBlockResident(item)}
+                              >
+                                <Ionicons name="ban" size={14} color="#ef4444" />
+                                <Text style={styles.residentGridActionText}>Block</Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
                         </View>
-                      </View>
-                      
-                      {/* Action Button */}
-                      <View style={styles.residentGridActions}>
-                        {item.isBlocked ? (
-                          <TouchableOpacity
-                            style={[styles.residentGridActionButton, styles.unblockButton]}
-                            onPress={() => handleUnblockResident(item)}
-                          >
-                            <Ionicons name="checkmark-circle" size={16} color="#10b981" />
-                            <Text style={styles.residentGridActionText}>Unblock</Text>
-                          </TouchableOpacity>
-                        ) : (
-                          <TouchableOpacity
-                            style={[styles.residentGridActionButton, styles.blockButton]}
-                            onPress={() => handleBlockResident(item)}
-                          >
-                            <Ionicons name="ban" size={16} color="#ef4444" />
-                            <Text style={styles.residentGridActionText}>Block</Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
+                      </Animated.View>
                     </View>
-                  </Animated.View>
-                );
-              }}
-              ListEmptyComponent={
-                <View style={styles.emptyState}>
-                  <Ionicons name="people" size={48} color="#9ca3af" />
-                  <Text style={styles.emptyStateText}>No residents found</Text>
-                  <Text style={styles.emptyStateSubtext}>
-                    Residents will appear here once they register in the system
-                  </Text>
-                </View>
-              }
-            />
+                  );
+                })}
+              </View>
+            )}
           </View>
         );
       
@@ -1562,127 +1590,124 @@ const AdminScreen = () => {
                 </TouchableOpacity>
               </Animated.View>
             </View>
-            <FlatList
-              data={boardMembers}
-              keyExtractor={(item) => item._id}
-              numColumns={2}
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-              }
-              renderItem={({ item }) => {
-                // Determine role icon and color
-                let roleIcon = 'person';
-                let roleColor = '#6b7280';
-                
-                if (item.position) {
-                  if (item.position.toLowerCase().includes('president')) {
-                    roleIcon = 'star';
-                    roleColor = '#f59e0b';
-                  } else if (item.position.toLowerCase().includes('vice')) {
-                    roleIcon = 'star-half';
-                    roleColor = '#8b5cf6';
-                  } else if (item.position.toLowerCase().includes('treasurer')) {
-                    roleIcon = 'wallet';
-                    roleColor = '#10b981';
-                  } else if (item.position.toLowerCase().includes('secretary')) {
-                    roleIcon = 'document-text';
-                    roleColor = '#3b82f6';
-                  } else {
-                    roleIcon = 'people';
-                    roleColor = '#6b7280';
+            {boardMembers.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="people" size={48} color="#9ca3af" />
+                <Text style={styles.emptyStateText}>No board members found</Text>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                {boardMembers.map((item: any, index: number) => {
+                  // Determine role icon and color
+                  let roleIcon = 'person';
+                  let roleColor = '#6b7280';
+                  
+                  if (item.position) {
+                    if (item.position.toLowerCase().includes('president')) {
+                      roleIcon = 'star';
+                      roleColor = '#f59e0b';
+                    } else if (item.position.toLowerCase().includes('vice')) {
+                      roleIcon = 'star-half';
+                      roleColor = '#8b5cf6';
+                    } else if (item.position.toLowerCase().includes('treasurer')) {
+                      roleIcon = 'wallet';
+                      roleColor = '#10b981';
+                    } else if (item.position.toLowerCase().includes('secretary')) {
+                      roleIcon = 'document-text';
+                      roleColor = '#3b82f6';
+                    } else {
+                      roleIcon = 'people';
+                      roleColor = '#6b7280';
+                    }
                   }
-                }
 
-                return (
-                  <Animated.View 
-                    style={[
-                      styles.residentGridCard,
-                      {
-                        opacity: fadeAnim,
-                        transform: [{
-                          translateY: fadeAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [50, 0],
-                          })
-                        }]
-                      }
-                    ]}
-                  >
-                    <View style={styles.residentGridCardContent}>
-                      {/* Main Info Row - Avatar Left, Details Right */}
-                      <View style={styles.residentGridMainInfo}>
-                        <ProfileImage 
-                          source={item.image} 
-                          size={48}
-                          initials={item.name.split(' ').map(n => n.charAt(0)).join('').substring(0, 2)}
-                          style={{ marginRight: 8 }}
-                        />
-                        
-                        <View style={styles.residentGridDetails}>
-                          {/* Name and Role Row */}
-                          <View style={styles.residentGridNameRow}>
-                            <Text style={styles.residentGridName} numberOfLines={1}>
-                              {item.name}
-                            </Text>
-                            <View style={[styles.residentGridRoleBadge, { backgroundColor: roleColor + '20' }]}>
-                              <Ionicons name={roleIcon as any} size={12} color={roleColor} />
-                              <Text style={[styles.residentGridRoleText, { color: roleColor }]} numberOfLines={1}>
-                                {item.position || 'Board Member'}
+                  return (
+                    <View key={item._id} style={{ width: '50%', padding: 8 }}>
+                      <Animated.View 
+                        style={[
+                          styles.residentGridCard,
+                          {
+                            opacity: fadeAnim,
+                            transform: [{
+                              translateY: fadeAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [50, 0],
+                              })
+                            }]
+                          }
+                        ]}
+                      >
+                        <View style={styles.residentGridCardContent}>
+                          {/* Main Info Row - Avatar Left, Details Right */}
+                          <View style={styles.residentGridMainInfo}>
+                            <ProfileImage 
+                              source={item.image} 
+                              size={40}
+                              initials={item.name.split(' ').map((n: string) => n.charAt(0)).join('').substring(0, 2)}
+                              style={{ marginRight: 6 }}
+                            />
+                            
+                            <View style={styles.residentGridDetails}>
+                              {/* Name and Role Row */}
+                              <View style={styles.residentGridNameRow}>
+                                <Text style={styles.residentGridName} numberOfLines={1}>
+                                  {item.name}
+                                </Text>
+                                <View style={[styles.residentGridRoleBadge, { backgroundColor: roleColor + '20' }]}>
+                                  <Ionicons name={roleIcon as any} size={12} color={roleColor} />
+                                  <Text style={[styles.residentGridRoleText, { color: roleColor }]} numberOfLines={1}>
+                                    {item.position || 'Board Member'}
+                                  </Text>
+                                </View>
+                              </View>
+                              
+                              {/* Email */}
+                              <Text style={styles.residentGridEmail} numberOfLines={1}>
+                                {item.email}
                               </Text>
+                              
+                              {/* Phone */}
+                              {item.phone && (
+                                <Text style={styles.residentGridAddress} numberOfLines={1}>
+                                  {item.phone}
+                                </Text>
+                              )}
+                              
+                              {/* Term End */}
+                              {item.termEnd && (
+                                <Text style={styles.residentGridAddress} numberOfLines={1}>
+                                  Term: {item.termEnd}
+                                </Text>
+                              )}
                             </View>
                           </View>
                           
-                          {/* Email */}
-                          <Text style={styles.residentGridEmail} numberOfLines={2}>
-                            {item.email}
-                          </Text>
-                          
-                          {/* Phone */}
-                          {item.phone && (
-                            <Text style={styles.residentGridAddress} numberOfLines={1}>
-                              {item.phone}
-                            </Text>
-                          )}
-                          
-                          {/* Term End */}
-                          {item.termEnd && (
-                            <Text style={styles.residentGridAddress} numberOfLines={1}>
-                              Term: {item.termEnd}
-                            </Text>
-                          )}
+                          {/* Action Buttons */}
+                          <View style={styles.residentGridActions}>
+                            <View style={styles.boardActionButtons}>
+                              <TouchableOpacity
+                                style={[styles.boardActionButton, styles.editButton]}
+                                onPress={() => handleEditBoardMember(item)}
+                              >
+                                <Ionicons name="create" size={14} color="#2563eb" />
+                                <Text style={styles.residentGridActionText}>Edit</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[styles.boardActionButton, styles.blockButton]}
+                                onPress={() => handleDeleteItem(item, 'board')}
+                              >
+                                <Ionicons name="trash" size={14} color="#ef4444" />
+                                <Text style={styles.residentGridActionText}>Delete</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
                         </View>
-                      </View>
-                      
-                      {/* Action Buttons */}
-                      <View style={styles.residentGridActions}>
-                        <View style={styles.boardActionButtons}>
-                          <TouchableOpacity
-                            style={[styles.boardActionButton, styles.editButton]}
-                            onPress={() => handleEditBoardMember(item)}
-                          >
-                            <Ionicons name="create" size={16} color="#2563eb" />
-                            <Text style={styles.residentGridActionText}>Edit</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[styles.boardActionButton, styles.blockButton]}
-                            onPress={() => handleDeleteItem(item, 'board')}
-                          >
-                            <Ionicons name="trash" size={16} color="#ef4444" />
-                            <Text style={styles.residentGridActionText}>Delete</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
+                      </Animated.View>
                     </View>
-                  </Animated.View>
-                );
-              }}
-              ListEmptyComponent={
-                <View style={styles.emptyState}>
-                  <Ionicons name="people" size={48} color="#9ca3af" />
-                  <Text style={styles.emptyStateText}>No board members found</Text>
-                </View>
-              }
-            />
+                  );
+                })}
+              </View>
+            )}
           </View>
         );
       
@@ -1705,120 +1730,117 @@ const AdminScreen = () => {
                 </TouchableOpacity>
               </Animated.View>
             </View>
-            <FlatList
-              data={covenants}
-              keyExtractor={(item) => item._id}
-              numColumns={2}
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-              }
-              renderItem={({ item }) => {
-                // Determine covenant icon and color based on category
-                let covenantIcon = 'document-text';
-                let covenantColor = '#6b7280';
-                
-                if (item.category === 'Architecture') {
-                  covenantIcon = 'home';
-                  covenantColor = '#8b5cf6';
-                } else if (item.category === 'Landscaping') {
-                  covenantIcon = 'leaf';
-                  covenantColor = '#10b981';
-                } else if (item.category === 'Minutes') {
-                  covenantIcon = 'clipboard';
-                  covenantColor = '#06b6d4';
-                } else if (item.category === 'Caveats') {
-                  covenantIcon = 'warning';
-                  covenantColor = '#f59e0b';
-                } else if (item.category === 'General') {
-                  covenantIcon = 'document-text';
-                  covenantColor = '#6b7280';
-                } else {
-                  covenantIcon = 'document-text';
-                  covenantColor = '#6b7280';
-                }
+            {covenants.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="document-text" size={48} color="#9ca3af" />
+                <Text style={styles.emptyStateText}>No covenants found</Text>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                {covenants.map((item: any, index: number) => {
+                  // Determine covenant icon and color based on category
+                  let covenantIcon = 'document-text';
+                  let covenantColor = '#6b7280';
+                  
+                  if (item.category === 'Architecture') {
+                    covenantIcon = 'home';
+                    covenantColor = '#8b5cf6';
+                  } else if (item.category === 'Landscaping') {
+                    covenantIcon = 'leaf';
+                    covenantColor = '#10b981';
+                  } else if (item.category === 'Minutes') {
+                    covenantIcon = 'clipboard';
+                    covenantColor = '#06b6d4';
+                  } else if (item.category === 'Caveats') {
+                    covenantIcon = 'warning';
+                    covenantColor = '#f59e0b';
+                  } else if (item.category === 'General') {
+                    covenantIcon = 'document-text';
+                    covenantColor = '#6b7280';
+                  } else {
+                    covenantIcon = 'document-text';
+                    covenantColor = '#6b7280';
+                  }
 
-                return (
-                  <Animated.View 
-                    style={[
-                      styles.residentGridCard,
-                      {
-                        opacity: fadeAnim,
-                        transform: [{
-                          translateY: fadeAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [50, 0],
-                          })
-                        }]
-                      }
-                    ]}
-                  >
-                    <View style={styles.residentGridCardContent}>
-                      {/* Main Info Row - Icon Left, Details Right */}
-                      <View style={styles.residentGridMainInfo}>
-                        <View style={styles.residentGridAvatar}>
-                          <View style={[styles.postAvatarPlaceholder, { backgroundColor: covenantColor + '20' }]}>
-                            <Ionicons name={covenantIcon as any} size={24} color={covenantColor} />
-                          </View>
-                        </View>
-                        
-                        <View style={styles.residentGridDetails}>
-                          {/* Title and Category Row */}
-                          <View style={styles.residentGridNameRow}>
-                            <Text style={styles.residentGridName} numberOfLines={2}>
-                              {item.title}
-                            </Text>
-                            <View style={[styles.residentGridRoleBadge, { backgroundColor: covenantColor + '20' }]}>
-                              <Ionicons name={covenantIcon as any} size={12} color={covenantColor} />
-                              <Text style={[styles.residentGridRoleText, { color: covenantColor }]} numberOfLines={1}>
-                                {item.category}
+                  return (
+                    <View key={item._id} style={{ width: '50%', padding: 8 }}>
+                      <Animated.View 
+                        style={[
+                          styles.residentGridCard,
+                          {
+                            opacity: fadeAnim,
+                            transform: [{
+                              translateY: fadeAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [50, 0],
+                              })
+                            }]
+                          }
+                        ]}
+                      >
+                        <View style={styles.residentGridCardContent}>
+                          {/* Main Info Row - Icon Left, Details Right */}
+                          <View style={styles.residentGridMainInfo}>
+                            <View style={styles.residentGridAvatar}>
+                              <View style={[styles.postAvatarPlaceholder, { backgroundColor: covenantColor + '20' }]}>
+                                <Ionicons name={covenantIcon as any} size={20} color={covenantColor} />
+                              </View>
+                            </View>
+                            
+                            <View style={styles.residentGridDetails}>
+                              {/* Title and Category Row */}
+                              <View style={styles.residentGridNameRow}>
+                                <Text style={styles.residentGridName} numberOfLines={2}>
+                                  {item.title}
+                                </Text>
+                                <View style={[styles.residentGridRoleBadge, { backgroundColor: covenantColor + '20' }]}>
+                                  <Ionicons name={covenantIcon as any} size={12} color={covenantColor} />
+                                  <Text style={[styles.residentGridRoleText, { color: covenantColor }]} numberOfLines={1}>
+                                    {item.category}
+                                  </Text>
+                                </View>
+                              </View>
+                              
+                              {/* Last Updated */}
+                              {item.lastUpdated && (
+                                <Text style={styles.residentGridEmail} numberOfLines={1}>
+                                  Updated: {item.lastUpdated}
+                                </Text>
+                              )}
+                              
+                              {/* Description */}
+                              <Text style={styles.residentGridAddress} numberOfLines={2}>
+                                {item.description}
                               </Text>
                             </View>
                           </View>
                           
-                          {/* Last Updated */}
-                          {item.lastUpdated && (
-                            <Text style={styles.residentGridEmail} numberOfLines={1}>
-                              Updated: {item.lastUpdated}
-                            </Text>
-                          )}
-                          
-                          {/* Description */}
-                          <Text style={styles.residentGridAddress} numberOfLines={3}>
-                            {item.description}
-                          </Text>
+                          {/* Action Buttons */}
+                          <View style={styles.residentGridActions}>
+                            <View style={styles.boardActionButtons}>
+                              <TouchableOpacity
+                                style={[styles.boardActionButton, styles.editButton]}
+                                onPress={() => handleEditCovenant(item)}
+                              >
+                                <Ionicons name="create" size={14} color="#2563eb" />
+                                <Text style={styles.residentGridActionText}>Edit</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[styles.boardActionButton, styles.blockButton]}
+                                onPress={() => handleDeleteItem(item, 'covenant')}
+                              >
+                                <Ionicons name="trash" size={14} color="#ef4444" />
+                                <Text style={styles.residentGridActionText}>Delete</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
                         </View>
-                      </View>
-                      
-                      {/* Action Buttons */}
-                      <View style={styles.residentGridActions}>
-                        <View style={styles.boardActionButtons}>
-                          <TouchableOpacity
-                            style={[styles.boardActionButton, styles.editButton]}
-                            onPress={() => handleEditCovenant(item)}
-                          >
-                            <Ionicons name="create" size={16} color="#2563eb" />
-                            <Text style={styles.residentGridActionText}>Edit</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[styles.boardActionButton, styles.blockButton]}
-                            onPress={() => handleDeleteItem(item, 'covenant')}
-                          >
-                            <Ionicons name="trash" size={16} color="#ef4444" />
-                            <Text style={styles.residentGridActionText}>Delete</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
+                      </Animated.View>
                     </View>
-                  </Animated.View>
-                );
-              }}
-              ListEmptyComponent={
-                <View style={styles.emptyState}>
-                  <Ionicons name="document-text" size={48} color="#9ca3af" />
-                  <Text style={styles.emptyStateText}>No covenants found</Text>
-                </View>
-              }
-            />
+                  );
+                })}
+              </View>
+            )}
           </View>
         );
       
@@ -1833,247 +1855,150 @@ const AdminScreen = () => {
             <ScrollView 
               horizontal 
               showsHorizontalScrollIndicator={false}
-              style={styles.subTabsContainer}
-              contentContainerStyle={styles.subTabsContent}
+              style={styles.communitySubTabsContainer}
+              contentContainerStyle={styles.communitySubTabsContent}
             >
               <TouchableOpacity
-                style={[styles.subTab, postsSubTab === 'complaints' && styles.activeSubTab]}
+                style={[styles.communitySubTab, postsSubTab === 'complaints' && styles.activeCommunitySubTab]}
                 onPress={() => setPostsSubTab('complaints')}
               >
                 <Ionicons name="warning" size={18} color={postsSubTab === 'complaints' ? '#3b82f6' : '#6b7280'} />
-                <Text style={[styles.subTabText, postsSubTab === 'complaints' && styles.activeSubTabText]}>
+                <Text style={[styles.communitySubTabText, postsSubTab === 'complaints' && styles.activeCommunitySubTabText]}>
                   Complaints ({communityPosts.filter((p: any) => p.category === 'Complaint').length})
                 </Text>
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={[styles.subTab, postsSubTab === 'posts' && styles.activeSubTab]}
+                style={[styles.communitySubTab, postsSubTab === 'posts' && styles.activeCommunitySubTab]}
                 onPress={() => setPostsSubTab('posts')}
               >
                 <Ionicons name="chatbubbles" size={18} color={postsSubTab === 'posts' ? '#3b82f6' : '#6b7280'} />
-                <Text style={[styles.subTabText, postsSubTab === 'posts' && styles.activeSubTabText]}>
+                <Text style={[styles.communitySubTabText, postsSubTab === 'posts' && styles.activeCommunitySubTabText]}>
                   Posts ({communityPosts.filter((p: any) => p.category !== 'Complaint').length})
                 </Text>
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={[styles.subTab, postsSubTab === 'comments' && styles.activeSubTab]}
+                style={[styles.communitySubTab, postsSubTab === 'comments' && styles.activeCommunitySubTab]}
                 onPress={() => setPostsSubTab('comments')}
               >
                 <Ionicons name="chatbox" size={18} color={postsSubTab === 'comments' ? '#3b82f6' : '#6b7280'} />
-                <Text style={[styles.subTabText, postsSubTab === 'comments' && styles.activeSubTabText]}>
+                <Text style={[styles.communitySubTabText, postsSubTab === 'comments' && styles.activeCommunitySubTabText]}>
                   Comments ({comments.length})
                 </Text>
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={[styles.subTab, postsSubTab === 'polls' && styles.activeSubTab]}
+                style={[styles.communitySubTab, postsSubTab === 'polls' && styles.activeCommunitySubTab]}
                 onPress={() => setPostsSubTab('polls')}
               >
                 <Ionicons name="bar-chart" size={18} color={postsSubTab === 'polls' ? '#3b82f6' : '#6b7280'} />
-                <Text style={[styles.subTabText, postsSubTab === 'polls' && styles.activeSubTabText]}>
+                <Text style={[styles.communitySubTabText, postsSubTab === 'polls' && styles.activeCommunitySubTabText]}>
                   Polls ({polls.length})
                 </Text>
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={[styles.subTab, postsSubTab === 'pets' && styles.activeSubTab]}
+                style={[styles.communitySubTab, postsSubTab === 'pets' && styles.activeCommunitySubTab]}
                 onPress={() => setPostsSubTab('pets')}
               >
                 <Ionicons name="paw" size={18} color={postsSubTab === 'pets' ? '#3b82f6' : '#6b7280'} />
-                <Text style={[styles.subTabText, postsSubTab === 'pets' && styles.activeSubTabText]}>
+                <Text style={[styles.communitySubTabText, postsSubTab === 'pets' && styles.activeCommunitySubTabText]}>
                   Pets ({pets.length})
                 </Text>
               </TouchableOpacity>
             </ScrollView>
             
             {postsSubTab === 'posts' && (
-            <FlatList
-              data={communityPosts.filter((p: any) => p.category !== 'Complaint')}
-              keyExtractor={(item) => item._id}
-              numColumns={2}
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-              }
-              renderItem={({ item }) => (
-                <Animated.View 
-                  style={[
-                    styles.residentGridCard,
-                    {
-                      opacity: fadeAnim,
-                      transform: [{
-                        translateY: fadeAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [50, 0],
-                        })
-                      }]
-                    }
-                  ]}
-                >
-                  <View style={styles.residentGridCardContent}>
-                    {/* Main Info Row - Icon Left, Details Right */}
-                    <View style={styles.residentGridMainInfo}>
-                      <ProfileImage 
-                        source={item.authorProfileImage} 
-                        size={48}
-                        style={{ marginRight: 12 }}
-                      />
-                      
-                      <View style={styles.residentGridDetails}>
-                        {/* Title */}
-                        <Text style={styles.postTitleText}>
-                          {item.title}
-                        </Text>
-                        
-                        {/* Date */}
-                        <Text style={styles.postDateText}>
-                          {formatDate(item.createdAt)}
-                        </Text>
-                        
-                        {/* Author */}
-                        <Text style={styles.residentGridEmail} numberOfLines={1}>
-                          By: {item.author}
-                        </Text>
-                        
-                        {/* Content */}
-                        <Text style={styles.postContentText}>
-                          {item.content}
-                        </Text>
-                      </View>
-                    </View>
-                    
-                    {/* Action Button */}
-                    <View style={styles.residentGridActions}>
-                      <TouchableOpacity
-                        style={[styles.residentGridActionButton, styles.blockButton]}
-                        onPress={() => handleDeleteItem(item, 'post')}
-                      >
-                        <Ionicons name="trash" size={16} color="#ef4444" />
-                        <Text style={styles.residentGridActionText}>Delete</Text>
-                      </TouchableOpacity>
-                    </View>
+              (() => {
+                const filteredPosts = communityPosts.filter((p: any) => p.category !== 'Complaint');
+                return filteredPosts.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <Ionicons name="document-text" size={48} color="#9ca3af" />
+                    <Text style={styles.emptyStateText}>No posts found</Text>
                   </View>
-                </Animated.View>
-              )}
-              ListEmptyComponent={
-                <View style={styles.emptyState}>
-                  <Ionicons name="document-text" size={48} color="#9ca3af" />
-                  <Text style={styles.emptyStateText}>No posts found</Text>
-                </View>
-              }
-            />
+                ) : (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                    {filteredPosts.map((item: any) => (
+                      <View key={item._id} style={{ width: '50%', padding: 8 }}>
+                        <Animated.View 
+                          style={[
+                            styles.residentGridCard,
+                            {
+                              opacity: fadeAnim,
+                              transform: [{
+                                translateY: fadeAnim.interpolate({
+                                  inputRange: [0, 1],
+                                  outputRange: [50, 0],
+                                })
+                              }]
+                            }
+                          ]}
+                        >
+                          <View style={styles.residentGridCardContent}>
+                            {/* Main Info Row - Icon Left, Details Right */}
+                            <View style={styles.residentGridMainInfo}>
+                              <ProfileImage 
+                                source={item.authorProfileImage} 
+                                size={48}
+                                style={{ marginRight: 12 }}
+                              />
+                              
+                              <View style={styles.residentGridDetails}>
+                                {/* Title */}
+                                <Text style={styles.postTitleText}>
+                                  {item.title}
+                                </Text>
+                                
+                                {/* Date */}
+                                <Text style={styles.postDateText}>
+                                  {formatDate(item.createdAt)}
+                                </Text>
+                                
+                                {/* Author */}
+                                <Text style={styles.residentGridEmail} numberOfLines={1}>
+                                  By: {item.author}
+                                </Text>
+                                
+                                {/* Content */}
+                                <Text style={styles.postContentText}>
+                                  {item.content}
+                                </Text>
+                              </View>
+                            </View>
+                            
+                            {/* Action Button */}
+                            <View style={styles.residentGridActions}>
+                              <TouchableOpacity
+                                style={[styles.residentGridActionButton, styles.blockButton]}
+                                onPress={() => handleDeleteItem(item, 'post')}
+                              >
+                                <Ionicons name="trash" size={16} color="#ef4444" />
+                                <Text style={styles.residentGridActionText}>Delete</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        </Animated.View>
+                      </View>
+                    ))}
+                  </View>
+                );
+              })()
             )}
             
             {postsSubTab === 'comments' && (
-              <FlatList
-                data={comments}
-                keyExtractor={(item) => item._id}
-                numColumns={2}
-                refreshControl={
-                  <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-                }
-                renderItem={({ item }) => (
-                  <Animated.View 
-                    style={[
-                      styles.residentGridCard,
-                      {
-                        opacity: fadeAnim,
-                        transform: [{
-                          translateY: fadeAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [50, 0],
-                          })
-                        }]
-                      }
-                    ]}
-                  >
-                    <View style={styles.residentGridCardContent}>
-                      {/* Main Info Row - Icon Left, Details Right */}
-                      <View style={styles.residentGridMainInfo}>
-                        <ProfileImage 
-                          source={item.authorProfileImage} 
-                          size={48}
-                          style={{ marginRight: 12 }}
-                        />
-                        
-                        <View style={styles.residentGridDetails}>
-                          {/* Post Title */}
-                          <Text style={styles.postTitleText}>
-                            {item.postTitle}
-                          </Text>
-                          
-                          {/* Date */}
-                          <Text style={styles.postDateText}>
-                            {formatDate(item.createdAt)}
-                          </Text>
-                          
-                          {/* Author */}
-                          <Text style={styles.residentGridEmail} numberOfLines={1}>
-                            By: {item.author}
-                          </Text>
-                          
-                          {/* Comment Content */}
-                          <Text style={styles.postContentText}>
-                            {item.content}
-                          </Text>
-                        </View>
-                      </View>
-                      
-                      {/* Action Button */}
-                      <View style={styles.residentGridActions}>
-                        <TouchableOpacity
-                          style={[styles.residentGridActionButton, styles.blockButton]}
-                          onPress={() => handleDeleteItem(item, 'comment')}
-                        >
-                          <Ionicons name="trash" size={16} color="#ef4444" />
-                          <Text style={styles.residentGridActionText}>Delete</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </Animated.View>
-                )}
-                ListEmptyComponent={
-                  <View style={styles.emptyState}>
-                    <Ionicons name="chatbubble" size={48} color="#9ca3af" />
-                    <Text style={styles.emptyStateText}>No comments found</Text>
-                  </View>
-                }
-              />
-            )}
-            
-            {postsSubTab === 'polls' && (
-              <>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Community Polls</Text>
-                  <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-                    <TouchableOpacity
-                      style={[styles.adminFeeButton, { backgroundColor: '#3b82f6' }]}
-                      onPress={() => {
-                        animateButtonPress();
-                        setShowPollModal(true);
-                        animateIn('poll');
-                      }}
-                    >
-                      <Ionicons name="add" size={16} color="#ffffff" />
-                      <Text style={styles.adminFeeButtonText}>Create Poll</Text>
-                    </TouchableOpacity>
-                  </Animated.View>
+              comments.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="chatbubble" size={48} color="#9ca3af" />
+                  <Text style={styles.emptyStateText}>No comments found</Text>
                 </View>
-                
-                {/* Polls List */}
-                <FlatList
-                  data={polls}
-                  keyExtractor={(item) => item._id}
-                  refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-                  }
-                  renderItem={({ item }) => {
-                    const poll = item as any;
-                    return (
+              ) : (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                  {comments.map((item: any) => (
+                    <View key={item._id} style={{ width: '50%', padding: 8 }}>
                       <Animated.View 
-                        key={poll._id} 
                         style={[
-                          styles.postCard,
+                          styles.residentGridCard,
                           {
                             opacity: fadeAnim,
                             transform: [{
@@ -2085,6 +2010,103 @@ const AdminScreen = () => {
                           }
                         ]}
                       >
+                        <View style={styles.residentGridCardContent}>
+                          {/* Main Info Row - Icon Left, Details Right */}
+                          <View style={styles.residentGridMainInfo}>
+                            <ProfileImage 
+                              source={item.authorProfileImage} 
+                              size={48}
+                              style={{ marginRight: 12 }}
+                            />
+                            
+                            <View style={styles.residentGridDetails}>
+                              {/* Post Title */}
+                              <Text style={styles.postTitleText}>
+                                {item.postTitle}
+                              </Text>
+                              
+                              {/* Date */}
+                              <Text style={styles.postDateText}>
+                                {formatDate(item.createdAt)}
+                              </Text>
+                              
+                              {/* Author */}
+                              <Text style={styles.residentGridEmail} numberOfLines={1}>
+                                By: {item.author}
+                              </Text>
+                              
+                              {/* Comment Content */}
+                              <Text style={styles.postContentText}>
+                                {item.content}
+                              </Text>
+                            </View>
+                          </View>
+                          
+                          {/* Action Button */}
+                          <View style={styles.residentGridActions}>
+                            <TouchableOpacity
+                              style={[styles.residentGridActionButton, styles.blockButton]}
+                              onPress={() => handleDeleteItem(item, 'comment')}
+                            >
+                              <Ionicons name="trash" size={16} color="#ef4444" />
+                              <Text style={styles.residentGridActionText}>Delete</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </Animated.View>
+                    </View>
+                  ))}
+                </View>
+              )
+            )}
+            
+            {postsSubTab === 'polls' && (
+              <>
+                <View style={styles.sectionHeader} pointerEvents="box-none">
+                  <Text style={styles.sectionTitle}>Community Polls</Text>
+                  <Animated.View style={{ transform: [{ scale: buttonScale }] }} pointerEvents="box-none">
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.adminFeeButton,
+                        { backgroundColor: '#3b82f6' },
+                        pressed && styles.adminFeeButtonPressed
+                      ]}
+                      onPress={() => {
+                        animateButtonPress();
+                        setShowPollModal(true);
+                      }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <Ionicons name="add" size={16} color="#ffffff" />
+                      <Text style={styles.adminFeeButtonText}>Create Poll</Text>
+                    </Pressable>
+                  </Animated.View>
+                </View>
+                
+                {/* Polls List */}
+                {polls.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <Ionicons name="bar-chart-outline" size={48} color="#9ca3af" />
+                    <Text style={styles.emptyStateText}>No polls found</Text>
+                    <Text style={styles.emptyStateSubtext}>Create your first community poll!</Text>
+                  </View>
+                ) : (
+                  polls.map((poll: any, index: number) => (
+                    <Animated.View 
+                      key={poll._id} 
+                      style={[
+                        styles.postCard,
+                        {
+                          opacity: fadeAnim,
+                          transform: [{
+                            translateY: fadeAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [50, 0],
+                            })
+                          }]
+                        }
+                      ]}
+                    >
                         <View style={styles.postHeader}>
                           <View style={styles.postAuthor}>
                             <View style={styles.avatar}>
@@ -2191,164 +2213,159 @@ const AdminScreen = () => {
                           </View>
                         </View>
                       </Animated.View>
-                    );
-                  }}
-                />
+                    ))
+                  )}
               </>
             )}
             
             {postsSubTab === 'pets' && (
-              <FlatList
-                data={pets}
-                keyExtractor={(item) => item._id}
-                numColumns={2}
-                refreshControl={
-                  <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-                }
-                renderItem={({ item }) => (
-                    <Animated.View 
-                      style={[
-                        styles.residentGridCard,
-                        {
-                          opacity: fadeAnim,
-                          transform: [{
-                            translateY: fadeAnim.interpolate({
-                              inputRange: [0, 1],
-                              outputRange: [50, 0],
-                            })
-                          }]
-                        }
-                      ]}
-                    >
-                      <View style={styles.residentGridCardContent}>
-                        {/* Pet Image - Centered */}
-                        <View style={styles.petCardImageContainer}>
-                          <View style={styles.petImageAvatar}>
-                            <PetImage storageId={item.image} />
+              pets.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="paw-outline" size={48} color="#9ca3af" />
+                  <Text style={styles.emptyStateText}>No pet registrations found</Text>
+                </View>
+              ) : (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                  {pets.map((item: any) => (
+                    <View key={item._id} style={{ width: '50%', padding: 8 }}>
+                      <Animated.View 
+                        style={[
+                          styles.residentGridCard,
+                          {
+                            opacity: fadeAnim,
+                            transform: [{
+                              translateY: fadeAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [50, 0],
+                              })
+                            }]
+                          }
+                        ]}
+                      >
+                        <View style={styles.residentGridCardContent}>
+                          {/* Pet Image - Centered */}
+                          <View style={styles.petCardImageContainer}>
+                            <View style={styles.petImageAvatar}>
+                              <PetImage storageId={item.image} />
+                            </View>
                           </View>
-                        </View>
-                        
-                        {/* Text Content - Underneath Image */}
-                        <View style={styles.petCardTextContent}>
-                          {/* Pet Name and Date Row */}
-                          <View style={styles.petCardNameRow}>
-                            <Text style={styles.petCardName} numberOfLines={2}>
-                              {item.name}
+                          
+                          {/* Text Content - Underneath Image */}
+                          <View style={styles.petCardTextContent}>
+                            {/* Pet Name and Date Row */}
+                            <View style={styles.petCardNameRow}>
+                              <Text style={styles.petCardName} numberOfLines={2}>
+                                {item.name}
+                              </Text>
+                              <Text style={styles.petCardDate} numberOfLines={1}>
+                                {formatDate(item.createdAt)}
+                              </Text>
+                            </View>
+                            
+                            {/* Owner */}
+                            <Text style={styles.petCardOwner} numberOfLines={1}>
+                              Owner: {item.residentName || 'Unknown'}
                             </Text>
-                            <Text style={styles.petCardDate} numberOfLines={1}>
-                              {formatDate(item.createdAt)}
+                            
+                            {/* Address */}
+                            <Text style={styles.petCardAddress} numberOfLines={2}>
+                              {item.residentAddress || ''}
                             </Text>
                           </View>
                           
-                          {/* Owner */}
-                          <Text style={styles.petCardOwner} numberOfLines={1}>
-                            Owner: {item.residentName || 'Unknown'}
-                          </Text>
-                          
-                          {/* Address */}
-                          <Text style={styles.petCardAddress} numberOfLines={2}>
-                            {item.residentAddress || ''}
-                          </Text>
+                          {/* Action Button */}
+                          <View style={styles.residentGridActions}>
+                            <TouchableOpacity
+                              style={[styles.residentGridActionButton, styles.blockButton]}
+                              onPress={() => handleDeleteItem(item, 'pet')}
+                            >
+                              <Ionicons name="trash" size={16} color="#ef4444" />
+                              <Text style={styles.residentGridActionText}>Delete</Text>
+                            </TouchableOpacity>
+                          </View>
                         </View>
-                        
-                        {/* Action Button */}
-                        <View style={styles.residentGridActions}>
-                          <TouchableOpacity
-                            style={[styles.residentGridActionButton, styles.blockButton]}
-                            onPress={() => handleDeleteItem(item, 'pet')}
-                          >
-                            <Ionicons name="trash" size={16} color="#ef4444" />
-                            <Text style={styles.residentGridActionText}>Delete</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    </Animated.View>
-                  )
-                }
-                ListEmptyComponent={
-                  <View style={styles.emptyState}>
-                    <Ionicons name="paw-outline" size={48} color="#9ca3af" />
-                    <Text style={styles.emptyStateText}>No pet registrations found</Text>
-                  </View>
-                }
-              />
+                      </Animated.View>
+                    </View>
+                  ))}
+                </View>
+              )
             )}
             
             {postsSubTab === 'complaints' && (
-              <FlatList
-                data={communityPosts.filter((p: any) => p.category === 'Complaint')}
-                keyExtractor={(item) => item._id}
-                numColumns={2}
-                refreshControl={
-                  <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-                }
-                renderItem={({ item }) => (
-                  <Animated.View 
-                    style={[
-                      styles.residentGridCard,
-                      {
-                        opacity: fadeAnim,
-                        transform: [{
-                          translateY: fadeAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [50, 0],
-                          })
-                        }]
-                      }
-                    ]}
-                  >
-                    <View style={styles.residentGridCardContent}>
-                      {/* Main Info Row - Icon Left, Details Right */}
-                      <View style={styles.residentGridMainInfo}>
-                        <ProfileImage 
-                          source={item.authorProfileImage} 
-                          size={48}
-                          style={{ marginRight: 12 }}
-                        />
-                        
-                        <View style={styles.residentGridDetails}>
-                          {/* Title */}
-                          <Text style={styles.postTitleText}>
-                            {item.title}
-                          </Text>
-                          
-                          {/* Date */}
-                          <Text style={styles.postDateText}>
-                            {formatDate(item.createdAt)}
-                          </Text>
-                          
-                          {/* Author */}
-                          <Text style={styles.residentGridEmail} numberOfLines={1}>
-                            By: {item.author}
-                          </Text>
-                          
-                          {/* Content */}
-                          <Text style={styles.postContentText}>
-                            {item.content}
-                          </Text>
-                        </View>
-                      </View>
-                      
-                      {/* Action Button */}
-                      <View style={styles.residentGridActions}>
-                        <TouchableOpacity
-                          style={[styles.residentGridActionButton, styles.blockButton]}
-                          onPress={() => handleDeleteItem(item, 'post')}
-                        >
-                          <Ionicons name="trash" size={16} color="#ef4444" />
-                          <Text style={styles.residentGridActionText}>Delete</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </Animated.View>
-                )}
-                ListEmptyComponent={
+              (() => {
+                const filteredComplaints = communityPosts.filter((p: any) => p.category === 'Complaint');
+                return filteredComplaints.length === 0 ? (
                   <View style={styles.emptyState}>
                     <Ionicons name="warning-outline" size={48} color="#9ca3af" />
                     <Text style={styles.emptyStateText}>No complaints found</Text>
                   </View>
-                }
-              />
+                ) : (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                    {filteredComplaints.map((item: any) => (
+                      <View key={item._id} style={{ width: '50%', padding: 8 }}>
+                        <Animated.View 
+                          style={[
+                            styles.residentGridCard,
+                            {
+                              opacity: fadeAnim,
+                              transform: [{
+                                translateY: fadeAnim.interpolate({
+                                  inputRange: [0, 1],
+                                  outputRange: [50, 0],
+                                })
+                              }]
+                            }
+                          ]}
+                        >
+                          <View style={styles.residentGridCardContent}>
+                            {/* Main Info Row - Icon Left, Details Right */}
+                            <View style={styles.residentGridMainInfo}>
+                              <ProfileImage 
+                                source={item.authorProfileImage} 
+                                size={48}
+                                style={{ marginRight: 12 }}
+                              />
+                              
+                              <View style={styles.residentGridDetails}>
+                                {/* Title */}
+                                <Text style={styles.postTitleText}>
+                                  {item.title}
+                                </Text>
+                                
+                                {/* Date */}
+                                <Text style={styles.postDateText}>
+                                  {formatDate(item.createdAt)}
+                                </Text>
+                                
+                                {/* Author */}
+                                <Text style={styles.residentGridEmail} numberOfLines={1}>
+                                  By: {item.author}
+                                </Text>
+                                
+                                {/* Content */}
+                                <Text style={styles.postContentText}>
+                                  {item.content}
+                                </Text>
+                              </View>
+                            </View>
+                            
+                            {/* Action Button */}
+                            <View style={styles.residentGridActions}>
+                              <TouchableOpacity
+                                style={[styles.residentGridActionButton, styles.blockButton]}
+                                onPress={() => handleDeleteItem(item, 'post')}
+                              >
+                                <Ionicons name="trash" size={16} color="#ef4444" />
+                                <Text style={styles.residentGridActionText}>Delete</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        </Animated.View>
+                      </View>
+                    ))}
+                  </View>
+                );
+              })()
             )}
           </View>
         );
@@ -2364,25 +2381,25 @@ const AdminScreen = () => {
             <ScrollView 
               horizontal 
               showsHorizontalScrollIndicator={false}
-              style={styles.subTabsContainer}
-              contentContainerStyle={styles.subTabsContent}
+              style={styles.feesSubTabsContainer}
+              contentContainerStyle={styles.feesSubTabsContent}
             >
               <TouchableOpacity
-                style={[styles.subTab, feesSubTab === 'dues' && styles.activeFeesSubTab]}
+                style={[styles.feesSubTab, feesSubTab === 'dues' && styles.activeFeesSubTabStyle]}
                 onPress={() => setFeesSubTab('dues')}
               >
                 <Ionicons name="card" size={18} color={feesSubTab === 'dues' ? '#ec4899' : '#6b7280'} />
-                <Text style={[styles.subTabText, feesSubTab === 'dues' && styles.activeFeesSubTabText]}>
+                <Text style={[styles.feesSubTabText, feesSubTab === 'dues' && styles.activeFeesSubTabTextStyle]}>
                   Dues Management
                 </Text>
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={[styles.subTab, feesSubTab === 'residents' && styles.activeFeesSubTab]}
+                style={[styles.feesSubTab, feesSubTab === 'residents' && styles.activeFeesSubTabStyle]}
                 onPress={() => setFeesSubTab('residents')}
               >
                 <Ionicons name="people" size={18} color={feesSubTab === 'residents' ? '#ec4899' : '#6b7280'} />
-                <Text style={[styles.subTabText, feesSubTab === 'residents' && styles.activeFeesSubTabText]}>
+                <Text style={[styles.feesSubTabText, feesSubTab === 'residents' && styles.activeFeesSubTabTextStyle]}>
                   Residents
                 </Text>
               </TouchableOpacity>
@@ -2551,21 +2568,32 @@ const AdminScreen = () => {
             
             {/* Fees and Fines Status Grid */}
             <View style={isMobileDevice || screenWidth < 768 ? styles.feesGridContainerMobile : {}}>
-              <FlatList
-                key={`fees-grid-${isMobileDevice || screenWidth < 768 ? 1 : 2}`}
-                data={homeownersWithFeesOrFines}
-                keyExtractor={(item) => item._id}
-                numColumns={isMobileDevice || screenWidth < 768 ? 1 : 2}
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-              }
-              renderItem={({ item }) => {
-                const homeowner = item as any;
-                // Get fees and fines for this homeowner from cached maps
-                const homeownerFees = feesByUserId.get(homeowner._id) || [];
-                const homeownerFines = finesByResidentId.get(homeowner._id) || [];
-                  const isSingleColumn = isMobileDevice || screenWidth < 768;
-                  return (
+              {homeownersWithFeesOrFines.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="card" size={48} color="#9ca3af" />
+                  <Text style={styles.emptyStateText}>No homeowners found</Text>
+                  <Text style={styles.emptyStateSubtext}>
+                    Homeowners will appear here once they are registered in the system
+                  </Text>
+                </View>
+              ) : (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                  {homeownersWithFeesOrFines.map((homeowner: any) => {
+                    // Get fees and fines for this homeowner from cached maps
+                    const homeownerFees = feesByUserId.get(homeowner._id) || [];
+                    const homeownerFines = finesByResidentId.get(homeowner._id) || [];
+                    const isSingleColumn = isMobileDevice || screenWidth < 768;
+                    const numColumns = isSingleColumn ? 1 : (screenWidth >= 1024 ? 4 : 2);
+                    const itemWidth = isSingleColumn ? ('100%' as const) : (`${100 / numColumns}%` as const);
+                    
+                    return (
+                      <View 
+                        key={homeowner._id} 
+                        style={{ 
+                          width: itemWidth as any,
+                          padding: isSingleColumn ? 0 : 8 
+                        }}
+                      >
                     <Animated.View 
                       style={[
                         styles.gridCard,
@@ -2786,18 +2814,11 @@ const AdminScreen = () => {
                         )}
                       </View>
                     </Animated.View>
-                  );
-              }}
-              ListEmptyComponent={
-                <View style={styles.emptyState}>
-                  <Ionicons name="card" size={48} color="#9ca3af" />
-                  <Text style={styles.emptyStateText}>No homeowners found</Text>
-                  <Text style={styles.emptyStateSubtext}>
-                    Homeowners will appear here once they are registered in the system
-                  </Text>
+                      </View>
+                    );
+                  })}
                 </View>
-              }
-            />
+              )}
             </View>
               </View>
             )}
@@ -3125,11 +3146,13 @@ const AdminScreen = () => {
           })}
         >
           {/* Header with ImageBackground */}
-          <ImageBackground
-            source={require('../../assets/hoa-4k.jpg')}
-            style={styles.header}
-            imageStyle={styles.headerImage}
-          >
+          <View style={Platform.OS === 'ios' ? styles.headerContainerIOS : undefined}>
+            <ImageBackground
+              source={require('../../assets/hoa-4k.jpg')}
+              style={styles.header}
+              imageStyle={styles.headerImage}
+              resizeMode="stretch"
+            >
             <View style={styles.headerOverlay} />
             <View style={styles.headerTop}>
               {/* Hamburger Menu - Only when mobile nav is shown */}
@@ -3155,7 +3178,8 @@ const AdminScreen = () => {
                 </View>
               </View>
             </View>
-          </ImageBackground>
+            </ImageBackground>
+          </View>
 
           {/* Custom Tab Bar - Only when screen is wide enough */}
           {showDesktopNav && (
@@ -3384,7 +3408,11 @@ const AdminScreen = () => {
                 </TouchableOpacity>
               </View>
               
-              <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
+              <ScrollView 
+                style={styles.modalForm} 
+                contentContainerStyle={styles.modalFormContent}
+                showsVerticalScrollIndicator={false}
+              >
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Name *</Text>
                   <TextInput
@@ -3490,24 +3518,24 @@ const AdminScreen = () => {
                     autoCapitalize="words"
                   />
                 </View>
-              </ScrollView>
 
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={handleCancelBoardMember}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.confirmButton}
-                  onPress={handleSaveBoardMember}
-                >
-                  <Text style={styles.confirmButtonText}>
-                    {isEditingBoardMember ? 'Update' : 'Add'} Member
-                  </Text>
-                </TouchableOpacity>
-              </View>
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={handleCancelBoardMember}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.confirmButton}
+                    onPress={handleSaveBoardMember}
+                  >
+                    <Text style={styles.confirmButtonText}>
+                      {isEditingBoardMember ? 'Update' : 'Add'} Member
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
             </Animated.View>
           </Animated.View>
         </Modal>
@@ -3537,7 +3565,11 @@ const AdminScreen = () => {
                 </TouchableOpacity>
               </View>
               
-              <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
+              <ScrollView 
+                style={styles.modalForm} 
+                contentContainerStyle={styles.modalFormContent}
+                showsVerticalScrollIndicator={false}
+              >
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Year *</Text>
                   <TextInput
@@ -3617,7 +3649,11 @@ const AdminScreen = () => {
                 </TouchableOpacity>
               </View>
               
-              <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
+              <ScrollView 
+                style={styles.modalForm} 
+                contentContainerStyle={styles.modalFormContent}
+                showsVerticalScrollIndicator={false}
+              >
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Select Property Address *</Text>
                   <ScrollView style={styles.addressSelector} nestedScrollEnabled>
@@ -3727,7 +3763,11 @@ const AdminScreen = () => {
                 </TouchableOpacity>
               </View>
               
-              <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
+              <ScrollView 
+                style={styles.modalForm} 
+                contentContainerStyle={styles.modalFormContent}
+                showsVerticalScrollIndicator={false}
+              >
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>New Dues Amount ($) *</Text>
                   <Text style={styles.inputDescription}>
@@ -3786,7 +3826,11 @@ const AdminScreen = () => {
                 </TouchableOpacity>
               </View>
               
-              <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
+              <ScrollView 
+                style={styles.modalForm} 
+                contentContainerStyle={styles.modalFormContent}
+                showsVerticalScrollIndicator={false}
+              >
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Select Resident *</Text>
                   <ScrollView style={styles.addressSelector} nestedScrollEnabled>
@@ -3894,7 +3938,11 @@ const AdminScreen = () => {
                 </TouchableOpacity>
               </View>
               
-              <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
+              <ScrollView 
+                style={styles.modalForm} 
+                contentContainerStyle={styles.modalFormContent}
+                showsVerticalScrollIndicator={false}
+              >
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Title *</Text>
                   <TextInput
@@ -4021,19 +4069,22 @@ const AdminScreen = () => {
 
         {/* Poll Modal */}
         <Modal
+          key={`poll-modal-${showPollModal}`}
           visible={showPollModal}
           transparent={true}
           animationType="none"
           onRequestClose={handleCancelPoll}
         >
-          <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
+          <View style={styles.modalOverlay} pointerEvents="auto">
             <Animated.View style={[
               styles.boardMemberModalContent,
               {
                 opacity: pollModalOpacity,
                 transform: [{ translateY: pollModalTranslateY }],
               }
-            ]}>
+            ]}
+            pointerEvents="box-none"
+            >
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>
                   {isEditingPoll ? 'Edit Poll' : 'Create Poll'}
@@ -4046,7 +4097,11 @@ const AdminScreen = () => {
                 </TouchableOpacity>
               </View>
               
-              <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
+              <ScrollView 
+                style={styles.modalForm} 
+                contentContainerStyle={styles.modalFormContent}
+                showsVerticalScrollIndicator={false}
+              >
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Poll Title *</Text>
                   <TextInput
@@ -4128,27 +4183,27 @@ const AdminScreen = () => {
                     onChangeText={(text) => setPollForm(prev => ({ ...prev, expiresAt: text }))}
                   />
                 </View>
-              </ScrollView>
 
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={handleCancelPoll}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={styles.confirmButton}
-                  onPress={isEditingPoll ? handleUpdatePoll : handleCreatePoll}
-                >
-                  <Text style={styles.confirmButtonText}>
-                    {isEditingPoll ? 'Update Poll' : 'Create Poll'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={handleCancelPoll}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={styles.confirmButton}
+                    onPress={isEditingPoll ? handleUpdatePoll : handleCreatePoll}
+                  >
+                    <Text style={styles.confirmButtonText}>
+                      {isEditingPoll ? 'Update Poll' : 'Create Poll'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
             </Animated.View>
-          </Animated.View>
+          </View>
         </Modal>
           
           {/* Additional content to ensure scrollable content */}
@@ -4212,6 +4267,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
+  headerContainerIOS: {
+    width: Dimensions.get('window').width,
+    alignSelf: 'stretch',
+    overflow: 'hidden',
+  },
   header: {
     height: 240,
     padding: 20,
@@ -4219,11 +4279,19 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     position: 'relative',
     justifyContent: 'space-between',
+    width: '100%',
+    alignSelf: 'stretch',
   },
   headerImage: {
     borderRadius: 0,
     resizeMode: 'stretch',
-    width: '100%',
+    width: Platform.OS === 'ios' ? Dimensions.get('window').width + 40 : '100%',
+    height: 240,
+    position: 'absolute',
+    left: Platform.OS === 'ios' ? -20 : 0,
+    right: Platform.OS === 'ios' ? -20 : 0,
+    top: 0,
+    bottom: 0,
   },
   headerOverlay: {
     position: 'absolute',
@@ -4373,9 +4441,89 @@ const styles = StyleSheet.create({
   },
   activeFeesSubTab: {
     backgroundColor: '#eff6ff',
-    borderColor: '#ec4899',
+    borderColor: '#3b82f6',
   },
   activeFeesSubTabText: {
+    color: '#3b82f6',
+    fontWeight: '600',
+  },
+  // Community sub-tabs styles (separate for consistency)
+  communitySubTabsContainer: {
+    backgroundColor: '#f8fafc',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    maxHeight: 60,
+    paddingBottom: 3,
+    paddingTop: 3,
+  },
+  communitySubTabsContent: {
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  communitySubTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginRight: 6,
+    borderRadius: 8,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  activeCommunitySubTab: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#3b82f6',
+  },
+  communitySubTabText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#6b7280',
+    marginLeft: 6,
+  },
+  activeCommunitySubTabText: {
+    color: '#3b82f6',
+    fontWeight: '600',
+  },
+  // Fees sub-tabs styles (separate for consistency)
+  feesSubTabsContainer: {
+    backgroundColor: '#f8fafc',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    maxHeight: 150,
+    paddingBottom: 3,
+    paddingTop: 3,
+  },
+  feesSubTabsContent: {
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  feesSubTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginRight: 6,
+    borderRadius: 8,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  activeFeesSubTabStyle: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#ec4899',
+  },
+  feesSubTabText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#6b7280',
+    marginLeft: 6,
+  },
+  activeFeesSubTabTextStyle: {
     color: '#ec4899',
     fontWeight: '600',
   },
@@ -4607,6 +4755,9 @@ const styles = StyleSheet.create({
   modalForm: {
     maxHeight: 400,
     padding: 20,
+  },
+  modalFormContent: {
+    paddingBottom: 20,
   },
   inputGroup: {
     marginBottom: 20,
@@ -5121,6 +5272,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     gap: 6,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    zIndex: 10,
+    elevation: 10,
+  },
+  adminFeeButtonPressed: {
+    opacity: 0.7,
   },
   addFineButton: {
     backgroundColor: '#dc2626',
@@ -5610,9 +5769,9 @@ const styles = StyleSheet.create({
   },
   // Grid-specific resident card styles
   residentGridCard: {
-    flex: 1,
+    width: '100%',
+    height: 140,
     backgroundColor: '#ffffff',
-    margin: 4,
     borderRadius: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -5621,28 +5780,27 @@ const styles = StyleSheet.create({
     elevation: 2,
     borderWidth: 1,
     borderColor: '#f3f4f6',
-    maxWidth: '48%',
-    minHeight: 140,
   },
   residentGridCardContent: {
-    padding: 12,
-    minHeight: '100%',
+    padding: 8,
+    flex: 1,
     justifyContent: 'space-between',
   },
   residentGridMainInfo: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 6,
+    marginBottom: 4,
+    flex: 1,
   },
   residentGridDetails: {
     flex: 1,
+    minWidth: 0,
   },
   residentGridNameRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: 4,
-    minHeight: Platform.OS === 'web' ? 32 : 36,
+    marginBottom: 3,
     flexWrap: 'wrap',
   },
   residentGridName: {
@@ -5680,35 +5838,35 @@ const styles = StyleSheet.create({
   residentGridEmail: {
     fontSize: 10,
     color: '#6b7280',
-    marginBottom: 2,
-    lineHeight: 13,
+    marginBottom: 1,
+    lineHeight: 12,
   },
   residentGridAddress: {
     fontSize: 9,
     color: '#9ca3af',
-    marginBottom: 4,
+    marginBottom: 3,
     lineHeight: 11,
   },
   residentGridAvatar: {
-    marginRight: 8,
+    marginRight: 6,
   },
   postAvatarContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     overflow: 'hidden',
     borderWidth: 2,
     borderColor: '#e5e7eb',
   },
   postAvatarImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   postAvatarPlaceholder: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#f3f4f6',
     borderWidth: 2,
     borderColor: '#e5e7eb',
@@ -5737,14 +5895,15 @@ const styles = StyleSheet.create({
   },
   residentGridActions: {
     alignItems: 'flex-end',
+    marginTop: 'auto',
   },
   residentGridActionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 8,
-    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 3,
   },
   residentGridActionText: {
     fontSize: 9,

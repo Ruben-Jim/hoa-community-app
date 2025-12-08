@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -36,6 +36,9 @@ const CovenantsScreen = () => {
   const showMobileNav = isMobileDevice || screenWidth < 1024; // Always mobile on mobile devices, responsive on web
   const showDesktopNav = !isMobileDevice && screenWidth >= 1024; // Only desktop nav on web when wide enough
 
+  // ScrollView ref for better control
+  const scrollViewRef = useRef<ScrollView>(null);
+
   // Listen for window size changes (only on web/desktop)
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -47,8 +50,30 @@ const CovenantsScreen = () => {
     }
   }, []);
 
+  // Set initial cursor and cleanup on unmount (web only)
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      // Set initial cursor
+      document.body.style.cursor = 'grab';
+      
+      // Ensure scroll view is properly initialized
+      setTimeout(() => {
+        if (scrollViewRef.current) {
+          // Force a layout update
+          scrollViewRef.current.scrollTo({ y: 0, animated: false });
+        }
+      }, 100);
+      
+      return () => {
+        document.body.style.cursor = 'default';
+      };
+    }
+  }, [screenWidth, showMobileNav, showDesktopNav]);
+
   const categories = ['Architecture', 'Landscaping', 'Minutes', 'Caveats', 'General'];
-  const covenants = useQuery(api.covenants.getAll) ?? [];
+  const [covenantsLimit, setCovenantsLimit] = useState(50);
+  const covenantsData = useQuery(api.covenants.getPaginated, { limit: covenantsLimit, offset: 0 });
+  const covenants = covenantsData?.items ?? [];
 
   const filteredCovenants = covenants.filter((covenant: any) => {
     const matchesSearch = covenant.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -111,19 +136,48 @@ const CovenantsScreen = () => {
       )}
       
       <ScrollView 
-        style={styles.scrollContainer}
+        ref={scrollViewRef}
+        style={[styles.scrollContainer, Platform.OS === 'web' && styles.webScrollContainer]}
+        contentContainerStyle={[styles.scrollContent, Platform.OS === 'web' && styles.webScrollContent]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={true}
         bounces={true}
         scrollEnabled={true}
+        alwaysBounceVertical={false}
+        nestedScrollEnabled={true}
+        removeClippedSubviews={false}
+        scrollEventThrottle={16}
+        decelerationRate="normal"
+        directionalLockEnabled={true}
+        canCancelContentTouches={true}
+        // Web-specific enhancements
+        {...(Platform.OS === 'web' && {
+          onScrollBeginDrag: () => {
+            if (Platform.OS === 'web') {
+              document.body.style.cursor = 'grabbing';
+              document.body.style.userSelect = 'none';
+            }
+          },
+          onScrollEndDrag: () => {
+            if (Platform.OS === 'web') {
+              document.body.style.cursor = 'grab';
+              document.body.style.userSelect = 'auto';
+            }
+          },
+          onScroll: () => {
+            // Ensure scrolling is working
+          },
+        })}
       >
         {/* Header with ImageBackground */}
-        <ImageBackground
-          source={require('../../assets/hoa-4k.jpg')}
-          style={styles.header}
-          imageStyle={styles.headerImage}
-        >
+        <View style={Platform.OS === 'ios' ? styles.headerContainerIOS : undefined}>
+          <ImageBackground
+            source={require('../../assets/hoa-4k.jpg')}
+            style={styles.header}
+            imageStyle={styles.headerImage}
+            resizeMode="stretch"
+          >
           <View style={styles.headerOverlay} />
           <View style={styles.headerTop}>
             {/* Hamburger Menu - Only when mobile nav is shown */}
@@ -149,7 +203,8 @@ const CovenantsScreen = () => {
               </View>
             </View>
           </View>
-        </ImageBackground>
+          </ImageBackground>
+        </View>
 
         {/* Custom Tab Bar - Only when screen is wide enough */}
         {showDesktopNav && (
@@ -298,6 +353,29 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flex: 1,
   },
+  webScrollContainer: {
+    ...(Platform.OS === 'web' && {
+      overflow: 'auto' as any,
+      height: '100vh' as any,
+      maxHeight: '100vh' as any,
+      position: 'relative' as any,
+    }),
+  },
+  scrollContent: {
+    paddingBottom: 20,
+  },
+  webScrollContent: {
+    ...(Platform.OS === 'web' && {
+      minHeight: '100vh' as any,
+      flexGrow: 1,
+      paddingBottom: 100 as any,
+    }),
+  },
+  headerContainerIOS: {
+    width: Dimensions.get('window').width,
+    alignSelf: 'stretch',
+    overflow: 'hidden',
+  },
   header: {
     height: 240,
     padding: 20,
@@ -305,11 +383,19 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     position: 'relative',
     justifyContent: 'space-between',
+    width: '100%',
+    alignSelf: 'stretch',
   },
   headerImage: {
     borderRadius: 0,
     resizeMode: 'stretch',
-    width: '100%',
+    width: Platform.OS === 'ios' ? Dimensions.get('window').width + 40 : '100%',
+    height: 240,
+    position: 'absolute',
+    left: Platform.OS === 'ios' ? -20 : 0,
+    right: Platform.OS === 'ios' ? -20 : 0,
+    top: 0,
+    bottom: 0,
   },
   headerOverlay: {
     position: 'absolute',

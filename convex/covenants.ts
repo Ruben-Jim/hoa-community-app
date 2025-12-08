@@ -12,6 +12,33 @@ export const getAll = query({
   },
 });
 
+// Get paginated covenants
+export const getPaginated = query({
+  args: {
+    limit: v.optional(v.number()),
+    offset: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 20;
+    const offset = args.offset ?? 0;
+    
+    // Get total count
+    const allCovenants = await ctx.db
+      .query("covenants")
+      .order("desc")
+      .collect();
+    const total = allCovenants.length;
+    
+    // Get paginated covenants
+    const covenants = allCovenants.slice(offset, offset + limit);
+    
+    return {
+      items: covenants,
+      total,
+    };
+  },
+});
+
 export const getByCategory = query({
   args: { category: v.union(
     v.literal("Architecture"),

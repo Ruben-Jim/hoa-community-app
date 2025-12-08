@@ -34,8 +34,12 @@ const HomeScreen = () => {
   const { user } = useAuth();
   const navigation = useNavigation();
   const hoaInfo = useQuery(api.hoaInfo.get);
-  const communityPosts = useQuery(api.communityPosts.getAll);
-  const polls = useQuery(api.polls.getAll);
+  // Use paginated queries with small initial limits for home screen
+  const communityPostsData = useQuery(api.communityPosts.getPaginated, { limit: 5, offset: 0 });
+  const communityPosts = communityPostsData?.items ?? [];
+  
+  const pollsData = useQuery(api.polls.getPaginated, { limit: 1, offset: 0 });
+  const polls = pollsData?.items ?? [];
   const userVotes = useQuery(api.polls.getAllUserVotes, user ? { userId: user._id } : "skip");
   const voteOnPoll = useMutation(api.polls.vote);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -294,9 +298,14 @@ const HomeScreen = () => {
           })}
         >
       {/* Header */}
-      <Animated.View style={{
-        opacity: fadeAnim,
-      }}>
+      <Animated.View
+        style={[
+          {
+            opacity: fadeAnim,
+          },
+          Platform.OS === 'ios' && styles.headerContainerIOS
+        ]}
+      >
         <ImageBackground
           source={require('../../assets/hoa-4k.jpg')}
           style={styles.header}
@@ -389,76 +398,78 @@ const HomeScreen = () => {
       </Animated.View> */}
 
       {/* Recent Community Posts */}
-      <Animated.View style={[
-        styles.section,
-        { borderLeftColor: '#ef4444' }, // Orange
-        {
-          opacity: postsAnim,
-          transform: [{
-            translateY: postsAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [50, 0],
-            })
-          }]
-        }
-      ]}>
-        <View style={styles.communityHeader}>
-          <Ionicons name="people" size={24} color="#64748b" />
-          <Text style={[styles.sectionTitle, { marginLeft: 8, marginBottom: 0 }]}>Recent Community Posts</Text>
-        </View>
-        {(communityPosts?.filter((post: any) => post.category !== 'Complaint') || []).slice(0, 2).map((post: any, index: number) => {
-          return (
-            <Animated.View 
-              key={post._id} 
-              style={[
-                styles.postCard,
-                {
-                  opacity: postsAnim,
-                  transform: [{
-                    translateY: postsAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [30 + (index * 20), 0],
-                    })
-                  }]
-                }
-              ]}
-            >
-              <View style={styles.postHeader}>
-                <View style={styles.postAuthorInfo}>
-                  <ProfileImage source={post.authorProfileImage} size={40} style={{ marginRight: 8 }} />
-                  <Text style={styles.postAuthor}>{post.author}</Text>
+      {(communityPosts?.filter((post: any) => post.category !== 'Complaint') || []).length > 0 && (
+        <Animated.View style={[
+          styles.section,
+          { borderLeftColor: '#ef4444' }, // Orange
+          {
+            opacity: postsAnim,
+            transform: [{
+              translateY: postsAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [50, 0],
+              })
+            }]
+          }
+        ]}>
+          <View style={styles.communityHeader}>
+            <Ionicons name="people" size={24} color="#64748b" />
+            <Text style={[styles.sectionTitle, { marginLeft: 8, marginBottom: 0 }]}>Recent Community Posts</Text>
+          </View>
+          {(communityPosts?.filter((post: any) => post.category !== 'Complaint') || []).slice(0, 2).map((post: any, index: number) => {
+            return (
+              <Animated.View 
+                key={post._id} 
+                style={[
+                  styles.postCard,
+                  {
+                    opacity: postsAnim,
+                    transform: [{
+                      translateY: postsAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [30 + (index * 20), 0],
+                      })
+                    }]
+                  }
+                ]}
+              >
+                <View style={styles.postHeader}>
+                  <View style={styles.postAuthorInfo}>
+                    <ProfileImage source={post.authorProfileImage} size={40} style={{ marginRight: 8 }} />
+                    <Text style={styles.postAuthor}>{post.author}</Text>
+                  </View>
+                  <Text style={styles.postCategory}>{post.category}</Text>
                 </View>
-                <Text style={styles.postCategory}>{post.category}</Text>
-              </View>
-              <Text style={styles.postTitle}>{post.title}</Text>
-              <Text style={styles.postContent}>
-                {post.content}
-              </Text>
-              
-              <View style={styles.postFooter}>
-                <Text style={styles.postTime}>{formatDate(new Date(post.createdAt).toISOString())}</Text>
-                <View style={styles.postStats}>
-                  <Ionicons name="heart" size={16} color="#6b7280" />
-                  <Text style={styles.postStatsText}>{post.likes}</Text>
-                  <Ionicons name="chatbubble" size={16} color="#6b7280" />
-                  <Text style={styles.postStatsText}>{post.comments?.length ?? 0}</Text>
+                <Text style={styles.postTitle}>{post.title}</Text>
+                <Text style={styles.postContent}>
+                  {post.content}
+                </Text>
+                
+                <View style={styles.postFooter}>
+                  <Text style={styles.postTime}>{formatDate(new Date(post.createdAt).toISOString())}</Text>
+                  <View style={styles.postStats}>
+                    <Ionicons name="heart" size={16} color="#6b7280" />
+                    <Text style={styles.postStatsText}>{post.likes}</Text>
+                    <Ionicons name="chatbubble" size={16} color="#6b7280" />
+                    <Text style={styles.postStatsText}>{post.comments?.length ?? 0}</Text>
+                  </View>
                 </View>
-              </View>
-            </Animated.View>
-          );
-        })}
-        
-        {/* View More Button */}
-        <TouchableOpacity
-          style={styles.viewMoreButton}
-          onPress={() => {
-            navigation.navigate('Community' as never);
-          }}
-        >
-          <Text style={styles.viewMoreButtonText}>View More</Text>
-          <Ionicons name="arrow-forward" size={14} color="#ef4444" />
-        </TouchableOpacity>
-      </Animated.View>
+              </Animated.View>
+            );
+          })}
+          
+          {/* View More Button */}
+          <TouchableOpacity
+            style={styles.viewMoreButton}
+            onPress={() => {
+              navigation.navigate('Community' as never);
+            }}
+          >
+            <Text style={styles.viewMoreButtonText}>View More</Text>
+            <Ionicons name="arrow-forward" size={14} color="#ef4444" />
+          </TouchableOpacity>
+        </Animated.View>
+      )}
 
       {/* Recent Polls */}
       {polls && polls.length > 0 && (
@@ -481,7 +492,7 @@ const HomeScreen = () => {
           </View>
           {polls.slice(0, 1).map((poll: any, index: number) => (
             <Animated.View 
-              key={poll._id} 
+              key={poll._id}
               style={[
                 styles.postCard,
                 {
@@ -579,19 +590,23 @@ const HomeScreen = () => {
                     <Text style={styles.actionText}>Multiple votes allowed</Text>
                   </View>
                 )}
-                
-                <TouchableOpacity 
-                  style={styles.viewPollButton}
-                  onPress={() => {
-                    navigation.navigate('Community' as never);
-                  }}
-                >
-                  <Text style={styles.viewMoreText}>View Poll</Text>
-                  <Ionicons name="arrow-forward" size={16} color="#f97316" />
-                </TouchableOpacity>
               </View>
             </Animated.View>
           ))}
+          
+          {/* View Poll Button */}
+          <TouchableOpacity 
+            style={[
+              styles.viewMoreButton,
+              (isMobileDevice || screenWidth < 1024) && styles.viewMoreButtonMobile
+            ]}
+            onPress={() => {
+              (navigation.navigate as any)('Community', { activeSubTab: 'polls' });
+            }}
+          >
+            <Text style={styles.viewMoreButtonText}>View Poll</Text>
+            <Ionicons name="arrow-forward" size={14} color="#ef4444" />
+          </TouchableOpacity>
         </Animated.View>
       )}
 
@@ -755,6 +770,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f3f4f6',
   },
+  headerContainerIOS: {
+    width: Dimensions.get('window').width,
+    alignSelf: 'stretch',
+    overflow: 'hidden',
+  },
   header: {
     height: 240,
     padding: 20,
@@ -762,10 +782,18 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     position: 'relative',
     justifyContent: 'space-between',
+    width: '100%',
+    alignSelf: 'stretch',
   },
   headerImage: {
     borderRadius: 0,
-    width: '100%',
+    width: Platform.OS === 'ios' ? Dimensions.get('window').width + 40 : '100%',
+    height: 240,
+    position: 'absolute',
+    left: Platform.OS === 'ios' ? -20 : 0,
+    right: Platform.OS === 'ios' ? -20 : 0,
+    top: 0,
+    bottom: 0,
   },
   headerOverlay: {
     position: 'absolute',
@@ -1042,6 +1070,11 @@ const styles = StyleSheet.create({
     marginTop: 8,
     gap: 4,
   },
+  viewMoreButtonMobile: {
+    alignSelf: 'flex-end',
+    width: '100%',
+    justifyContent: 'flex-end',
+  },
   viewMoreButtonText: {
     color: '#ef4444',
     fontSize: 14,
@@ -1131,6 +1164,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  viewPollButtonOuter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginTop: 12,
+    gap: 4,
+  },
   infoCard: {
     backgroundColor: '#ffffff',
     padding: 20,
@@ -1156,8 +1199,6 @@ const styles = StyleSheet.create({
   eventText: {
     fontSize: 14,
     color: '#374151',
-    marginBottom: 8,
-    lineHeight: 20,
   },
 });
 
