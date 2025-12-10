@@ -12,12 +12,39 @@ export const getAll = query({
   },
 });
 
+// Get paginated covenants
+export const getPaginated = query({
+  args: {
+    limit: v.optional(v.number()),
+    offset: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 20;
+    const offset = args.offset ?? 0;
+    
+    // Get total count
+    const allCovenants = await ctx.db
+      .query("covenants")
+      .order("desc")
+      .collect();
+    const total = allCovenants.length;
+    
+    // Get paginated covenants
+    const covenants = allCovenants.slice(offset, offset + limit);
+    
+    return {
+      items: covenants,
+      total,
+    };
+  },
+});
+
 export const getByCategory = query({
   args: { category: v.union(
     v.literal("Architecture"),
     v.literal("Landscaping"),
-    v.literal("Parking"),
-    v.literal("Pets"),
+    v.literal("Minutes"),
+    v.literal("Caveats"),
     v.literal("General")
   ) },
   handler: async (ctx, args) => {
@@ -44,8 +71,8 @@ export const create = mutation({
     category: v.union(
       v.literal("Architecture"),
       v.literal("Landscaping"),
-      v.literal("Parking"),
-      v.literal("Pets"),
+      v.literal("Minutes"),
+      v.literal("Caveats"),
       v.literal("General")
     ),
     lastUpdated: v.string(),
@@ -70,8 +97,8 @@ export const update = mutation({
     category: v.optional(v.union(
       v.literal("Architecture"),
       v.literal("Landscaping"),
-      v.literal("Parking"),
-      v.literal("Pets"),
+      v.literal("Minutes"),
+      v.literal("Caveats"),
       v.literal("General")
     )),
     lastUpdated: v.optional(v.string()),

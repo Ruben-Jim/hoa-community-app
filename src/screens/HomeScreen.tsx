@@ -12,10 +12,18 @@ import {
   Image,
   Animated,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+<<<<<<< HEAD
 import { useQuery, api } from '../services/mockConvex';
+=======
+import { useNavigation } from '@react-navigation/native';
+import { useQuery, useMutation } from 'convex/react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { api } from '../../convex/_generated/api';
+>>>>>>> master
 import { useAuth } from '../context/AuthContext';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import DeveloperIndicator from '../components/DeveloperIndicator';
@@ -24,13 +32,26 @@ import MobileTabBar from '../components/MobileTabBar';
 import { webCompatibleAlert } from '../utils/webCompatibleAlert';
 import CustomAlert from '../components/CustomAlert';
 import { useCustomAlert } from '../hooks/useCustomAlert';
+import ProfileImage from '../components/ProfileImage';
+import MessagingButton from '../components/MessagingButton';
+import { useMessaging } from '../context/MessagingContext';
 
 const HomeScreen = () => {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
+  const navigation = useNavigation();
+  const { setShowOverlay } = useMessaging();
+  const isBoardMember = user?.isBoardMember && user?.isActive;
   const hoaInfo = useQuery(api.hoaInfo.get);
-  const emergencyNotifications = useQuery(api.emergencyNotifications.getActive);
-  const communityPosts = useQuery(api.communityPosts.getAll);
+  // Use paginated queries with small initial limits for home screen
+  const communityPostsData = useQuery(api.communityPosts.getPaginated, { limit: 5, offset: 0 });
+  const communityPosts = communityPostsData?.items ?? [];
+  
+  const pollsData = useQuery(api.polls.getPaginated, { limit: 1, offset: 0 });
+  const polls = pollsData?.items ?? [];
+  const userVotes = useQuery(api.polls.getAllUserVotes, user ? { userId: user._id } : "skip");
+  const voteOnPoll = useMutation(api.polls.vote);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [selectedPollVotes, setSelectedPollVotes] = useState<{[pollId: string]: number[]}>({});
   const { alertState, showAlert, hideAlert } = useCustomAlert();
   
   // State for dynamic responsive behavior (only for web/desktop)
@@ -45,9 +66,11 @@ const HomeScreen = () => {
   // Animation values
   const fadeAnim = useRef(new Animated.Value(1)).current; // Start at 1 to avoid white flash
   const quickActionsAnim = useRef(new Animated.Value(0)).current;
-  const notificationsAnim = useRef(new Animated.Value(0)).current;
   const postsAnim = useRef(new Animated.Value(0)).current;
   const officeAnim = useRef(new Animated.Value(0)).current;
+  
+  // Onboarding state
+  const [showOnboarding, setShowOnboarding] = useState(false);
   
   // ScrollView ref for better control
   const scrollViewRef = useRef<ScrollView>(null);
@@ -59,22 +82,17 @@ const HomeScreen = () => {
       Animated.timing(quickActionsAnim, {
         toValue: 1,
         duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.timing(notificationsAnim, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(postsAnim, {
         toValue: 1,
         duration: 500,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(officeAnim, {
         toValue: 1,
         duration: 500,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
   };
@@ -107,11 +125,7 @@ const HomeScreen = () => {
           // Force a layout update
           scrollViewRef.current.scrollTo({ y: 0, animated: false });
           
-          // Debug: Log scroll view properties
-          console.log('ScrollView initialized for web');
-          console.log('Screen width:', screenWidth);
-          console.log('Show mobile nav:', showMobileNav);
-          console.log('Show desktop nav:', showDesktopNav);
+          // ScrollView initialized for web
         }
       }, 100);
       
@@ -120,6 +134,28 @@ const HomeScreen = () => {
       };
     }
   }, [screenWidth, showMobileNav, showDesktopNav]);
+
+  // Update selectedPollVotes when userVotes data is available
+  useEffect(() => {
+    if (userVotes) {
+      setSelectedPollVotes(userVotes);
+    }
+  }, [userVotes]);
+
+  // Check if user needs onboarding (previously showed arrow towards nav bar)
+  useEffect(() => {
+    const clearLegacyOnboarding = async () => {
+      try {
+        if (user?._id) {
+          await AsyncStorage.setItem(`onboarding_seen_${user._id}`, 'true');
+        }
+      } catch (error) {
+        console.error('Error clearing onboarding flag:', error);
+      }
+      setShowOnboarding(false);
+    };
+    clearLegacyOnboarding();
+  }, [user?._id]);
 
   const handleContact = (type: 'phone' | 'email') => {
     if (type === 'phone') {
@@ -143,15 +179,74 @@ const HomeScreen = () => {
     });
   };
 
-  const handleSignOut = () => {
-    showAlert({
-      title: 'Sign Out',
-      message: 'Are you sure you want to sign out?',
-      buttons: [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign Out', style: 'destructive', onPress: signOut }
-      ]
-    });
+  const handleVoteOnPoll = async (pollId: string, optionIndex: number) => {
+    if (!user) {
+      showAlert({
+        title: 'Error',
+        message: 'You must be logged in to vote',
+        type: 'error'
+      });
+      
+      // Auto-dismiss error alert after 3 seconds
+      setTimeout(() => {
+        hideAlert();
+      }, 3000);
+      return;
+    }
+
+    try {
+      const currentVotes = selectedPollVotes[pollId] || [];
+      let newVotes: number[];
+
+      if (currentVotes.includes(optionIndex)) {
+        // Remove vote if already selected
+        newVotes = currentVotes.filter(vote => vote !== optionIndex);
+      } else {
+        // Add vote
+        const poll = polls?.find(p => p._id === pollId);
+        if (poll && !poll.allowMultipleVotes) {
+          // Single vote only - replace current vote
+          newVotes = [optionIndex];
+        } else {
+          // Multiple votes allowed - add to existing votes
+          newVotes = [...currentVotes, optionIndex];
+        }
+      }
+
+      setSelectedPollVotes(prev => ({
+        ...prev,
+        [pollId]: newVotes
+      }));
+
+      await voteOnPoll({
+        userId: user._id,
+        pollId: pollId as any,
+        selectedOptions: newVotes
+      });
+      
+      showAlert({
+        title: 'Success',
+        message: 'Your vote has been recorded!',
+        type: 'success'
+      });
+      
+      // Auto-dismiss success alert after 2 seconds
+      setTimeout(() => {
+        hideAlert();
+      }, 2000);
+    } catch (error) {
+      console.error('Error voting on poll:', error);
+      showAlert({
+        title: 'Error',
+        message: 'Failed to record your vote. Please try again.',
+        type: 'error'
+      });
+      
+      // Auto-dismiss error alert after 3 seconds
+      setTimeout(() => {
+        hideAlert();
+      }, 3000);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -162,7 +257,6 @@ const HomeScreen = () => {
     }
   };
 
-  const activeNotifications = emergencyNotifications?.filter((n: any) => n.isActive) ?? [];
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -212,13 +306,19 @@ const HomeScreen = () => {
           })}
         >
       {/* Header */}
-      <Animated.View style={{
+      <Animated.View
+        style={[
+          {
         opacity: fadeAnim,
-      }}>
+          },
+          Platform.OS === 'ios' && styles.headerContainerIOS
+        ]}
+      >
         <ImageBackground
           source={require('../../assets/hoa-4k.jpg')}
           style={styles.header}
           imageStyle={styles.headerImage}
+          resizeMode="stretch"
         >
         <View style={styles.headerOverlay} />
         <View style={styles.headerTop}>
@@ -237,13 +337,13 @@ const HomeScreen = () => {
             <Text style={styles.hoaName}>{hoaInfo?.name ?? 'Shelton Springs'}</Text>
             <Text style={styles.subtitle}>Your Community Connection</Text>
           </View>
-          
-          <TouchableOpacity
-            style={styles.signOutButton}
-            onPress={handleSignOut}
-          >
-            <Ionicons name="log-out-outline" size={24} color="#ffffff" />
-          </TouchableOpacity>
+
+          {/* Messaging Button - Board Members Only */}
+          {isBoardMember && (
+            <View style={styles.headerRight}>
+              <MessagingButton onPress={() => setShowOverlay(true)} />
+            </View>
+          )}
         </View>
               
         {user && (
@@ -312,47 +412,11 @@ const HomeScreen = () => {
         </View>
       </Animated.View> */}
 
-      {/* Active Notifications */}
-      {activeNotifications.length > 0 && (
-        <Animated.View style={[
-          styles.section, 
-          styles.emergencySection,
-          {
-            opacity: notificationsAnim,
-            transform: [{
-              translateY: notificationsAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [50, 0],
-              })
-            }]
-          }
-        ]}>
-          <View style={styles.emergencyHeader}>
-            <Ionicons name="warning" size={24} color="#ef4444" />
-            <Text style={styles.emergencyTitle}>Active Alerts</Text>
-          </View>
-          {activeNotifications.slice(0, 2).map((notification: any) => (
-            <View key={notification._id} style={styles.notificationCard}>
-              <View style={styles.notificationHeader}>
-                <Ionicons 
-                  name={notification.type === 'Emergency' ? 'warning' : 'information-circle'} 
-                  size={20} 
-                  color={notification.priority === 'High' ? '#dc2626' : '#f59e0b'} 
-                />
-                <Text style={styles.notificationTitle}>{notification.title}</Text>
-              </View>
-              <Text style={styles.notificationContent}>{notification.content}</Text>
-              <Text style={styles.notificationTime}>
-                {formatDate(new Date(notification.createdAt).toISOString())}
-              </Text>
-            </View>
-          ))}
-        </Animated.View>
-      )}
-
       {/* Recent Community Posts */}
+      {(communityPosts?.filter((post: any) => post.category !== 'Complaint') || []).length > 0 && (
       <Animated.View style={[
         styles.section,
+        { borderLeftColor: '#ef4444' }, // Orange
         {
           opacity: postsAnim,
           transform: [{
@@ -367,59 +431,204 @@ const HomeScreen = () => {
           <Ionicons name="people" size={24} color="#64748b" />
           <Text style={[styles.sectionTitle, { marginLeft: 8, marginBottom: 0 }]}>Recent Community Posts</Text>
         </View>
-        {communityPosts?.slice(0, 2).map((post: any, index: number) => (
-          <Animated.View 
-            key={post._id} 
-            style={[
-              styles.postCard,
-              {
-                opacity: postsAnim,
-                transform: [{
-                  translateY: postsAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [30 + (index * 20), 0],
-                  })
-                }]
-              }
-            ]}
-          >
-            <View style={styles.postHeader}>
-              <View style={styles.postAuthorInfo}>
-                <View style={styles.postAvatar}>
-                  {post.authorProfileImage ? (
-                    <Image 
-                      source={{ uri: post.authorProfileImage }} 
-                      style={styles.postAvatarImage}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <Ionicons name="person" size={20} color="#6b7280" />
-                  )}
+        {(communityPosts?.filter((post: any) => post.category !== 'Complaint') || []).slice(0, 2).map((post: any, index: number) => {
+          return (
+            <Animated.View 
+              key={post._id} 
+              style={[
+                styles.postCard,
+                {
+                  opacity: postsAnim,
+                  transform: [{
+                    translateY: postsAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [30 + (index * 20), 0],
+                    })
+                  }]
+                }
+              ]}
+            >
+              <View style={styles.postHeader}>
+                <View style={styles.postAuthorInfo}>
+                  <ProfileImage source={post.authorProfileImage} size={40} style={{ marginRight: 8 }} />
+                  <Text style={styles.postAuthor}>{post.author}</Text>
                 </View>
-                <Text style={styles.postAuthor}>{post.author}</Text>
+                <Text style={styles.postCategory}>{post.category}</Text>
               </View>
-              <Text style={styles.postCategory}>{post.category}</Text>
-            </View>
-            <Text style={styles.postTitle}>{post.title}</Text>
-            <Text style={styles.postContent} numberOfLines={2}>
-              {post.content}
-            </Text>
-            <View style={styles.postFooter}>
-              <Text style={styles.postTime}>{formatDate(new Date(post.createdAt).toISOString())}</Text>
-              <View style={styles.postStats}>
-                <Ionicons name="heart" size={16} color="#6b7280" />
-                <Text style={styles.postStatsText}>{post.likes}</Text>
-                <Ionicons name="chatbubble" size={16} color="#6b7280" />
-                <Text style={styles.postStatsText}>{post.comments?.length ?? 0}</Text>
+              <Text style={styles.postTitle}>{post.title}</Text>
+              <Text style={styles.postContent}>
+                {post.content}
+              </Text>
+              
+              <View style={styles.postFooter}>
+                <Text style={styles.postTime}>{formatDate(new Date(post.createdAt).toISOString())}</Text>
+                <View style={styles.postStats}>
+                  <Ionicons name="heart" size={16} color="#6b7280" />
+                  <Text style={styles.postStatsText}>{post.likes}</Text>
+                  <Ionicons name="chatbubble" size={16} color="#6b7280" />
+                  <Text style={styles.postStatsText}>{post.comments?.length ?? 0}</Text>
+                </View>
               </View>
-            </View>
-          </Animated.View>
-        ))}
+            </Animated.View>
+          );
+        })}
+        
+        {/* View More Button */}
+        <TouchableOpacity
+          style={styles.viewMoreButton}
+          onPress={() => {
+            navigation.navigate('Community' as never);
+          }}
+        >
+          <Text style={styles.viewMoreButtonText}>View More</Text>
+          <Ionicons name="arrow-forward" size={14} color="#ef4444" />
+        </TouchableOpacity>
       </Animated.View>
+      )}
+
+      {/* Recent Polls */}
+      {polls && polls.length > 0 && (
+        <Animated.View style={[
+          styles.section,
+          { borderLeftColor: '#f97316' }, // Yellow
+          {
+            opacity: postsAnim,
+            transform: [{
+              translateY: postsAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [50, 0],
+              })
+            }]
+          }
+        ]}>
+          <View style={styles.communityHeader}>
+            <Ionicons name="bar-chart" size={24} color="#64748b" />
+            <Text style={[styles.sectionTitle, { marginLeft: 8, marginBottom: 0 }]}>Recent Polls</Text>
+          </View>
+          {polls.slice(0, 1).map((poll: any, index: number) => (
+            <Animated.View 
+              key={poll._id} 
+              style={[
+                styles.postCard,
+                {
+                  opacity: postsAnim,
+                  transform: [{
+                    translateY: postsAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [30 + (index * 20), 0],
+                    })
+                  }]
+                }
+              ]}
+            >
+              <View style={styles.postHeader}>
+                <View style={styles.postAuthorInfo}>
+                  {/* <View style={styles.postAvatar}>
+                    <Ionicons name="bar-chart" size={20} color="#6b7280" />
+                  </View> */}
+                  <Text style={styles.postAuthor}>Community Poll</Text>
+                </View>
+                <Text style={styles.postTime}>
+                  {new Date(poll.createdAt).toLocaleDateString()}
+                </Text>
+              </View>
+              
+              <Text style={styles.postTitle}>{poll.title}</Text>
+              {poll.description && (
+                <Text style={styles.postContent}>{poll.description}</Text>
+              )}
+              
+              {/* Poll Options */}
+              <View style={styles.pollOptionsContainer}>
+                {poll.options.map((option: string, optionIndex: number) => {
+                  const isSelected = selectedPollVotes[poll._id]?.includes(optionIndex) || false;
+                  const voteCount = poll.optionVotes?.[optionIndex] || 0;
+                  const totalVotes = poll.totalVotes || 0;
+                  const percentage = totalVotes > 0 ? (voteCount / totalVotes) * 100 : 0;
+                  const isWinningOption = !poll.isActive && poll.winningOption && poll.winningOption.tiedIndices?.includes(optionIndex);
+                  const isTied = isWinningOption && poll.winningOption?.isTied;
+                  
+                  return (
+                    <TouchableOpacity
+                      key={optionIndex}
+                      style={[
+                        styles.pollOption,
+                        isSelected && styles.pollOptionSelected,
+                        !poll.isActive && styles.pollOptionDisabled,
+                        isWinningOption && styles.pollWinningOption
+                      ]}
+                      onPress={() => poll.isActive ? handleVoteOnPoll(poll._id, optionIndex) : null}
+                      disabled={!poll.isActive}
+                    >
+                      <View style={styles.pollOptionContent}>
+                        <Text style={[
+                          styles.pollOptionText,
+                          isSelected && styles.pollOptionTextSelected,
+                          isWinningOption && styles.pollWinningOptionText
+                        ]}>
+                          {option}
+                        </Text>
+                        <Text style={[
+                          styles.pollVoteCount,
+                          isWinningOption && styles.pollWinningVoteCount
+                        ]}>
+                          {voteCount} votes ({percentage.toFixed(1)}%)
+                        </Text>
+                      </View>
+                      <View style={styles.pollOptionActions}>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={20} color="#2563eb" />
+                        )}
+                        {isWinningOption && (
+                          <View style={styles.winningBadge}>
+                            <Ionicons name="trophy" size={16} color="#ffffff" />
+                            <Text style={styles.winningBadgeText}>
+                              {isTied ? 'Tied' : 'Most Voted'}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              
+              <View style={styles.postFooter}>
+                <View style={styles.actionButton}>
+                  <Ionicons name="people" size={16} color="#6b7280" />
+                  <Text style={styles.actionText}>{poll.totalVotes || 0} total votes</Text>
+                </View>
+                
+                {poll.allowMultipleVotes && (
+                  <View style={styles.actionButton}>
+                    <Ionicons name="checkmark-done" size={16} color="#6b7280" />
+                    <Text style={styles.actionText}>Multiple votes allowed</Text>
+                  </View>
+                )}
+              </View>
+            </Animated.View>
+          ))}
+                
+          {/* View Poll Button */}
+                <TouchableOpacity 
+            style={[
+              styles.viewMoreButton,
+              (isMobileDevice || screenWidth < 1024) && styles.viewMoreButtonMobile
+            ]}
+                  onPress={() => {
+              (navigation.navigate as any)('Community', { activeSubTab: 'polls' });
+                  }}
+                >
+            <Text style={styles.viewMoreButtonText}>View Poll</Text>
+            <Ionicons name="arrow-forward" size={14} color="#ef4444" />
+                </TouchableOpacity>
+        </Animated.View>
+      )}
 
       {/* Office Information */}
       <Animated.View style={[
         styles.section,
+        { borderLeftColor: '#eab308' }, // Green
         {
           opacity: officeAnim,
           transform: [{
@@ -443,10 +652,10 @@ const HomeScreen = () => {
             <Ionicons name="time" size={20} color="#6b7280" />
             <Text style={styles.infoText}>{hoaInfo?.officeHours ?? ''}</Text>
           </View>
-          <View style={styles.infoRow}>
+          {/* <View style={styles.infoRow}>
             <Ionicons name="call" size={20} color="#6b7280" />
             <Text style={styles.infoText}>{hoaInfo?.phone ?? ''}</Text>
-          </View>
+          </View> */}
           <View style={styles.infoRow}>
             <Ionicons name="mail" size={20} color="#6b7280" />
             <Text style={styles.infoText}>{hoaInfo?.email ?? ''}</Text>
@@ -454,9 +663,10 @@ const HomeScreen = () => {
         </View>
       </Animated.View>
       
-      {/* Additional sections for more content */}
+      {/* Additional sections for more content - Community Guidelines */}
       <Animated.View style={[
         styles.section,
+        { borderLeftColor: '#22c55e' }, // Blue
         {
           opacity: officeAnim,
           transform: [{
@@ -487,8 +697,10 @@ const HomeScreen = () => {
         </View>
       </Animated.View>
       
+      {/* Upcoming Events */}
       <Animated.View style={[
         styles.section,
+        { borderLeftColor: '#3b82f6' }, // Indigo
         {
           opacity: officeAnim,
           transform: [{
@@ -504,15 +716,13 @@ const HomeScreen = () => {
           <Text style={[styles.sectionTitle, { marginLeft: 8, marginBottom: 0 }]}>Upcoming Events</Text>
         </View>
         <View style={styles.infoCard}>
-          <Text style={styles.eventText}>
-            📅 Board Meeting - Next Tuesday at 7:00 PM
-          </Text>
-          <Text style={styles.eventText}>
-            🏠 Community Cleanup - This Saturday 9:00 AM
-          </Text>
-          <Text style={styles.eventText}>
-            🎉 Annual BBQ - June 15th at the Clubhouse
-          </Text>
+          {(hoaInfo?.eventText || '').split(/\r?\n/).filter(line => line.trim().length > 0).length > 0 ? (
+            (hoaInfo?.eventText || '').split(/\r?\n/).map((line, idx) => (
+              <Text key={idx} style={styles.eventText}>{line}</Text>
+            ))
+          ) : (
+            <Text style={styles.eventText}>No upcoming events posted.</Text>
+          )}
         </View>
       </Animated.View>
       
@@ -520,6 +730,7 @@ const HomeScreen = () => {
       <View style={styles.spacer} />
       </ScrollView>
       </View>
+
       
       {/* Custom Alert */}
       <CustomAlert
@@ -527,9 +738,11 @@ const HomeScreen = () => {
         title={alertState.title}
         message={alertState.message}
         buttons={alertState.buttons}
+        type={alertState.type}
         onClose={hideAlert}
-        type="warning"
+        
       />
+
     </SafeAreaView>
   );
 };
@@ -572,6 +785,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f3f4f6',
   },
+  headerContainerIOS: {
+    width: Dimensions.get('window').width,
+    alignSelf: 'stretch',
+    overflow: 'hidden',
+  },
   header: {
     height: 240,
     padding: 20,
@@ -579,11 +797,18 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     position: 'relative',
     justifyContent: 'space-between',
+    width: '100%',
+    alignSelf: 'stretch',
   },
   headerImage: {
     borderRadius: 0,
-    resizeMode: 'stretch',
-    width: '100%',
+    width: Platform.OS === 'ios' ? Dimensions.get('window').width + 40 : '100%',
+    height: 240,
+    position: 'absolute',
+    left: Platform.OS === 'ios' ? -20 : 0,
+    right: Platform.OS === 'ios' ? -20 : 0,
+    top: 0,
+    bottom: 0,
   },
   headerOverlay: {
     position: 'absolute',
@@ -598,6 +823,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 10,
+    gap: 12,
+  },
+  headerRight: {
+    alignItems: 'center',
+    justifyContent: 'center',
     zIndex: 1,
   },
   menuButton: {
@@ -610,12 +840,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingHorizontal: 10,
-  },
-  signOutButton: {
-    padding: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 8,
-    marginLeft: 12,
   },
   userInfo: {
     marginTop: 5,
@@ -637,37 +861,31 @@ const styles = StyleSheet.create({
     color: '#e0e7ff',
     opacity: 0.9,
   },
-  welcomeText: {
+  welcomeText: ({
     color: '#ffffff',
     fontSize: 18,
     fontWeight: '500',
     opacity: 0.95,
-    textShadowColor: 'rgba(0, 0, 0, 0.9)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
+    textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9)' as any,
     textAlign: 'center',
-  },
-  hoaName: {
+  } as any),
+  hoaName: ({
     color: '#ffffff',
     fontSize: 28,
     fontWeight: 'bold',
     marginTop: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.9)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
+    textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9)' as any,
     textAlign: 'center',
-  },
-  subtitle: {
+  } as any),
+  subtitle: ({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '400',
     opacity: 0.9,
     marginTop: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.9)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
+    textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9)' as any,
     textAlign: 'center',
-  },
+  } as any),
   quickActions: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -705,28 +923,13 @@ const styles = StyleSheet.create({
     padding: 20,
     borderWidth: 1,
     borderColor: '#f1f5f9',
+    borderLeftWidth: 4,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#1e293b',
     marginBottom: 15,
-  },
-  emergencySection: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#ef4444',
-    backgroundColor: '#fef2f2',
-  },
-  emergencyHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  emergencyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#ef4444',
-    marginLeft: 8,
   },
   communityHeader: {
     flexDirection: 'row',
@@ -795,18 +998,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   postAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#f3f4f6',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
-  },
-  postAvatarImage: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
   },
   postAuthor: {
     fontSize: 14,
@@ -854,6 +1052,148 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     marginRight: 12,
   },
+  postImagesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginVertical: 12,
+    gap: 8,
+  },
+  postImageWrapper: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  postImage: {
+    width: Platform.OS === 'web' ? 120 : 100,
+    height: Platform.OS === 'web' ? 120 : 100,
+    borderRadius: 8,
+  },
+  imageLoading: {
+    width: Platform.OS === 'web' ? 120 : 100,
+    height: Platform.OS === 'web' ? 120 : 100,
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  viewMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    gap: 4,
+  },
+  viewMoreButtonMobile: {
+    alignSelf: 'flex-end',
+    width: '100%',
+    justifyContent: 'flex-end',
+  },
+  viewMoreButtonText: {
+    color: '#ef4444',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  pollOptionsContainer: {
+    marginVertical: 12,
+  },
+  pollOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+  },
+  pollOptionSelected: {
+    backgroundColor: '#e0e7ff',
+    borderColor: '#2563eb',
+  },
+  pollOptionContent: {
+    flex: 1,
+  },
+  pollOptionText: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  pollOptionTextSelected: {
+    color: '#2563eb',
+    fontWeight: '600',
+  },
+  pollVoteCount: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '600',
+  },
+  pollOptionDisabled: {
+    backgroundColor: '#f3f4f6',
+    borderColor: '#d1d5db',
+    opacity: 0.6,
+  },
+  pollWinningOption: {
+    backgroundColor: '#fef3c7',
+    borderLeftColor: '#f59e0b',
+    borderWidth: 2,
+    borderColor: '#f59e0b',
+  },
+  pollWinningOptionText: {
+    color: '#92400e',
+    fontWeight: '700',
+  },
+  pollWinningVoteCount: {
+    color: '#92400e',
+    fontWeight: '700',
+  },
+  pollOptionActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  winningBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f59e0b',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  winningBadgeText: {
+    fontSize: 10,
+    color: '#ffffff',
+    fontWeight: '700',
+    marginLeft: 4,
+  },
+  viewMoreText: {
+    fontSize: 12,
+    color: '#f97316',
+    marginRight: 4,
+  },
+  viewPollButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  viewPollButtonOuter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginTop: 12,
+    gap: 4,
+  },
   infoCard: {
     backgroundColor: '#ffffff',
     padding: 20,
@@ -879,8 +1219,6 @@ const styles = StyleSheet.create({
   eventText: {
     fontSize: 14,
     color: '#374151',
-    marginBottom: 8,
-    lineHeight: 20,
   },
 });
 

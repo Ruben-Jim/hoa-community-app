@@ -86,6 +86,7 @@ export const update = mutation({
     isDev: v.optional(v.boolean()),
     isActive: v.optional(v.boolean()),
     password: v.optional(v.string()),
+    profileImage: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { id, ...updates } = args;

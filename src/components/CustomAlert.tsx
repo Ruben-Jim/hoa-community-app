@@ -44,12 +44,12 @@ const CustomAlert: React.FC<CustomAlertProps> = ({
         Animated.timing(scaleAnim, {
           toValue: 1,
           duration: 300,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(opacityAnim, {
           toValue: 1,
           duration: 300,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ]).start();
     } else {
@@ -57,12 +57,12 @@ const CustomAlert: React.FC<CustomAlertProps> = ({
         Animated.timing(scaleAnim, {
           toValue: 0,
           duration: 200,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(opacityAnim, {
           toValue: 0,
           duration: 200,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ]).start();
     }
@@ -100,7 +100,7 @@ const CustomAlert: React.FC<CustomAlertProps> = ({
       case 'success':
         return { icon: 'checkmark-circle', color: '#10b981' };
       case 'error':
-        return { icon: 'close-circle', color: '#dc2626' };
+        return { icon: 'close-circle', color: '#ef4444' };
       case 'warning':
         return { icon: 'warning', color: '#f59e0b' };
       default:
@@ -133,7 +133,10 @@ const CustomAlert: React.FC<CustomAlertProps> = ({
           <View style={styles.alertContent}>
             {/* Header */}
             <View style={styles.header}>
-              <View style={[styles.iconContainer, { backgroundColor: `${color}20` }]}>
+              <View style={[
+                styles.iconContainer, 
+                { backgroundColor: type === 'warning' ? '#fef3c7' : type === 'error' ? '#fee2e2' : type === 'success' ? '#d1fae5' : `${color}20` }
+              ]}>
                 <Ionicons name={icon as any} size={24} color={color} />
               </View>
               <Text style={styles.title}>{title}</Text>
@@ -184,11 +187,7 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     backgroundColor: '#ffffff',
     borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 10,
+    boxShadow: '0px 10px 20px rgba(0, 0, 0, 0.25)' as any,
   },
   alertContent: {
     padding: 24,
@@ -243,7 +242,7 @@ const styles = StyleSheet.create({
     borderColor: '#d1d5db',
   },
   destructiveButton: {
-    backgroundColor: '#dc2626',
+    backgroundColor: '#ef4444',
   },
   buttonText: {
     fontSize: 16,

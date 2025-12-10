@@ -10,20 +10,36 @@ import {
   Animated,
   Dimensions,
   Platform,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+<<<<<<< HEAD
 import { useQuery, api } from '../services/mockConvex';
+=======
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../../convex/_generated/api';
+>>>>>>> master
 import { useAuth } from '../context/AuthContext';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import DeveloperIndicator from '../components/DeveloperIndicator';
 import CustomTabBar from '../components/CustomTabBar';
 import MobileTabBar from '../components/MobileTabBar';
+import PaymentModal from '../components/PaymentModal';
+import ProfileImage from '../components/ProfileImage';
+import MessagingButton from '../components/MessagingButton';
+import { useMessaging } from '../context/MessagingContext';
 
 const FeesScreen = () => {
   const { user } = useAuth();
+  const { setShowOverlay } = useMessaging();
+  const isBoardMember = user?.isBoardMember && user?.isActive;
   const [activeTab, setActiveTab] = useState<'fees' | 'fines'>('fees');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [hasPaidAnnualFee, setHasPaidAnnualFee] = useState(false);
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [selectedPaymentItem, setSelectedPaymentItem] = useState<any>(null);
+  const [selectedPaymentType, setSelectedPaymentType] = useState<'fee' | 'fine'>('fee');
 
   // State for dynamic responsive behavior (only for web/desktop)
   const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
@@ -65,11 +81,7 @@ const FeesScreen = () => {
           // Force a layout update
           scrollViewRef.current.scrollTo({ y: 0, animated: false });
           
-          // Debug: Log scroll view properties
-          console.log('FeesScreen ScrollView initialized for web');
-          console.log('Screen width:', screenWidth);
-          console.log('Show mobile nav:', showMobileNav);
-          console.log('Show desktop nav:', showDesktopNav);
+          // ScrollView initialized for web
         }
       }, 100);
       
@@ -85,12 +97,12 @@ const FeesScreen = () => {
       Animated.timing(summaryAnim, {
         toValue: 1,
         duration: 500,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(contentAnim, {
         toValue: 1,
         duration: 500,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
   };
@@ -99,6 +111,18 @@ const FeesScreen = () => {
   useEffect(() => {
     animateStaggeredContent();
   }, []);
+
+  // Check if user has paid their annual fee
+  const userPaymentStatus = useQuery(
+    api.fees.hasPaidAnnualFee,
+    user ? { userId: user._id } : "skip"
+  );
+
+  useEffect(() => {
+    if (userPaymentStatus !== undefined) {
+      setHasPaidAnnualFee(userPaymentStatus);
+    }
+  }, [userPaymentStatus]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -141,152 +165,67 @@ const FeesScreen = () => {
     }
   };
 
+  // Convex mutations
+  // Note: Not updating fee/fine status here - will remain "Pending" until admin verifies
+
   const handlePayment = (item: any, type: 'fee' | 'fine') => {
-    Alert.alert(
-      `Pay ${type === 'fee' ? 'Fee' : 'Fine'}`,
-      `Would you like to pay ${formatCurrency(item.amount)} for ${type === 'fee' ? item.name : item.violation}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Pay Now', onPress: () => Alert.alert('Payment', 'Payment processing would be integrated here.') }
-      ]
-    );
+    setSelectedPaymentItem(item);
+    setSelectedPaymentType(type);
+    setPaymentModalVisible(true);
   };
 
-  // 🚧 MOCK DATA FOR DEMONSTRATION 🚧
-  // This shows what the FeesScreen will look like with real data
-  // Replace with actual Convex queries when ready:
-  // const fees = useQuery(api.fees.getAll) ?? [];
-  // const fines = useQuery(api.fines.getAll) ?? [];
+  const handlePaymentSuccess = async () => {
+    try {
+      // For Venmo manual tracking: Just close modal and show success message
+      // Payment status remains "Pending" until admin verifies in AdminScreen
+      setPaymentModalVisible(false);
+      setSelectedPaymentItem(null);
+      
+      // Show success message but note verification is required
+      Alert.alert(
+        'Payment Submitted', 
+        'Your payment information has been submitted and is pending verification by HOA staff. You will be notified once it is verified.'
+      );
+    } catch (error) {
+      console.error('Error submitting payment:', error);
+      Alert.alert('Error', 'Failed to submit payment information.');
+    }
+  };
+
+  // Dynamic fee generation based on user status
+  const getUserType = () => {
+    if (!user) return 'guest';
+    if (user.isBoardMember) return 'board-member';
+    if (user.isRenter) return 'renter';
+    if (user.isResident) return 'resident';
+    return 'guest';
+  };
+
+  // Get the latest user data from database (for fresh profile image)
+  const residents = useQuery(api.residents.getAll) ?? [];
+  const currentUser = residents.find(resident => resident.email === user?.email);
+  const displayProfileImage = currentUser?.profileImage || user?.profileImage;
+
+  // Get all fees from database and filter for current user
+  const [feesLimit, setFeesLimit] = useState(50);
+  const feesData = useQuery(api.fees.getPaginated, { limit: feesLimit, offset: 0 });
+  const allFeesFromDatabase = feesData?.items ?? [];
   
-  const mockFees = [
-    {
-      _id: 'mock-fee-1',
-      name: 'Monthly HOA Dues',
-      amount: 250,
-      frequency: 'Monthly',
-      dueDate: '2024-08-01',
-      description: 'Standard monthly HOA assessment for maintenance and services',
-      isLate: false,
-    },
-    {
-      _id: 'mock-fee-2',
-      name: 'Landscape Maintenance',
-      amount: 75,
-      frequency: 'Monthly',
-      dueDate: '2024-08-01',
-      description: 'Front yard maintenance and irrigation service',
-      isLate: false,
-    },
-    {
-      _id: 'mock-fee-3',
-      name: 'Annual Assessment',
-      amount: 500,
-      frequency: 'Annually',
-      dueDate: '2024-12-31',
-      description: 'Annual capital improvement fund for community projects',
-      isLate: false,
-    },
-    {
-      _id: 'mock-fee-4',
-      name: 'Trash Collection',
-      amount: 35,
-      frequency: 'Monthly',
-      dueDate: '2024-08-15',
-      description: 'Monthly trash and recycling collection service',
-      isLate: true,
-    },
-    {
-      _id: 'mock-fee-5',
-      name: 'Pool Maintenance',
-      amount: 120,
-      frequency: 'Monthly',
-      dueDate: '2024-08-01',
-      description: 'Community pool maintenance, cleaning, and chemical treatment',
-      isLate: false,
-    },
-    {
-      _id: 'mock-fee-6',
-      name: 'Security Service',
-      amount: 45,
-      frequency: 'Monthly',
-      dueDate: '2024-08-01',
-      description: 'Night security patrol and gate monitoring',
-      isLate: false,
-    }
-  ];
+  // Filter fees for the current user if they are a homeowner
+  const fees = user && (user.isResident && !user.isRenter) 
+    ? allFeesFromDatabase.filter((fee: any) => fee.userId === user._id)
+    : [];
 
-  const mockFines = [
-    {
-      _id: 'mock-fine-1',
-      violation: 'Unauthorized Parking',
-      amount: 50,
-      dateIssued: '2024-07-15',
-      dueDate: '2024-08-15',
-      status: 'Pending',
-      description: 'Vehicle parked on street overnight without permit',
-    },
-    {
-      _id: 'mock-fine-2',
-      violation: 'Landscaping Violation',
-      amount: 100,
-      dateIssued: '2024-07-10',
-      dueDate: '2024-08-10',
-      status: 'Paid',
-      description: 'Unapproved plants in front yard - not in compliance with HOA guidelines',
-    },
-    {
-      _id: 'mock-fine-3',
-      violation: 'Noise Complaint',
-      amount: 75,
-      dateIssued: '2024-07-20',
-      dueDate: '2024-08-20',
-      status: 'Overdue',
-      description: 'Excessive noise after 10 PM - multiple neighbor complaints',
-    },
-    {
-      _id: 'mock-fine-4',
-      violation: 'Pet Violation',
-      amount: 25,
-      dateIssued: '2024-07-25',
-      dueDate: '2024-08-25',
-      status: 'Pending',
-      description: 'Dog off leash in common areas - first offense',
-    },
-    {
-      _id: 'mock-fine-5',
-      violation: 'Garbage Violation',
-      amount: 40,
-      dateIssued: '2024-07-05',
-      dueDate: '2024-08-05',
-      status: 'Paid',
-      description: 'Garbage cans left out past collection day',
-    },
-    {
-      _id: 'mock-fine-6',
-      violation: 'Exterior Modification',
-      amount: 150,
-      dateIssued: '2024-07-12',
-      dueDate: '2024-08-12',
-      status: 'Overdue',
-      description: 'Exterior paint color change without HOA approval',
-    },
-    {
-      _id: 'mock-fine-7',
-      violation: 'Holiday Decorations',
-      amount: 30,
-      dateIssued: '2024-07-30',
-      dueDate: '2024-08-30',
-      status: 'Pending',
-      description: 'Holiday decorations left up past allowed timeframe',
-    }
-  ];
-
-  // Use mock data for demonstration
-  const fees = mockFees;
-  const fines = mockFines;
+  // Get fines for the user (if any)
+  const allFines = useQuery(api.fees.getAllFines) ?? [];
+  
+  // Filter fines for the current user if they are a homeowner
+  const fines = user && (user.isResident && !user.isRenter) 
+    ? allFines.filter((fine: any) => fine.residentId === user._id)
+    : [];
   const totalFees = fees.reduce((sum: number, fee: any) => sum + fee.amount, 0);
   const totalFines = fines.reduce((sum: number, fine: any) => sum + fine.amount, 0);
-  const overdueFines = fines.filter((fine: any) => fine.status === 'Overdue').reduce((sum: number, fine: any) => sum + fine.amount, 0);
+  const overdueFines = fines.filter((fine: any) => (fine.status || 'Pending') === 'Overdue').reduce((sum: number, fine: any) => sum + fine.amount, 0);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -297,53 +236,6 @@ const FeesScreen = () => {
             isMenuOpen={isMenuOpen}
             onMenuClose={() => setIsMenuOpen(false)}
           />
-        )}
-        
-        {/* Header */}
-        <Animated.View style={{
-          opacity: fadeAnim,
-        }}>
-          <ImageBackground
-            source={require('../../assets/hoa-4k.jpg')}
-            style={styles.header}
-            imageStyle={styles.headerImage}
-          >
-            <View style={styles.headerOverlay} />
-            <View style={styles.headerTop}>
-              {/* Hamburger Menu - Only when mobile nav is shown */}
-              {showMobileNav && (
-                <TouchableOpacity
-                  style={styles.menuButton}
-                  onPress={() => setIsMenuOpen(true)}
-                >
-                  <Ionicons name="menu" size={24} color="#ffffff" />
-                </TouchableOpacity>
-              )}
-              
-              <View style={styles.headerLeft}>
-                <View style={styles.titleContainer}>
-                  <Text style={styles.headerTitle}>Fees & Fines</Text>
-                  <View style={styles.demoBadge}>
-                    <Text style={styles.demoBadgeText}>DEMO DATA</Text>
-                  </View>
-                  <DeveloperIndicator />
-                  <BoardMemberIndicator />
-                </View>
-                <Text style={styles.headerSubtitle}>
-                  Manage your HOA payments and violations
-                </Text>
-              </View>
-            </View>
-          </ImageBackground>
-        </Animated.View>
-
-        {/* Custom Tab Bar - Only when screen is wide enough */}
-        {showDesktopNav && (
-          <Animated.View style={{
-            opacity: fadeAnim,
-          }}>
-            <CustomTabBar />
-          </Animated.View>
         )}
         
         <ScrollView 
@@ -382,6 +274,133 @@ const FeesScreen = () => {
             },
           })}
         >
+        {/* Header */}
+        <Animated.View
+          style={[
+            {
+          opacity: fadeAnim,
+            },
+            Platform.OS === 'ios' && styles.headerContainerIOS
+          ]}
+        >
+          <ImageBackground
+            source={require('../../assets/hoa-4k.jpg')}
+            style={styles.header}
+            imageStyle={styles.headerImage}
+            resizeMode="stretch"
+          >
+            <View style={styles.headerOverlay} />
+            <View style={styles.headerTop}>
+              {/* Hamburger Menu - Only when mobile nav is shown */}
+              {showMobileNav && (
+                <TouchableOpacity
+                  style={styles.menuButton}
+                  onPress={() => setIsMenuOpen(true)}
+                >
+                  <Ionicons name="menu" size={24} color="#ffffff" />
+                </TouchableOpacity>
+              )}
+              
+              <View style={styles.headerLeft}>
+                <View style={styles.titleContainer}>
+                  <Text style={styles.headerTitle}>Fees & Fines</Text>
+                </View>
+                <Text style={styles.headerSubtitle}>
+                  Manage your HOA payments and violations
+                </Text>
+                <View style={styles.indicatorsContainer}>
+                  <DeveloperIndicator />
+                  <BoardMemberIndicator />
+                </View>
+              </View>
+
+              {/* Messaging Button - Board Members Only */}
+              {isBoardMember && (
+                <View style={styles.headerRight}>
+                  <MessagingButton onPress={() => setShowOverlay(true)} />
+                </View>
+              )}
+            </View>
+          </ImageBackground>
+        </Animated.View>
+
+        {/* Custom Tab Bar - Only when screen is wide enough */}
+        {showDesktopNav && (
+          <Animated.View style={{
+            opacity: fadeAnim,
+          }}>
+            <CustomTabBar />
+          </Animated.View>
+        )}
+
+        {/* User Status Section - Compact */}
+        {user && (
+          <Animated.View style={[
+            styles.section,
+            {
+              opacity: contentAnim,
+              transform: [{
+                translateY: contentAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [50, 0],
+                })
+              }]
+            }
+          ]}>
+            <View style={styles.compactUserCard}>
+              <View style={styles.compactUserInfo}>
+                <ProfileImage 
+                  source={displayProfileImage} 
+                  size={50}
+                  initials={`${user.firstName.charAt(0)}${user.lastName.charAt(0)}`}
+                  style={{ marginRight: 10 }}
+                />
+                <View style={styles.compactUserDetails}>
+                  <Text style={styles.compactUserName}>{user.firstName} {user.lastName}</Text>
+                  <Text style={styles.compactUserType}>
+                    {user.isBoardMember ? 'Board Member' : 
+                     user.isRenter ? 'Renter' : 
+                     user.isResident ? 'Homeowner' : 'Resident'}
+                  </Text>
+                </View>
+                {/* Show status only if there are fees, otherwise show no fees message */}
+                {fees.length > 0 || fines.length > 0 ? (
+                  <View style={[
+                    styles.compactStatusBadge,
+                    hasPaidAnnualFee ? styles.compactPaidBadge : styles.compactPendingBadge
+                  ]}>
+                    <Ionicons 
+                      name={hasPaidAnnualFee ? "checkmark-circle" : "time"} 
+                      size={14} 
+                      color={hasPaidAnnualFee ? "#10b981" : "#f59e0b"} 
+                    />
+                    <Text style={[
+                      styles.compactStatusText,
+                      { color: hasPaidAnnualFee ? "#10b981" : "#f59e0b" }
+                    ]}>
+                      {hasPaidAnnualFee ? 'Paid' : 'Pending'}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={[styles.compactStatusBadge, styles.compactNoFeesBadge]}>
+                    <Ionicons 
+                      name="calendar-outline" 
+                      size={14} 
+                      color="#6b7280" 
+                    />
+                    <Text style={[
+                      styles.compactStatusText,
+                      { color: "#6b7280" }
+                    ]}>
+                      No fees yet
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </Animated.View>
+        )}
+
         {/* Summary Cards */}
         <Animated.View style={[
           styles.section,
@@ -478,41 +497,53 @@ const FeesScreen = () => {
           {activeTab === 'fees' ? (
             <View>
               <Text style={styles.sectionTitle}>HOA Fees</Text>
-              {fees.map((fee: any) => (
-                <View key={fee._id} style={styles.itemCard}>
-                  <View style={styles.itemHeader}>
-                    <View style={styles.itemInfo}>
-                      <Text style={styles.itemTitle}>{fee.name}</Text>
-                      <Text style={styles.itemDescription}>{fee.description}</Text>
-                      <Text style={styles.itemFrequency}>{fee.frequency}</Text>
-                    </View>
-                    <View style={styles.itemAmount}>
-                      <Text style={styles.amountText}>{formatCurrency(fee.amount)}</Text>
-                      <Text style={styles.dueDate}>Due: {formatDate(fee.dueDate)}</Text>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.itemFooter}>
-                    <View style={styles.statusContainer}>
-                      <Ionicons 
-                        name={fee.isLate ? "warning" : "checkmark-circle"} 
-                        size={16} 
-                        color={fee.isLate ? "#ef4444" : "#10b981"} 
-                      />
-                      <Text style={[styles.statusText, { color: fee.isLate ? "#ef4444" : "#10b981" }]}>
-                        {fee.isLate ? 'Late' : 'Current'}
-                      </Text>
+              {fees.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="card" size={48} color="#10b981" />
+                  <Text style={styles.emptyStateText}>No fees found</Text>
+                  <Text style={styles.emptyStateSubtext}>All fees are up to date!</Text>
+                </View>
+              ) : (
+                fees.map((fee: any) => (
+                  <View key={fee._id} style={styles.itemCard}>
+                    <View style={styles.itemHeader}>
+                      <View style={styles.itemInfo}>
+                        <Text style={styles.itemTitle}>{fee.name}</Text>
+                        <Text style={styles.itemDescription}>{fee.description}</Text>
+                        <Text style={styles.itemFrequency}>{fee.frequency}</Text>
+                      </View>
+                      <View style={styles.itemAmount}>
+                        <Text style={styles.amountText}>{formatCurrency(fee.amount)}</Text>
+                        <Text style={styles.dueDate}>Due: {formatDate(fee.dueDate)}</Text>
+                      </View>
                     </View>
                     
-                    <TouchableOpacity
-                      style={styles.payButton}
-                      onPress={() => handlePayment(fee, 'fee')}
-                    >
-                      <Text style={styles.payButtonText}>Pay Now</Text>
-                    </TouchableOpacity>
+                    <View style={styles.itemFooter}>
+                      <View style={styles.statusContainer}>
+                        <Ionicons 
+                          name={fee.status === 'Paid' ? "checkmark-circle" : fee.isLate ? "warning" : "time"} 
+                          size={16} 
+                          color={fee.status === 'Paid' ? "#10b981" : fee.isLate ? "#ef4444" : "#f59e0b"} 
+                        />
+                        <Text style={[styles.compactStatusText, { 
+                          color: fee.status === 'Paid' ? "#10b981" : fee.isLate ? "#ef4444" : "#f59e0b"
+                        }]}>
+                          {fee.status === 'Paid' ? 'Paid' : fee.isLate ? 'Late' : 'Pending'}
+                        </Text>
+                      </View>
+                      
+                      {fee.status !== 'Paid' && (
+                        <TouchableOpacity
+                          style={styles.payButton}
+                          onPress={() => handlePayment(fee, 'fee')}
+                        >
+                          <Text style={styles.payButtonText}>Pay Now</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
-                </View>
-              ))}
+                ))
+              )}
             </View>
           ) : (
             <View>
@@ -530,27 +561,26 @@ const FeesScreen = () => {
                       <View style={styles.itemInfo}>
                         <Text style={styles.itemTitle}>{fine.violation}</Text>
                         <Text style={styles.itemDescription}>{fine.description}</Text>
-                        <Text style={styles.itemDate}>Issued: {formatDate(fine.dateIssued)}</Text>
+                        <Text style={styles.itemDate}>Issued: {fine.dateIssued}</Text>
                       </View>
                       <View style={styles.itemAmount}>
                         <Text style={styles.amountText}>{formatCurrency(fine.amount)}</Text>
-                        <Text style={styles.dueDate}>Due: {formatDate(fine.dueDate)}</Text>
                       </View>
                     </View>
                     
                     <View style={styles.itemFooter}>
                       <View style={styles.statusContainer}>
                         <Ionicons 
-                          name={getStatusIcon(fine.status) as any} 
+                          name={getStatusIcon(fine.status || 'Pending') as any} 
                           size={16} 
-                          color={getStatusColor(fine.status)} 
+                          color={getStatusColor(fine.status || 'Pending')} 
                         />
-                        <Text style={[styles.statusText, { color: getStatusColor(fine.status) }]}>
-                          {fine.status}
+                        <Text style={[styles.compactStatusText, { color: getStatusColor(fine.status || 'Pending') }]}>
+                          {fine.status || 'Pending'}
                         </Text>
                       </View>
                       
-                      {fine.status !== 'Paid' && (
+                      {(fine.status || 'Pending') !== 'Paid' && (
                         <TouchableOpacity
                           style={styles.payButton}
                           onPress={() => handlePayment(fine, 'fine')}
@@ -580,6 +610,15 @@ const FeesScreen = () => {
           }
         ]}>
           <Text style={styles.sectionTitle}>Payment Information</Text>
+          <View style={styles.dropboxInfo}>
+            <Ionicons name="cube" size={24} color="#2563eb" style={{ marginRight: 12 }} />
+            <View style={styles.dropboxTextContainer}>
+              <Text style={styles.dropboxLabel}>Dropbox:</Text>
+              <Text style={styles.dropboxText}>
+                301 Elderberry St, Shelton, WA
+              </Text>
+            </View>
+          </View>
           <Text style={styles.infoText}>
             • Payments can be made online through the HOA portal
           </Text>
@@ -597,6 +636,21 @@ const FeesScreen = () => {
         {/* Additional content to ensure scrollable content */}
         <View style={styles.spacer} />
         </ScrollView>
+
+        {/* Payment Modal */}
+        {selectedPaymentItem && user && (
+          <PaymentModal
+            visible={paymentModalVisible}
+            onClose={() => setPaymentModalVisible(false)}
+            amount={selectedPaymentItem.amount}
+            feeType={selectedPaymentType === 'fee' ? selectedPaymentItem.name : selectedPaymentItem.violation}
+            description={selectedPaymentItem.description}
+            userId={user._id}
+            feeId={selectedPaymentType === 'fee' ? selectedPaymentItem._id : undefined}
+            fineId={selectedPaymentType === 'fine' ? selectedPaymentItem._id : undefined}
+            onSuccess={handlePaymentSuccess}
+          />
+        )}
       </View>
     </SafeAreaView>
   );
@@ -640,6 +694,11 @@ const styles = StyleSheet.create({
   spacer: {
     height: Platform.OS === 'web' ? 200 : 100,
   },
+  headerContainerIOS: {
+    width: Dimensions.get('window').width,
+    alignSelf: 'stretch',
+    overflow: 'hidden',
+  },
   header: {
     height: 240,
     padding: 20,
@@ -647,11 +706,19 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     position: 'relative',
     justifyContent: 'space-between',
+    width: '100%',
+    alignSelf: 'stretch',
   },
   headerImage: {
     borderRadius: 0,
     resizeMode: 'stretch',
-    width: '100%',
+    width: Platform.OS === 'ios' ? Dimensions.get('window').width + 40 : '100%',
+    height: 240,
+    position: 'absolute',
+    left: Platform.OS === 'ios' ? -20 : 0,
+    right: Platform.OS === 'ios' ? -20 : 0,
+    top: 0,
+    bottom: 0,
   },
   headerOverlay: {
     position: 'absolute',
@@ -667,6 +734,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
     zIndex: 1,
+    gap: 12,
+  },
+  headerRight: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   menuButton: {
     padding: 8,
@@ -682,20 +754,15 @@ const styles = StyleSheet.create({
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
     marginBottom: 4,
-    flexWrap: 'wrap',
   },
-  demoBadge: {
-    backgroundColor: '#f59e0b',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  demoBadgeText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#ffffff',
+  indicatorsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 8,
   },
   headerTitle: {
     color: '#ffffff',
@@ -887,11 +954,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginLeft: 4,
-  },
   payButton: {
     backgroundColor: '#2563eb',
     paddingHorizontal: 16,
@@ -913,6 +975,84 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     lineHeight: 20,
     marginBottom: 6,
+  },
+  dropboxInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#eff6ff',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#2563eb',
+  },
+  dropboxTextContainer: {
+    flex: 1,
+  },
+  dropboxLabel: {
+    fontSize: 16,
+    color: '#2563eb',
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  dropboxText: {
+    fontSize: 18,
+    color: '#1e40af',
+    fontWeight: '800',
+    lineHeight: 24,
+  },
+  // Compact user status styles
+  compactUserCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  },
+  compactUserInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  compactUserDetails: {
+    flex: 1,
+  },
+  compactUserName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 2,
+  },
+  compactUserType: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  compactStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  compactPaidBadge: {
+    backgroundColor: '#d1fae5',
+  },
+  compactPendingBadge: {
+    backgroundColor: '#fef3c7',
+  },
+  compactNoFeesBadge: {
+    backgroundColor: '#f3f4f6',
+  },
+  compactStatusText: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginLeft: 4,
   },
 });
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,16 +15,24 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, api } from '../services/mockConvex';
 import { useAuth } from '../context/AuthContext';
+import { useStorageUrl } from '../hooks/useStorageUrl';
+import { Linking, ActivityIndicator } from 'react-native';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import DeveloperIndicator from '../components/DeveloperIndicator';
 import CustomTabBar from '../components/CustomTabBar';
 import MobileTabBar from '../components/MobileTabBar';
+import MessagingButton from '../components/MessagingButton';
+import { useMessaging } from '../context/MessagingContext';
 
 const CovenantsScreen = () => {
   const { user } = useAuth();
+  const { setShowOverlay } = useMessaging();
+  const isBoardMember = user?.isBoardMember && user?.isActive;
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const hoaInfo = useQuery(api.hoaInfo.get);
+  const ccrsPdfUrl = useStorageUrl(hoaInfo?.ccrsPdfStorageId || null);
 
   // State for dynamic responsive behavior (only for web/desktop)
   const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
@@ -34,6 +42,9 @@ const CovenantsScreen = () => {
   const isMobileDevice = Platform.OS === 'ios' || Platform.OS === 'android';
   const showMobileNav = isMobileDevice || screenWidth < 1024; // Always mobile on mobile devices, responsive on web
   const showDesktopNav = !isMobileDevice && screenWidth >= 1024; // Only desktop nav on web when wide enough
+
+  // ScrollView ref for better control
+  const scrollViewRef = useRef<ScrollView>(null);
 
   // Listen for window size changes (only on web/desktop)
   useEffect(() => {
@@ -46,8 +57,30 @@ const CovenantsScreen = () => {
     }
   }, []);
 
-  const categories = ['Architecture', 'Landscaping', 'Parking', 'Pets', 'General'];
-  const covenants = useQuery(api.covenants.getAll) ?? [];
+  // Set initial cursor and cleanup on unmount (web only)
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      // Set initial cursor
+      document.body.style.cursor = 'grab';
+      
+      // Ensure scroll view is properly initialized
+      setTimeout(() => {
+        if (scrollViewRef.current) {
+          // Force a layout update
+          scrollViewRef.current.scrollTo({ y: 0, animated: false });
+        }
+      }, 100);
+      
+      return () => {
+        document.body.style.cursor = 'default';
+      };
+    }
+  }, [screenWidth, showMobileNav, showDesktopNav]);
+
+  const categories = ['Architecture', 'Landscaping', 'Minutes', 'Caveats', 'General'];
+  const [covenantsLimit, setCovenantsLimit] = useState(50);
+  const covenantsData = useQuery(api.covenants.getPaginated, { limit: covenantsLimit, offset: 0 });
+  const covenants = covenantsData?.items ?? [];
 
   const filteredCovenants = covenants.filter((covenant: any) => {
     const matchesSearch = covenant.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -70,10 +103,10 @@ const CovenantsScreen = () => {
         return 'home';
       case 'Landscaping':
         return 'leaf';
-      case 'Parking':
-        return 'car';
-      case 'Pets':
-        return 'paw';
+      case 'Minutes':
+        return 'clipboard';
+      case 'Caveats':
+        return 'warning';
       case 'General':
         return 'document-text';
       default:
@@ -87,10 +120,10 @@ const CovenantsScreen = () => {
         return '#3b82f6';
       case 'Landscaping':
         return '#10b981';
-      case 'Parking':
+      case 'Minutes':
+        return '#06b6d4';
+      case 'Caveats':
         return '#f59e0b';
-      case 'Pets':
-        return '#8b5cf6';
       case 'General':
         return '#6b7280';
       default:
@@ -110,18 +143,47 @@ const CovenantsScreen = () => {
       )}
       
       <ScrollView 
-        style={styles.scrollContainer}
+        ref={scrollViewRef}
+        style={[styles.scrollContainer, Platform.OS === 'web' && styles.webScrollContainer]}
+        contentContainerStyle={[styles.scrollContent, Platform.OS === 'web' && styles.webScrollContent]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={true}
         bounces={true}
         scrollEnabled={true}
+        alwaysBounceVertical={false}
+        nestedScrollEnabled={true}
+        removeClippedSubviews={false}
+        scrollEventThrottle={16}
+        decelerationRate="normal"
+        directionalLockEnabled={true}
+        canCancelContentTouches={true}
+        // Web-specific enhancements
+        {...(Platform.OS === 'web' && {
+          onScrollBeginDrag: () => {
+            if (Platform.OS === 'web') {
+              document.body.style.cursor = 'grabbing';
+              document.body.style.userSelect = 'none';
+            }
+          },
+          onScrollEndDrag: () => {
+            if (Platform.OS === 'web') {
+              document.body.style.cursor = 'grab';
+              document.body.style.userSelect = 'auto';
+            }
+          },
+          onScroll: () => {
+            // Ensure scrolling is working
+          },
+        })}
       >
         {/* Header with ImageBackground */}
+        <View style={Platform.OS === 'ios' ? styles.headerContainerIOS : undefined}>
         <ImageBackground
           source={require('../../assets/hoa-4k.jpg')}
           style={styles.header}
           imageStyle={styles.headerImage}
+            resizeMode="stretch"
         >
           <View style={styles.headerOverlay} />
           <View style={styles.headerTop}>
@@ -138,21 +200,51 @@ const CovenantsScreen = () => {
             <View style={styles.headerLeft}>
               <View style={styles.titleContainer}>
                 <Text style={styles.headerTitle}>Covenants & Rules</Text>
-                <DeveloperIndicator />
-                <BoardMemberIndicator />
               </View>
               <Text style={styles.headerSubtitle}>
                 Community guidelines and regulations
               </Text>
+              <View style={styles.indicatorsContainer}>
+                <DeveloperIndicator />
+                <BoardMemberIndicator />
+              </View>
             </View>
+
+            {/* Messaging Button - Board Members Only */}
+            {isBoardMember && (
+              <View style={styles.headerRight}>
+                <MessagingButton onPress={() => setShowOverlay(true)} />
+              </View>
+            )}
           </View>
         </ImageBackground>
+        </View>
 
         {/* Custom Tab Bar - Only when screen is wide enough */}
         {showDesktopNav && (
           <CustomTabBar />
         )}
       
+      {/* CC&Rs PDF View Button */}
+      {ccrsPdfUrl && (
+        <View style={styles.ccrsContainer}>
+          <TouchableOpacity
+            style={styles.ccrsButton}
+            onPress={() => {
+              if (ccrsPdfUrl) {
+                Linking.openURL(ccrsPdfUrl).catch((err) => {
+                  console.error('Error opening CC&Rs PDF:', err);
+                  Alert.alert('Error', 'Unable to open PDF. Please try again.');
+                });
+              }
+            }}
+          >
+            <Ionicons name="document-text" size={20} color="#2563eb" />
+            <Text style={styles.ccrsButtonText}>View CC&Rs PDF</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
@@ -172,45 +264,53 @@ const CovenantsScreen = () => {
       </View>
 
       {/* Category Filter */}
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        style={styles.categoryContainer}
-        contentContainerStyle={styles.categoryContent}
-      >
-        <TouchableOpacity
-          style={[
-            styles.categoryButton,
-            !selectedCategory && styles.categoryButtonActive
-          ]}
-          onPress={() => setSelectedCategory(null)}
-        >
-          <Text style={[
-            styles.categoryButtonText,
-            !selectedCategory && styles.categoryButtonTextActive
-          ]}>
-            All
-          </Text>
-        </TouchableOpacity>
-        
-        {categories.map((category) => (
-          <TouchableOpacity
-            key={category}
-            style={[
-              styles.categoryButton,
-              selectedCategory === category && styles.categoryButtonActive
-            ]}
-            onPress={() => setSelectedCategory(category)}
+      <View style={styles.categoryContainer}>
+        <View style={styles.filterRow}>
+          <View style={styles.filterLabelContainer}>
+            <Ionicons name="filter" size={16} color="#6b7280" style={styles.filterIcon} />
+            <Text style={styles.filterLabel}>Filter:</Text>
+          </View>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryContent}
+            style={styles.categoryScrollView}
           >
-            <Text style={[
-              styles.categoryButtonText,
-              selectedCategory === category && styles.categoryButtonTextActive
-            ]}>
-              {category}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+            <TouchableOpacity
+              style={[
+                styles.categoryButton,
+                !selectedCategory && styles.categoryButtonActive
+              ]}
+              onPress={() => setSelectedCategory(null)}
+            >
+              <Text style={[
+                styles.categoryButtonText,
+                !selectedCategory && styles.categoryButtonTextActive
+              ]}>
+                All
+              </Text>
+            </TouchableOpacity>
+            
+            {categories.map((category) => (
+              <TouchableOpacity
+                key={category}
+                style={[
+                  styles.categoryButton,
+                  selectedCategory === category && styles.categoryButtonActive
+                ]}
+                onPress={() => setSelectedCategory(category)}
+              >
+                <Text style={[
+                  styles.categoryButtonText,
+                  selectedCategory === category && styles.categoryButtonTextActive
+                ]}>
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
 
       {/* Covenants List */}
       <View style={styles.covenantsContainer}>
@@ -295,6 +395,29 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flex: 1,
   },
+  webScrollContainer: {
+    ...(Platform.OS === 'web' && {
+      overflow: 'auto' as any,
+      height: '100vh' as any,
+      maxHeight: '100vh' as any,
+      position: 'relative' as any,
+    }),
+  },
+  scrollContent: {
+    paddingBottom: 20,
+  },
+  webScrollContent: {
+    ...(Platform.OS === 'web' && {
+      minHeight: '100vh' as any,
+      flexGrow: 1,
+      paddingBottom: 100 as any,
+    }),
+  },
+  headerContainerIOS: {
+    width: Dimensions.get('window').width,
+    alignSelf: 'stretch',
+    overflow: 'hidden',
+  },
   header: {
     height: 240,
     padding: 20,
@@ -302,11 +425,19 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     position: 'relative',
     justifyContent: 'space-between',
+    width: '100%',
+    alignSelf: 'stretch',
   },
   headerImage: {
     borderRadius: 0,
     resizeMode: 'stretch',
-    width: '100%',
+    width: Platform.OS === 'ios' ? Dimensions.get('window').width + 40 : '100%',
+    height: 240,
+    position: 'absolute',
+    left: Platform.OS === 'ios' ? -20 : 0,
+    right: Platform.OS === 'ios' ? -20 : 0,
+    top: 0,
+    bottom: 0,
   },
   headerOverlay: {
     position: 'absolute',
@@ -321,6 +452,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     zIndex: 1,
+    gap: 12,
+  },
+  headerRight: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   menuButton: {
     padding: 8,
@@ -336,8 +472,15 @@ const styles = StyleSheet.create({
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
     marginBottom: 4,
+  },
+  indicatorsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 8,
   },
   headerTitle: {
     color: '#ffffff',
@@ -380,11 +523,41 @@ const styles = StyleSheet.create({
     color: '#374151',
   },
   categoryContainer: {
-    backgroundColor: '#ffffff',
-    paddingVertical: 10,
+    backgroundColor: '#f9fafb',
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 15,
+  },
+  filterLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 12,
+    paddingRight: 12,
+    borderRightWidth: 1,
+    borderRightColor: '#e5e7eb',
+  },
+  filterIcon: {
+    marginRight: 6,
+  },
+  filterLabel: {
+    fontSize: 13,
+    color: '#6b7280',
+    fontWeight: '600',
+  },
+  categoryScrollView: {
+    flex: 1,
+    marginLeft: 0,
   },
   categoryContent: {
-    paddingHorizontal: 15,
+    paddingHorizontal: 0,
+    alignItems: 'center',
   },
   categoryButton: {
     paddingHorizontal: 16,
@@ -394,7 +567,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f3f4f6',
   },
   categoryButtonActive: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#22c55e',
   },
   categoryButtonText: {
     fontSize: 14,
@@ -517,6 +690,29 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     lineHeight: 20,
     marginBottom: 8,
+  },
+  ccrsContainer: {
+    backgroundColor: '#ffffff',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  ccrsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#eff6ff',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2563eb',
+    gap: 8,
+  },
+  ccrsButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2563eb',
   },
 });
 

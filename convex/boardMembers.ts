@@ -6,9 +6,14 @@ export const getAll = query({
   handler: async (ctx) => {
     const boardMembers = await ctx.db
       .query("boardMembers")
-      .order("desc")
       .collect();
-    return boardMembers;
+    
+    // Sort by sortOrder (lower numbers first), with undefined/null values last
+    return boardMembers.sort((a, b) => {
+      const aOrder = a.sortOrder ?? 999;
+      const bOrder = b.sortOrder ?? 999;
+      return aOrder - bOrder;
+    });
   },
 });
 
@@ -65,6 +70,54 @@ export const update = mutation({
 export const remove = mutation({
   args: { id: v.id("boardMembers") },
   handler: async (ctx, args) => {
+    // Get the board member record to find their email
+    const boardMember = await ctx.db.get(args.id);
+    
+    if (boardMember && boardMember.email) {
+      // Find the corresponding resident by email
+      const resident = await ctx.db
+        .query("residents")
+        .withIndex("by_email", (q) => q.eq("email", boardMember.email))
+        .first();
+      
+      // If resident exists, update their isBoardMember flag to false
+      // This ensures they remain as a homeowner when stepping down from the board
+      if (resident) {
+        await ctx.db.patch(resident._id, {
+          isBoardMember: false,
+          updatedAt: Date.now(),
+        });
+      }
+    }
+    
+    // Delete the board member record
     await ctx.db.delete(args.id);
   },
 }); 
+
+// Maintenance: backfill optional fields on existing documents
+export const backfillOptionalFields = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const members = await ctx.db.query("boardMembers").collect();
+    let updated = 0;
+    for (const m of members) {
+      const needsPatch =
+        (m.phone === undefined || m.phone === null) ||
+        (m.bio === undefined || m.bio === null) ||
+        (m.image === undefined || m.image === null) ||
+        (m.termEnd === undefined || m.termEnd === null);
+      if (needsPatch) {
+        await ctx.db.patch(m._id, {
+          phone: m.phone ?? "",
+          bio: m.bio ?? "",
+          image: m.image ?? "",
+          termEnd: m.termEnd ?? "",
+          updatedAt: Date.now(),
+        });
+        updated++;
+      }
+    }
+    return { total: members.length, updated };
+  },
+});

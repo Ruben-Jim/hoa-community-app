@@ -22,9 +22,14 @@ import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import DeveloperIndicator from '../components/DeveloperIndicator';
 import CustomTabBar from '../components/CustomTabBar';
 import MobileTabBar from '../components/MobileTabBar';
+import ProfileImage from '../components/ProfileImage';
+import MessagingButton from '../components/MessagingButton';
+import { useMessaging } from '../context/MessagingContext';
 
 const BoardScreen = () => {
   const { user } = useAuth();
+  const { setShowOverlay } = useMessaging();
+  const isBoardMember = user?.isBoardMember && user?.isActive;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   // State for dynamic responsive behavior (only for web/desktop)
@@ -61,6 +66,17 @@ const BoardScreen = () => {
   };
 
   const members = useQuery(api.boardMembers.getAll) ?? [];
+  
+  // Rainbow colors for board member cards
+  const borderColors = [
+    '#ef4444', // Red
+    '#f97316', // Orange
+    '#eab308', // Yellow
+    '#22c55e', // Green
+    '#3b82f6', // Blue
+    '#6366f1', // Indigo
+    '#8b5cf6', // Violet
+  ];
 
   // Animation functions
   const animateStaggeredContent = () => {
@@ -68,12 +84,12 @@ const BoardScreen = () => {
       Animated.timing(membersAnim, {
         toValue: 1,
         duration: 600,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(infoAnim, {
         toValue: 1,
         duration: 600,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
   };
@@ -107,11 +123,7 @@ const BoardScreen = () => {
           // Force a layout update
           scrollViewRef.current.scrollTo({ y: 0, animated: false });
           
-          // Debug: Log scroll view properties
-          console.log('BoardScreen ScrollView initialized for web');
-          console.log('Screen width:', screenWidth);
-          console.log('Show mobile nav:', showMobileNav);
-          console.log('Show desktop nav:', showDesktopNav);
+          // Debug logging removed
         }
       }, 100);
       
@@ -168,13 +180,19 @@ const BoardScreen = () => {
         })}
       >
         {/* Header */}
-        <Animated.View style={{
+        <Animated.View
+          style={[
+            {
           opacity: fadeAnim,
-        }}>
+            },
+            Platform.OS === 'ios' && styles.headerContainerIOS
+          ]}
+        >
           <ImageBackground
             source={require('../../assets/hoa-4k.jpg')}
             style={styles.header}
             imageStyle={styles.headerImage}
+            resizeMode="stretch"
           >
             <View style={styles.headerOverlay} />
             <View style={styles.headerTop}>
@@ -191,13 +209,22 @@ const BoardScreen = () => {
               <View style={styles.headerLeft}>
                 <View style={styles.titleContainer}>
                   <Text style={styles.headerTitle}>Board of Directors</Text>
-                  <DeveloperIndicator />
-                  <BoardMemberIndicator />
                 </View>
                 <Text style={styles.headerSubtitle}>
                   Your elected representatives serving the community
                 </Text>
+                <View style={styles.indicatorsContainer}>
+                  <DeveloperIndicator />
+                  <BoardMemberIndicator />
+                </View>
               </View>
+
+              {/* Messaging Button - Board Members Only */}
+              {isBoardMember && (
+                <View style={styles.headerRight}>
+                  <MessagingButton onPress={() => setShowOverlay(true)} />
+                </View>
+              )}
             </View>
           </ImageBackground>
         </Animated.View>
@@ -214,22 +241,21 @@ const BoardScreen = () => {
       <Animated.View style={{
         opacity: membersAnim,
       }}>
-        {members.map((member: any) => (
-          <View key={member._id} style={styles.memberCard}>
+        {members.map((member: any, index: number) => (
+          <View key={member._id} style={[
+            styles.memberCard,
+            {
+              borderLeftColor: borderColors[index % borderColors.length],
+            }
+          ]}>
             {/* Member Header with Avatar and Basic Info */}
             <View style={styles.memberHeader}>
               <View style={styles.avatarContainer}>
-                <View style={styles.avatar}>
-                  {member.image ? (
-                    <Image 
-                      source={{ uri: member.image }} 
-                      style={styles.avatarImage}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <Ionicons name="person" size={32} color="#6b7280" />
-                  )}
-                </View>
+                <ProfileImage 
+                  source={member.image}
+                  size={70}
+                  style={styles.avatarImage}
+                />
               </View>
               <View style={styles.memberInfo}>
                 <Text style={styles.memberName}>{member.name}</Text>
@@ -255,7 +281,7 @@ const BoardScreen = () => {
             {/* Contact Section */}
             <View style={styles.contactSection}>
               <View style={styles.contactHeader}>
-                <Ionicons name="call" size={16} color="#6b7280" />
+                <Ionicons name="information-circle" size={16} color="#6b7280" />
                 <Text style={styles.contactLabel}>Contact Information</Text>
               </View>
               <View style={styles.contactButtons}>
@@ -274,7 +300,7 @@ const BoardScreen = () => {
                   onPress={() => handleContact(member, 'email')}
                 >
                   <Ionicons name="mail" size={20} color="#2563eb" />
-                  <Text style={styles.contactText}>{member.email}</Text>
+                  <Text style={styles.contactText} numberOfLines={2}>{member.email}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -286,7 +312,10 @@ const BoardScreen = () => {
         opacity: infoAnim,
       }}>
         {/* Board Meetings Section */}
-        <View style={styles.infoSection}>
+        <View style={[styles.infoSection, {
+          borderLeftColor: borderColors[(members.length) % borderColors.length], // Next color after last member
+        }]}>
+          
           <View style={styles.infoHeader}>
             <View style={styles.infoIconContainer}>
               <Ionicons name="calendar" size={24} color="#2563eb" />
@@ -316,7 +345,9 @@ const BoardScreen = () => {
         </View>
 
         {/* Contact Information Section */}
-        <View style={styles.infoSection}>
+        <View style={[styles.infoSection, {
+          borderLeftColor: borderColors[(members.length + 1) % borderColors.length], // Second color after last member
+        }]}>
           <View style={styles.infoHeader}>
             <View style={styles.infoIconContainer}>
               <Ionicons name="mail" size={24} color="#2563eb" />
@@ -340,7 +371,9 @@ const BoardScreen = () => {
         </View>
 
         {/* Additional Resources Section */}
-        <View style={styles.infoSection}>
+        <View style={[styles.infoSection, {
+          borderLeftColor: borderColors[(members.length + 2) % borderColors.length], // Third color after last member
+        }]}>
           <View style={styles.infoHeader}>
             <View style={styles.infoIconContainer}>
               <Ionicons name="document-text" size={24} color="#2563eb" />
@@ -406,6 +439,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f3f4f6',
   },
+  headerContainerIOS: {
+    width: Dimensions.get('window').width,
+    alignSelf: 'stretch',
+    overflow: 'hidden',
+  },
   header: {
     height: 240,
     padding: 20,
@@ -413,11 +451,18 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     position: 'relative',
     justifyContent: 'space-between',
+    width: '100%',
+    alignSelf: 'stretch',
   },
   headerImage: {
     borderRadius: 0,
-    resizeMode: 'stretch',
-    width: '100%',
+    width: Platform.OS === 'ios' ? Dimensions.get('window').width + 40 : '100%',
+    height: 240,
+    position: 'absolute',
+    left: Platform.OS === 'ios' ? -20 : 0,
+    right: Platform.OS === 'ios' ? -20 : 0,
+    top: 0,
+    bottom: 0,
   },
   headerOverlay: {
     position: 'absolute',
@@ -431,6 +476,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
+  },
+  headerRight: {
+    alignItems: 'center',
+    justifyContent: 'center',
     zIndex: 1,
   },
   menuButton: {
@@ -447,29 +497,32 @@ const styles = StyleSheet.create({
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
     marginBottom: 4,
   },
-  headerTitle: {
+  indicatorsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  headerTitle: ({
     color: '#ffffff',
     fontSize: 24,
     fontWeight: 'bold',
-    textShadowColor: 'rgba(0, 0, 0, 0.9)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
+    textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9)' as any,
     textAlign: 'center',
-  },
-  headerSubtitle: {
+  } as any),
+  headerSubtitle: ({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '400',
     opacity: 0.9,
     marginTop: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.9)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
+    textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9)' as any,
     textAlign: 'center',
-  },
+  } as any),
   memberCard: {
     backgroundColor: '#ffffff',
     margin: 15,
@@ -481,7 +534,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
     borderLeftWidth: 4,
-    borderLeftColor: '#2563eb',
+    // borderLeftColor is now set dynamically in the component
   },
   memberHeader: {
     flexDirection: 'row',
@@ -491,24 +544,12 @@ const styles = StyleSheet.create({
   avatarContainer: {
     marginRight: 16,
   },
-  avatar: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: '#f8fafc',
-    justifyContent: 'center',
-    alignItems: 'center',
+  avatarImage: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
-    overflow: 'hidden',
-  },
-  avatarImage: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
   },
   memberInfo: {
     flex: 1,
@@ -581,6 +622,7 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     flex: 1,
     fontWeight: '500',
+    flexShrink: 1,
   },
   infoSection: {
     backgroundColor: '#ffffff',
@@ -593,6 +635,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
     borderLeftWidth: 4,
+    // borderLeftColor is now set dynamically in the component
     borderLeftColor: '#2563eb',
   },
   infoHeader: {

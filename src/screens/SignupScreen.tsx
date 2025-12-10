@@ -23,6 +23,7 @@ import { AuthStackParamList } from '../navigation/AuthNavigator';
 import { simpleAlert } from '../utils/webCompatibleAlert';
 import CustomAlert from '../components/CustomAlert';
 import { useCustomAlert } from '../hooks/useCustomAlert';
+import { getUploadReadyImage } from '../utils/imageUpload';
 
 type SignupScreenNavigationProp = StackNavigationProp<AuthStackParamList, 'Signup'>;
 
@@ -50,7 +51,30 @@ const SignupScreen = () => {
   // ScrollView ref for better control
   const scrollViewRef = useRef<ScrollView>(null);
 
+<<<<<<< HEAD
   // Ensure scroll view is properly initialized
+=======
+  // Format phone number: +1 (123) 456-7890
+  const formatPhoneNumber = (text: string): string => {
+    // Remove any non-numeric characters
+    const numbers = text.replace(/\D/g, '');
+    
+    // Format as +1 (123) 456-7890
+    if (numbers.length === 0) {
+      return '';
+    } else if (numbers.length <= 1) {
+      return `+${numbers}`;
+    } else if (numbers.length <= 4) {
+      return `+1 (${numbers.slice(1)}`;
+    } else if (numbers.length <= 7) {
+      return `+1 (${numbers.slice(1, 4)}) ${numbers.slice(4)}`;
+    } else {
+      return `+1 (${numbers.slice(1, 4)}) ${numbers.slice(4, 7)}-${numbers.slice(7, 11)}`;
+    }
+  };
+
+  // Set initial cursor and cleanup on unmount (web only)
+>>>>>>> master
   useEffect(() => {
     // Force a layout update after mount
     setTimeout(() => {
@@ -72,7 +96,7 @@ const SignupScreen = () => {
 
       // Launch image picker
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: 'images' as any,
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
@@ -116,19 +140,21 @@ const SignupScreen = () => {
   const uploadImage = async (imageUri: string): Promise<string> => {
     try {
       const uploadUrl = await generateUploadUrl();
-      
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
-      
+
+      const { blob, mimeType } = await getUploadReadyImage(imageUri);
+
       const uploadResponse = await fetch(uploadUrl, {
         method: 'POST',
-        headers: { 'Content-Type': blob.type },
+        headers: { 'Content-Type': mimeType },
         body: blob,
       });
       
       const { storageId } = await uploadResponse.json();
+<<<<<<< HEAD
       
       // For demo: return storageId directly (no real storage URLs)
+=======
+>>>>>>> master
       return storageId;
     } catch (error) {
       console.error('Error uploading image:', error);
@@ -256,7 +282,7 @@ const SignupScreen = () => {
       >
           {/* Header */}
           <View style={styles.header}>
-            <Ionicons name="home" size={48} color="#2563eb" />
+            <Ionicons name="home" size={Platform.OS === 'web' ? 40 : 36} color="#2563eb" />
             <Text style={styles.title}>Welcome to HOA Community</Text>
             <Text style={styles.subtitle}>Create your account to get started</Text>
           </View>
@@ -265,7 +291,7 @@ const SignupScreen = () => {
           <View style={styles.form}>
             {/* Profile Image */}
             <View style={styles.profileImageSection}>
-              <Text style={styles.label}>Profile Picture (Optional)</Text>
+              <Text style={[styles.label, styles.profileImageLabel]}>Profile Picture (Optional)</Text>
               <View style={styles.profileImageContainer}>
                 {profileImage ? (
                   <View style={styles.profileImageWrapper}>
@@ -279,7 +305,7 @@ const SignupScreen = () => {
                   </View>
                 ) : (
                   <View style={styles.profileImagePlaceholder}>
-                    <Ionicons name="person" size={40} color="#9ca3af" />
+                    <Ionicons name="person" size={Platform.OS === 'web' ? 36 : 32} color="#9ca3af" />
                   </View>
                 )}
               </View>
@@ -366,8 +392,12 @@ const SignupScreen = () => {
               style={[styles.input, errors.phone ? styles.inputError : null]}
               placeholder="Enter phone number"
               value={formData.phone}
-              onChangeText={(text) => updateFormData('phone', text)}
+              onChangeText={(text) => {
+                const formatted = formatPhoneNumber(text);
+                updateFormData('phone', formatted);
+              }}
               keyboardType="phone-pad"
+              maxLength={17}
             />
             {errors.phone ? <Text style={styles.errorText}>{errors.phone}</Text> : null}
 
@@ -407,14 +437,16 @@ const SignupScreen = () => {
               >
                 <Ionicons 
                   name="home" 
-                  size={20} 
+                  size={Platform.OS === 'web' ? 20 : 18} 
                   color={formData.isResident && !formData.isRenter ? '#ffffff' : '#6b7280'} 
                 />
-                <Text style={[
-                  styles.roleButtonText,
-                  formData.isResident && !formData.isRenter && styles.roleButtonTextActive
-                ]}>
-                  Resident
+                <Text 
+                  style={[
+                    styles.roleButtonText,
+                    formData.isResident && !formData.isRenter && styles.roleButtonTextActive
+                  ]}
+                >
+                  Homeowner
                 </Text>
               </TouchableOpacity>
 
@@ -430,13 +462,15 @@ const SignupScreen = () => {
               >
                 <Ionicons 
                   name="key" 
-                  size={20} 
+                  size={Platform.OS === 'web' ? 20 : 18} 
                   color={formData.isRenter ? '#ffffff' : '#6b7280'} 
                 />
-                <Text style={[
-                  styles.roleButtonText,
-                  formData.isRenter && styles.roleButtonTextActive
-                ]}>
+                <Text 
+                  style={[
+                    styles.roleButtonText,
+                    formData.isRenter && styles.roleButtonTextActive
+                  ]}
+                >
                   Renter
                 </Text>
               </TouchableOpacity>
@@ -450,13 +484,15 @@ const SignupScreen = () => {
               >
                 <Ionicons 
                   name="people" 
-                  size={20} 
+                  size={Platform.OS === 'web' ? 20 : 18} 
                   color={formData.isBoardMember ? '#ffffff' : '#6b7280'} 
                 />
-                <Text style={[
-                  styles.roleButtonText,
-                  formData.isBoardMember && styles.roleButtonTextActive
-                ]}>
+                <Text 
+                  style={[
+                    styles.roleButtonText,
+                    formData.isBoardMember && styles.roleButtonTextActive
+                  ]}
+                >
                   Board Member
                 </Text>
               </TouchableOpacity>
@@ -515,12 +551,24 @@ const styles = StyleSheet.create({
   },
   webScrollView: {
     ...(Platform.OS === 'web' && {
+<<<<<<< HEAD
       overflowY: 'auto' as any,
       overflowX: 'hidden' as any,
       WebkitOverflowScrolling: 'touch' as any,
       // Ensure proper height for web
       height: '100%' as any,
       maxHeight: '100vh' as any,
+=======
+      cursor: 'grab' as any,
+      userSelect: 'none' as any,
+      WebkitUserSelect: 'none' as any,
+      MozUserSelect: 'none' as any,
+      msUserSelect: 'none' as any,
+      overflow: 'auto' as any,
+      height: '100vh' as any,
+      maxHeight: '100vh' as any,
+      position: 'relative' as any,
+>>>>>>> master
     }),
   },
   scrollContent: {
@@ -530,8 +578,14 @@ const styles = StyleSheet.create({
   },
   webScrollContent: {
     ...(Platform.OS === 'web' && {
+<<<<<<< HEAD
       minHeight: '100%' as any,
       paddingBottom: 120 as any,
+=======
+      minHeight: '100vh' as any,
+      flexGrow: 1,
+      paddingBottom: 100 as any,
+>>>>>>> master
     }),
   },
   spacer: {
@@ -540,20 +594,20 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: Platform.OS === 'web' ? 24 : 20,
     paddingHorizontal: 20,
   },
   title: {
-    fontSize: 28,
+    fontSize: Platform.OS === 'web' ? 28 : 24,
     fontWeight: 'bold',
     color: '#1f2937',
-    marginTop: 16,
+    marginTop: Platform.OS === 'web' ? 12 : 8,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: Platform.OS === 'web' ? 16 : 14,
     color: '#6b7280',
-    marginTop: 8,
+    marginTop: Platform.OS === 'web' ? 6 : 4,
     textAlign: 'center',
   },
   form: {
@@ -603,24 +657,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: Platform.OS === 'web' ? 16 : 14,
+    paddingHorizontal: Platform.OS === 'web' ? 16 : 12,
     borderRadius: 12,
     backgroundColor: '#f3f4f6',
     borderWidth: 2,
     borderColor: 'transparent',
     flex: 1,
-    minWidth: '30%',
+    minWidth: Platform.OS === 'web' ? 120 : 100,
   },
   roleButtonActive: {
     backgroundColor: '#2563eb',
     borderColor: '#2563eb',
   },
   roleButtonText: {
-    fontSize: 16,
+    fontSize: Platform.OS === 'web' ? 16 : 14,
     fontWeight: '600',
     color: '#6b7280',
-    marginLeft: 8,
+    marginLeft: Platform.OS === 'web' ? 4 : 3,
+    textAlign: 'center',
   },
   roleButtonTextActive: {
     color: '#ffffff',
@@ -659,26 +714,29 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   profileImageSection: {
-    marginBottom: 20,
+    marginBottom: 16,
     alignItems: 'center',
   },
+  profileImageLabel: {
+    marginTop: Platform.OS === 'web' ? 20 : 12,
+  },
   profileImageContainer: {
-    marginBottom: 12,
+    marginBottom: 8,
   },
   profileImageWrapper: {
     position: 'relative',
   },
   profileImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: Platform.OS === 'web' ? 90 : 80,
+    height: Platform.OS === 'web' ? 90 : 80,
+    borderRadius: Platform.OS === 'web' ? 45 : 40,
     borderWidth: 3,
     borderColor: '#e5e7eb',
   },
   profileImagePlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: Platform.OS === 'web' ? 90 : 80,
+    height: Platform.OS === 'web' ? 90 : 80,
+    borderRadius: Platform.OS === 'web' ? 45 : 40,
     backgroundColor: '#f3f4f6',
     borderWidth: 2,
     borderColor: '#e5e7eb',

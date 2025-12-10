@@ -10,6 +10,7 @@ export default defineSchema({
     bio: v.optional(v.string()),
     image: v.optional(v.string()),
     termEnd: v.optional(v.string()),
+    sortOrder: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   }),
@@ -20,8 +21,8 @@ export default defineSchema({
     category: v.union(
       v.literal("Architecture"),
       v.literal("Landscaping"),
-      v.literal("Parking"),
-      v.literal("Pets"),
+      v.literal("Minutes"),
+      v.literal("Caveats"),
       v.literal("General")
     ),
     lastUpdated: v.string(),
@@ -42,15 +43,24 @@ export default defineSchema({
     dueDate: v.string(),
     description: v.string(),
     isLate: v.boolean(),
+    userId: v.optional(v.string()), // Link to homeowner
+    year: v.optional(v.number()), // For annual fees
+    address: v.optional(v.string()), // Property address for fines
+    reason: v.optional(v.string()), // Reason for fine
+    type: v.optional(v.string()), // 'Fee' or 'Fine'
+    status: v.optional(v.union(
+      v.literal("Pending"),
+      v.literal("Paid"),
+      v.literal("Overdue")
+    )),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }),
+  }).index("by_user", ["userId"]).index("by_type", ["type"]),
 
   fines: defineTable({
     violation: v.string(),
     amount: v.number(),
     dateIssued: v.string(),
-    dueDate: v.string(),
     status: v.union(
       v.literal("Pending"),
       v.literal("Paid"),
@@ -73,6 +83,7 @@ export default defineSchema({
       v.literal("Suggestion"),
       v.literal("Lost & Found")
     ),
+    images: v.optional(v.array(v.string())), // Array of image URLs
     likes: v.number(),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -86,31 +97,6 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_post", ["postId"]),
 
-  emergencyNotifications: defineTable({
-    title: v.string(),
-    content: v.string(),
-    type: v.union(
-      v.literal("Emergency"),
-      v.literal("Alert"),
-      v.literal("Info")
-    ),
-    priority: v.union(
-      v.literal("High"),
-      v.literal("Medium"),
-      v.literal("Low")
-    ),
-    isActive: v.boolean(),
-    category: v.union(
-      v.literal("Security"),
-      v.literal("Maintenance"),
-      v.literal("Event"),
-      v.literal("Lost Pet"),
-      v.literal("Other")
-    ),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  }).index("by_active", ["isActive"]).index("by_category", ["category"]).index("by_priority", ["priority"]),
-
   hoaInfo: defineTable({
     name: v.string(),
     address: v.string(),
@@ -119,6 +105,8 @@ export default defineSchema({
     website: v.optional(v.string()),
     officeHours: v.string(),
     emergencyContact: v.string(),
+    eventText: v.optional(v.string()),
+    ccrsPdfStorageId: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   }),
@@ -142,4 +130,107 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_email", ["email"]),
+
+  payments: defineTable({
+    userId: v.string(),
+    feeType: v.string(),
+    amount: v.number(),
+    paymentDate: v.string(),
+    status: v.union(
+      v.literal("Pending"),
+      v.literal("Paid"),
+      v.literal("Overdue")
+    ),
+    paymentMethod: v.union(
+      v.literal("Venmo")
+    ),
+      transactionId: v.string(),             // Venmo transaction ID
+    venmoUsername: v.optional(v.string()), // User's Venmo username
+    venmoTransactionId: v.optional(v.string()), // User-provided Venmo transaction ID
+    verificationStatus: v.optional(v.union(
+      v.literal("Pending"),
+      v.literal("Verified"),
+      v.literal("Rejected")
+    )),
+    feeId: v.optional(v.id("fees")),
+    fineId: v.optional(v.id("fines")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"])
+    .index("by_transaction", ["transactionId"]),
+
+  polls: defineTable({
+    title: v.string(),
+    description: v.optional(v.string()),
+    options: v.array(v.string()), // Array of poll options
+    isActive: v.boolean(),
+    allowMultipleVotes: v.boolean(),
+    expiresAt: v.optional(v.number()), // Optional expiration timestamp
+    createdBy: v.string(), // Admin/board member who created the poll
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_active", ["isActive"]),
+
+  residentNotifications: defineTable({
+    residentId: v.id("residents"),
+    createdBy: v.optional(v.string()), // Email of the user who created the notification
+    type: v.union(
+      v.literal("Selling"),
+      v.literal("Moving")
+    ),
+    listingDate: v.optional(v.string()),
+    closingDate: v.optional(v.string()),
+    realtorInfo: v.optional(v.string()),
+    newResidentName: v.optional(v.string()),
+    isRental: v.optional(v.boolean()),
+    additionalInfo: v.optional(v.string()),
+    houseImage: v.optional(v.string()), // Storage ID for house image
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_resident", ["residentId"]),
+
+  pollVotes: defineTable({
+    pollId: v.id("polls"),
+    userId: v.string(), // Resident ID who voted
+    selectedOptions: v.array(v.number()), // Array of option indices
+    createdAt: v.number(),
+  }).index("by_poll", ["pollId"]).index("by_user", ["userId"]),
+
+  pets: defineTable({
+    residentId: v.id("residents"),
+    name: v.string(),
+    image: v.string(), // Storage ID for pet image
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_resident", ["residentId"]),
+
+  documents: defineTable({
+    title: v.string(),
+    description: v.optional(v.string()),
+    type: v.union(
+      v.literal("Minutes"),
+      v.literal("Financial")
+    ),
+    fileStorageId: v.string(), // Storage ID for document file (PDF, etc.)
+    uploadedBy: v.string(), // User who uploaded the document
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_type", ["type"]),
+
+  conversations: defineTable({
+    participants: v.array(v.string()), // Array of participant user IDs
+    createdBy: v.string(), // ID of board member who started conversation
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }),
+
+  messages: defineTable({
+    conversationId: v.id("conversations"),
+    senderId: v.string(), // User ID of sender
+    senderName: v.string(), // Name of sender (for board: "Shelton Springs Board")
+    senderRole: v.string(), // Role of sender (board/individual name)
+    content: v.string(), // Message text
+    createdAt: v.number(),
+  }).index("by_conversation", ["conversationId"]),
 }); 
