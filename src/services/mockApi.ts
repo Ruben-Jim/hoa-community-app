@@ -63,6 +63,9 @@ export const mockApi = {
   },
   fees: {
     getAll: 'fees.getAll',
+    getPaginated: 'fees.getPaginated',
+    getAllFines: 'fees.getAllFines',
+    getAllHomeownersPaymentStatus: 'fees.getAllHomeownersPaymentStatus',
   },
   fines: {
     getAll: 'fines.getAll',
@@ -84,6 +87,9 @@ export const mockApi = {
     getUrl: 'storage.getUrl',
     generateUploadUrl: 'storage.generateUploadUrl',
     deleteStorageFile: 'storage.deleteStorageFile',
+  },
+  payments: {
+    getPendingVenmoPayments: 'payments.getPendingVenmoPayments',
   },
 };
 
@@ -156,6 +162,22 @@ export const resolveQuery = (queryPath: string, args?: any): any => {
     case 'fees.getAllFines':
       // Return all fines (same as fines.getAll)
       return getFines();
+    case 'fees.getAllHomeownersPaymentStatus':
+      // Return homeowners (residents who are not renters) with payment status
+      const allResidents = getResidents();
+      const homeowners = allResidents.filter((r: any) => r.isResident && !r.isRenter);
+      return homeowners.map((homeowner: any) => ({
+        _id: homeowner._id,
+        firstName: homeowner.firstName,
+        lastName: homeowner.lastName,
+        email: homeowner.email,
+        phone: homeowner.phone,
+        address: homeowner.address,
+        unitNumber: homeowner.unitNumber,
+        profileImage: homeowner.profileImage,
+        isBoardMember: homeowner.isBoardMember,
+        isActive: homeowner.isActive,
+      }));
     case 'fines.getAll':
       return getFines();
     case 'hoaInfo.get':
@@ -184,6 +206,9 @@ export const resolveQuery = (queryPath: string, args?: any): any => {
       return (mockState.messages || []).filter(
         (msg: any) => msg.conversationId === conversationId
       ).sort((a: any, b: any) => a.createdAt - b.createdAt);
+    case 'payments.getPendingVenmoPayments':
+      // Return empty array for demo (no pending payments by default)
+      return [];
     default:
       return undefined;
   }

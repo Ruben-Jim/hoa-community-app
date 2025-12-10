@@ -63,6 +63,7 @@ export const api = {
     getAll: 'fees.getAll',
     getPaginated: 'fees.getPaginated',
     getAllFines: 'fees.getAllFines',
+    getAllHomeownersPaymentStatus: 'fees.getAllHomeownersPaymentStatus',
   },
   fines: {
     getAll: 'fines.getAll',
@@ -96,6 +97,7 @@ export const api = {
   },
   payments: {
     createVenmoPayment: 'payments.createVenmoPayment',
+    getPendingVenmoPayments: 'payments.getPendingVenmoPayments',
   },
 };
 
