@@ -30,14 +30,14 @@ export const getAllActive = query({
     // Join with resident data using the map
     const notificationsWithResidentInfo = notifications.map((notification) => {
       const resident = residentsById.get(notification.residentId);
-      return {
-        ...notification,
-        residentName: resident ? `${resident.firstName} ${resident.lastName}` : 'Unknown',
-        residentAddress: resident 
-          ? `${resident.address}${resident.unitNumber ? ` #${resident.unitNumber}` : ''}` 
-          : '',
-        profileImage: resident?.profileImage || null,
-      };
+        return {
+          ...notification,
+          residentName: resident ? `${resident.firstName} ${resident.lastName}` : 'Unknown',
+          residentAddress: resident 
+            ? `${resident.address}${resident.unitNumber ? ` #${resident.unitNumber}` : ''}` 
+            : '',
+          profileImage: resident?.profileImage || null,
+        };
     });
     
     return notificationsWithResidentInfo;

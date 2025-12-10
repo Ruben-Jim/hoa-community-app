@@ -73,7 +73,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardView}
         >
-          <View style={styles.modalContainer}>
+        <View style={styles.modalContainer}>
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Complete Payment</Text>
@@ -137,7 +137,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
               />
             )}
           </ScrollView>
-          </View>
+        </View>
         </KeyboardAvoidingView>
       </View>
     </Modal>

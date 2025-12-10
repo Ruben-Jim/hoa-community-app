@@ -29,10 +29,14 @@ import { webCompatibleAlert } from '../utils/webCompatibleAlert';
 import CustomAlert from '../components/CustomAlert';
 import { useCustomAlert } from '../hooks/useCustomAlert';
 import ProfileImage from '../components/ProfileImage';
+import MessagingButton from '../components/MessagingButton';
+import { useMessaging } from '../context/MessagingContext';
 
 const HomeScreen = () => {
   const { user } = useAuth();
   const navigation = useNavigation();
+  const { setShowOverlay } = useMessaging();
+  const isBoardMember = user?.isBoardMember && user?.isActive;
   const hoaInfo = useQuery(api.hoaInfo.get);
   // Use paginated queries with small initial limits for home screen
   const communityPostsData = useQuery(api.communityPosts.getPaginated, { limit: 5, offset: 0 });
@@ -301,7 +305,7 @@ const HomeScreen = () => {
       <Animated.View
         style={[
           {
-            opacity: fadeAnim,
+        opacity: fadeAnim,
           },
           Platform.OS === 'ios' && styles.headerContainerIOS
         ]}
@@ -329,6 +333,13 @@ const HomeScreen = () => {
             <Text style={styles.hoaName}>{hoaInfo?.name ?? 'Shelton Springs'}</Text>
             <Text style={styles.subtitle}>Your Community Connection</Text>
           </View>
+
+          {/* Messaging Button - Board Members Only */}
+          {isBoardMember && (
+            <View style={styles.headerRight}>
+              <MessagingButton onPress={() => setShowOverlay(true)} />
+            </View>
+          )}
         </View>
               
         {user && (
@@ -399,76 +410,76 @@ const HomeScreen = () => {
 
       {/* Recent Community Posts */}
       {(communityPosts?.filter((post: any) => post.category !== 'Complaint') || []).length > 0 && (
-        <Animated.View style={[
-          styles.section,
-          { borderLeftColor: '#ef4444' }, // Orange
-          {
-            opacity: postsAnim,
-            transform: [{
-              translateY: postsAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [50, 0],
-              })
-            }]
-          }
-        ]}>
-          <View style={styles.communityHeader}>
-            <Ionicons name="people" size={24} color="#64748b" />
-            <Text style={[styles.sectionTitle, { marginLeft: 8, marginBottom: 0 }]}>Recent Community Posts</Text>
-          </View>
-          {(communityPosts?.filter((post: any) => post.category !== 'Complaint') || []).slice(0, 2).map((post: any, index: number) => {
-            return (
-              <Animated.View 
-                key={post._id} 
-                style={[
-                  styles.postCard,
-                  {
-                    opacity: postsAnim,
-                    transform: [{
-                      translateY: postsAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [30 + (index * 20), 0],
-                      })
-                    }]
-                  }
-                ]}
-              >
-                <View style={styles.postHeader}>
-                  <View style={styles.postAuthorInfo}>
-                    <ProfileImage source={post.authorProfileImage} size={40} style={{ marginRight: 8 }} />
-                    <Text style={styles.postAuthor}>{post.author}</Text>
-                  </View>
-                  <Text style={styles.postCategory}>{post.category}</Text>
+      <Animated.View style={[
+        styles.section,
+        { borderLeftColor: '#ef4444' }, // Orange
+        {
+          opacity: postsAnim,
+          transform: [{
+            translateY: postsAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [50, 0],
+            })
+          }]
+        }
+      ]}>
+        <View style={styles.communityHeader}>
+          <Ionicons name="people" size={24} color="#64748b" />
+          <Text style={[styles.sectionTitle, { marginLeft: 8, marginBottom: 0 }]}>Recent Community Posts</Text>
+        </View>
+        {(communityPosts?.filter((post: any) => post.category !== 'Complaint') || []).slice(0, 2).map((post: any, index: number) => {
+          return (
+            <Animated.View 
+              key={post._id} 
+              style={[
+                styles.postCard,
+                {
+                  opacity: postsAnim,
+                  transform: [{
+                    translateY: postsAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [30 + (index * 20), 0],
+                    })
+                  }]
+                }
+              ]}
+            >
+              <View style={styles.postHeader}>
+                <View style={styles.postAuthorInfo}>
+                  <ProfileImage source={post.authorProfileImage} size={40} style={{ marginRight: 8 }} />
+                  <Text style={styles.postAuthor}>{post.author}</Text>
                 </View>
-                <Text style={styles.postTitle}>{post.title}</Text>
-                <Text style={styles.postContent}>
-                  {post.content}
-                </Text>
-                
-                <View style={styles.postFooter}>
-                  <Text style={styles.postTime}>{formatDate(new Date(post.createdAt).toISOString())}</Text>
-                  <View style={styles.postStats}>
-                    <Ionicons name="heart" size={16} color="#6b7280" />
-                    <Text style={styles.postStatsText}>{post.likes}</Text>
-                    <Ionicons name="chatbubble" size={16} color="#6b7280" />
-                    <Text style={styles.postStatsText}>{post.comments?.length ?? 0}</Text>
-                  </View>
+                <Text style={styles.postCategory}>{post.category}</Text>
+              </View>
+              <Text style={styles.postTitle}>{post.title}</Text>
+              <Text style={styles.postContent}>
+                {post.content}
+              </Text>
+              
+              <View style={styles.postFooter}>
+                <Text style={styles.postTime}>{formatDate(new Date(post.createdAt).toISOString())}</Text>
+                <View style={styles.postStats}>
+                  <Ionicons name="heart" size={16} color="#6b7280" />
+                  <Text style={styles.postStatsText}>{post.likes}</Text>
+                  <Ionicons name="chatbubble" size={16} color="#6b7280" />
+                  <Text style={styles.postStatsText}>{post.comments?.length ?? 0}</Text>
                 </View>
-              </Animated.View>
-            );
-          })}
-          
-          {/* View More Button */}
-          <TouchableOpacity
-            style={styles.viewMoreButton}
-            onPress={() => {
-              navigation.navigate('Community' as never);
-            }}
-          >
-            <Text style={styles.viewMoreButtonText}>View More</Text>
-            <Ionicons name="arrow-forward" size={14} color="#ef4444" />
-          </TouchableOpacity>
-        </Animated.View>
+              </View>
+            </Animated.View>
+          );
+        })}
+        
+        {/* View More Button */}
+        <TouchableOpacity
+          style={styles.viewMoreButton}
+          onPress={() => {
+            navigation.navigate('Community' as never);
+          }}
+        >
+          <Text style={styles.viewMoreButtonText}>View More</Text>
+          <Ionicons name="arrow-forward" size={14} color="#ef4444" />
+        </TouchableOpacity>
+      </Animated.View>
       )}
 
       {/* Recent Polls */}
@@ -492,7 +503,7 @@ const HomeScreen = () => {
           </View>
           {polls.slice(0, 1).map((poll: any, index: number) => (
             <Animated.View 
-              key={poll._id}
+              key={poll._id} 
               style={[
                 styles.postCard,
                 {
@@ -593,20 +604,20 @@ const HomeScreen = () => {
               </View>
             </Animated.View>
           ))}
-          
+                
           {/* View Poll Button */}
-          <TouchableOpacity 
+                <TouchableOpacity 
             style={[
               styles.viewMoreButton,
               (isMobileDevice || screenWidth < 1024) && styles.viewMoreButtonMobile
             ]}
-            onPress={() => {
+                  onPress={() => {
               (navigation.navigate as any)('Community', { activeSubTab: 'polls' });
-            }}
-          >
+                  }}
+                >
             <Text style={styles.viewMoreButtonText}>View Poll</Text>
             <Ionicons name="arrow-forward" size={14} color="#ef4444" />
-          </TouchableOpacity>
+                </TouchableOpacity>
         </Animated.View>
       )}
 
@@ -808,6 +819,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 10,
+    gap: 12,
+  },
+  headerRight: {
+    alignItems: 'center',
+    justifyContent: 'center',
     zIndex: 1,
   },
   menuButton: {

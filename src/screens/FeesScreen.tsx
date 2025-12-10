@@ -23,9 +23,13 @@ import CustomTabBar from '../components/CustomTabBar';
 import MobileTabBar from '../components/MobileTabBar';
 import PaymentModal from '../components/PaymentModal';
 import ProfileImage from '../components/ProfileImage';
+import MessagingButton from '../components/MessagingButton';
+import { useMessaging } from '../context/MessagingContext';
 
 const FeesScreen = () => {
   const { user } = useAuth();
+  const { setShowOverlay } = useMessaging();
+  const isBoardMember = user?.isBoardMember && user?.isActive;
   const [activeTab, setActiveTab] = useState<'fees' | 'fines'>('fees');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [hasPaidAnnualFee, setHasPaidAnnualFee] = useState(false);
@@ -270,7 +274,7 @@ const FeesScreen = () => {
         <Animated.View
           style={[
             {
-              opacity: fadeAnim,
+          opacity: fadeAnim,
             },
             Platform.OS === 'ios' && styles.headerContainerIOS
           ]}
@@ -305,6 +309,13 @@ const FeesScreen = () => {
                   <BoardMemberIndicator />
                 </View>
               </View>
+
+              {/* Messaging Button - Board Members Only */}
+              {isBoardMember && (
+                <View style={styles.headerRight}>
+                  <MessagingButton onPress={() => setShowOverlay(true)} />
+                </View>
+              )}
             </View>
           </ImageBackground>
         </Animated.View>
@@ -719,6 +730,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
     zIndex: 1,
+    gap: 12,
+  },
+  headerRight: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   menuButton: {
     padding: 8,

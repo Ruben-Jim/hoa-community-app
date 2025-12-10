@@ -106,6 +106,7 @@ export default defineSchema({
     officeHours: v.string(),
     emergencyContact: v.string(),
     eventText: v.optional(v.string()),
+    ccrsPdfStorageId: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   }),
@@ -216,4 +217,20 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_type", ["type"]),
+
+  conversations: defineTable({
+    participants: v.array(v.string()), // Array of participant user IDs
+    createdBy: v.string(), // ID of board member who started conversation
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }),
+
+  messages: defineTable({
+    conversationId: v.id("conversations"),
+    senderId: v.string(), // User ID of sender
+    senderName: v.string(), // Name of sender (for board: "Shelton Springs Board")
+    senderRole: v.string(), // Role of sender (board/individual name)
+    content: v.string(), // Message text
+    createdAt: v.number(),
+  }).index("by_conversation", ["conversationId"]),
 }); 

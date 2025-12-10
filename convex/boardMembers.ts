@@ -70,6 +70,27 @@ export const update = mutation({
 export const remove = mutation({
   args: { id: v.id("boardMembers") },
   handler: async (ctx, args) => {
+    // Get the board member record to find their email
+    const boardMember = await ctx.db.get(args.id);
+    
+    if (boardMember && boardMember.email) {
+      // Find the corresponding resident by email
+      const resident = await ctx.db
+        .query("residents")
+        .withIndex("by_email", (q) => q.eq("email", boardMember.email))
+        .first();
+      
+      // If resident exists, update their isBoardMember flag to false
+      // This ensures they remain as a homeowner when stepping down from the board
+      if (resident) {
+        await ctx.db.patch(resident._id, {
+          isBoardMember: false,
+          updatedAt: Date.now(),
+        });
+      }
+    }
+    
+    // Delete the board member record
     await ctx.db.delete(args.id);
   },
 }); 

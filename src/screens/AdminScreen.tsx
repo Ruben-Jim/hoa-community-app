@@ -20,6 +20,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation } from 'convex/react';
@@ -216,6 +217,7 @@ const AdminScreen = () => {
   // Covenant management mutations
   const createCovenant = useMutation(api.covenants.create);
   const updateCovenant = useMutation(api.covenants.update);
+  const updateCcrsPdf = useMutation(api.hoaInfo.updateCcrsPdf);
   
   // Poll management mutations
   const createPoll = useMutation(api.polls.create);
@@ -1716,19 +1718,75 @@ const AdminScreen = () => {
           <View style={styles.tabContent}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Covenants & Rules</Text>
-              <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-                <TouchableOpacity
-                  style={[styles.addButton, { backgroundColor: '#22c55e' }]}
-                  onPress={() => {
-                    animateButtonPress();
-                    setShowCovenantModal(true);
-                    animateIn('covenant');
-                  }}
-                >
-                  <Ionicons name="add" size={20} color="#ffffff" />
-                  <Text style={styles.addButtonText}>Add Covenant</Text>
-                </TouchableOpacity>
-              </Animated.View>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+                  <TouchableOpacity
+                    style={[styles.addButton, { backgroundColor: '#2563eb' }]}
+                    onPress={async () => {
+                      try {
+                        const result = await DocumentPicker.getDocumentAsync({
+                          type: 'application/pdf',
+                          copyToCacheDirectory: true,
+                        });
+                        
+                        if (result.canceled) {
+                          return;
+                        }
+                        
+                        const file = result.assets[0];
+                        if (!file) {
+                          Alert.alert('Error', 'No file selected.');
+                          return;
+                        }
+                        
+                        // Generate upload URL
+                        const uploadUrl = await generateUploadUrl();
+                        
+                        // Read file and upload
+                        const fileResponse = await fetch(file.uri);
+                        const blob = await fileResponse.blob();
+                        
+                        // Upload file to Convex storage
+                        const uploadResponse = await fetch(uploadUrl, {
+                          method: 'POST',
+                          headers: { 'Content-Type': file.mimeType || 'application/pdf' },
+                          body: blob,
+                        });
+                        
+                        if (!uploadResponse.ok) {
+                          throw new Error('Upload failed');
+                        }
+                        
+                        const { storageId } = await uploadResponse.json();
+                        
+                        // Update CC&Rs PDF
+                        await updateCcrsPdf({ ccrsPdfStorageId: storageId });
+                        
+                        Alert.alert('Success', 'CC&Rs PDF uploaded successfully!');
+                      } catch (error: any) {
+                        console.error('Error uploading CC&Rs PDF:', error);
+                        Alert.alert('Error', error?.message || 'Failed to upload CC&Rs PDF. Please try again.');
+                      }
+                    }}
+                  >
+                    <Ionicons name="document-attach" size={20} color="#ffffff" />
+                    <Text style={styles.addButtonText}>Upload CC&Rs</Text>
+                  </TouchableOpacity>
+                </Animated.View>
+                <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+                  <TouchableOpacity
+                    style={[styles.addButton, { backgroundColor: '#22c55e' }]}
+                    onPress={() => {
+                      animateButtonPress();
+                      setShowCovenantModal(true);
+                      animateIn('covenant');
+                    }}
+                  >
+                    <Ionicons name="add" size={20} color="#ffffff" />
+                    <Text style={styles.addButtonText}>Add Covenant</Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              </View>
             </View>
             {covenants.length === 0 ? (
               <View style={styles.emptyState}>
@@ -2225,12 +2283,15 @@ const AdminScreen = () => {
                   <Text style={styles.emptyStateText}>No pet registrations found</Text>
                 </View>
               ) : (
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                <View style={styles.petsGridContainer}>
                   {pets.map((item: any) => (
-                    <View key={item._id} style={{ width: '50%', padding: 8 }}>
+                    <View key={item._id} style={[
+                      styles.petCardWrapper,
+                      Platform.OS === 'web' && screenWidth >= 1024 && styles.petCardWrapperDesktop
+                    ]}>
                       <Animated.View 
                         style={[
-                          styles.residentGridCard,
+                          styles.petGridCard,
                           {
                             opacity: fadeAnim,
                             transform: [{
@@ -2242,7 +2303,7 @@ const AdminScreen = () => {
                           }
                         ]}
                       >
-                        <View style={styles.residentGridCardContent}>
+                        <View style={styles.petGridCardContent}>
                           {/* Pet Image - Centered */}
                           <View style={styles.petCardImageContainer}>
                             <View style={styles.petImageAvatar}>
@@ -2274,13 +2335,13 @@ const AdminScreen = () => {
                           </View>
                           
                           {/* Action Button */}
-                          <View style={styles.residentGridActions}>
+                          <View style={styles.petCardActions}>
                             <TouchableOpacity
-                              style={[styles.residentGridActionButton, styles.blockButton]}
+                              style={[styles.petCardActionButton, styles.blockButton]}
                               onPress={() => handleDeleteItem(item, 'pet')}
                             >
-                              <Ionicons name="trash" size={16} color="#ef4444" />
-                              <Text style={styles.residentGridActionText}>Delete</Text>
+                              <Ionicons name="trash" size={18} color="#ef4444" />
+                              <Text style={styles.petCardActionText}>Delete</Text>
                             </TouchableOpacity>
                           </View>
                         </View>
@@ -5770,7 +5831,6 @@ const styles = StyleSheet.create({
   // Grid-specific resident card styles
   residentGridCard: {
     width: '100%',
-    height: 140,
     backgroundColor: '#ffffff',
     borderRadius: 10,
     shadowColor: '#000',
@@ -5784,7 +5844,6 @@ const styles = StyleSheet.create({
   residentGridCardContent: {
     padding: 8,
     flex: 1,
-    justifyContent: 'space-between',
   },
   residentGridMainInfo: {
     flexDirection: 'row',
@@ -5795,6 +5854,7 @@ const styles = StyleSheet.create({
   residentGridDetails: {
     flex: 1,
     minWidth: 0,
+    flexShrink: 1,
   },
   residentGridNameRow: {
     flexDirection: 'row',
@@ -5892,10 +5952,12 @@ const styles = StyleSheet.create({
     lineHeight: Platform.OS === 'web' ? 18 : 20,
     marginTop: 4,
     marginBottom: 8,
+    flexShrink: 1,
+    flexShrink: 1,
   },
   residentGridActions: {
     alignItems: 'flex-end',
-    marginTop: 'auto',
+    marginTop: 8,
   },
   residentGridActionButton: {
     flexDirection: 'row',
@@ -5956,38 +6018,91 @@ const styles = StyleSheet.create({
   },
   petCardImageContainer: {
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
   },
   petCardTextContent: {
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
+    minHeight: 80,
   },
   petCardNameRow: {
     alignItems: 'center',
     marginBottom: 8,
+    width: '100%',
   },
   petCardName: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
     color: '#1f2937',
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   petCardDate: {
     fontSize: 12,
     color: '#9ca3af',
     textAlign: 'center',
+    marginBottom: 8,
   },
   petCardOwner: {
     fontSize: 13,
     color: '#6b7280',
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
+    fontWeight: '500',
   },
   petCardAddress: {
     fontSize: 12,
     color: '#9ca3af',
     textAlign: 'center',
+  },
+  // Pet grid layout styles
+  petsGridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+    padding: 8,
+  },
+  petCardWrapper: {
+    width: '47%',
+    minWidth: 200,
+  },
+  petCardWrapperDesktop: {
+    width: '30%',
+  },
+  petGridCard: {
+    width: '100%',
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
+  },
+  petGridCardContent: {
+    padding: 16,
+  },
+  petCardActions: {
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  petCardActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fee2e2',
+  },
+  petCardActionText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#ef4444',
   },
   // Poll styles
   pollOptionsContainer: {

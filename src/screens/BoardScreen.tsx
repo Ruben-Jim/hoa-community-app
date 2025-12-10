@@ -24,9 +24,13 @@ import DeveloperIndicator from '../components/DeveloperIndicator';
 import CustomTabBar from '../components/CustomTabBar';
 import MobileTabBar from '../components/MobileTabBar';
 import ProfileImage from '../components/ProfileImage';
+import MessagingButton from '../components/MessagingButton';
+import { useMessaging } from '../context/MessagingContext';
 
 const BoardScreen = () => {
   const { user } = useAuth();
+  const { setShowOverlay } = useMessaging();
+  const isBoardMember = user?.isBoardMember && user?.isActive;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   // State for dynamic responsive behavior (only for web/desktop)
@@ -180,7 +184,7 @@ const BoardScreen = () => {
         <Animated.View
           style={[
             {
-              opacity: fadeAnim,
+          opacity: fadeAnim,
             },
             Platform.OS === 'ios' && styles.headerContainerIOS
           ]}
@@ -215,6 +219,13 @@ const BoardScreen = () => {
                   <BoardMemberIndicator />
                 </View>
               </View>
+
+              {/* Messaging Button - Board Members Only */}
+              {isBoardMember && (
+                <View style={styles.headerRight}>
+                  <MessagingButton onPress={() => setShowOverlay(true)} />
+                </View>
+              )}
             </View>
           </ImageBackground>
         </Animated.View>
@@ -466,6 +477,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
+  },
+  headerRight: {
+    alignItems: 'center',
+    justifyContent: 'center',
     zIndex: 1,
   },
   menuButton: {

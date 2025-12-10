@@ -24,9 +24,9 @@ export const optimizeImageForUpload = async (
     // ImageManipulator will maintain aspect ratio when only width is specified
     const actions: ImageManipulator.Action[] = [
       {
-        resize: {
+      resize: {
           width: maxDimension,
-        },
+      },
       },
     ];
 
@@ -38,9 +38,9 @@ export const optimizeImageForUpload = async (
     console.error('Error optimizing image:', error);
     // If manipulation fails, try without resizing
     return await ImageManipulator.manipulateAsync(uri, [], {
-      compress,
-      format,
-    });
+    compress,
+    format,
+  });
   }
 };
 

@@ -7,8 +7,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { ConvexProvider, ConvexReactClient } from 'convex/react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { MessagingProvider, useMessaging } from './src/context/MessagingContext';
 import AuthNavigator from './src/navigation/AuthNavigator';
 import enhancedUnifiedNotificationManager from './src/services/EnhancedUnifiedNotificationManager';
+import MessagingOverlay from './src/components/MessagingOverlay';
+import MinimizedMessageBubble from './src/components/MinimizedMessageBubble';
 
 import HomeScreen from './src/screens/HomeScreen';
 import BoardScreen from './src/screens/BoardScreen';
@@ -21,8 +24,9 @@ import AdminScreen from './src/screens/AdminScreen';
 
 const Stack = createStackNavigator();
 
-const MainApp = () => {
+const MainAppContent = () => {
   const { isAuthenticated, isLoading, isUserBlocked, user } = useAuth();
+  const { showOverlay, setShowOverlay } = useMessaging();
 
   if (isLoading) {
     return (
@@ -45,24 +49,33 @@ const MainApp = () => {
   const isDev = user?.isDev ?? false;
 
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
-      <Stack.Screen name="Home" component={HomeScreen} />
-      <Stack.Screen name="Board" component={BoardScreen} />
-      <Stack.Screen name="Covenants" component={CovenantsScreen} />
-      <Stack.Screen name="Community" component={CommunityScreen} />
-      <Stack.Screen name="Documents" component={DocumentsScreen} />
-      <Stack.Screen name="Fees" component={FeesScreen} />
-      {(isBoardMember || isDev) && (
-        <Stack.Screen 
-          name="Admin" 
-          component={AdminScreen}
-        />
-      )}
-    </Stack.Navigator>
+    <>
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,
+        }}
+      >
+        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Board" component={BoardScreen} />
+        <Stack.Screen name="Covenants" component={CovenantsScreen} />
+        <Stack.Screen name="Community" component={CommunityScreen} />
+        <Stack.Screen name="Documents" component={DocumentsScreen} />
+        <Stack.Screen name="Fees" component={FeesScreen} />
+        {(isBoardMember || isDev) && (
+          <Stack.Screen 
+            name="Admin" 
+            component={AdminScreen}
+          />
+        )}
+      </Stack.Navigator>
+      <MessagingOverlay
+        visible={showOverlay}
+        onClose={() => setShowOverlay(false)}
+      />
+      <MinimizedMessageBubble
+        onPress={() => setShowOverlay(true)}
+      />
+    </>
   );
 };
 
@@ -90,18 +103,16 @@ export default function App() {
 
   // Persistent navigation state
   const [isReady, setIsReady] = React.useState(false);
-  const [initialState, setInitialState] = React.useState();
+  const [initialState, setInitialState] = React.useState<any>();
 
   React.useEffect(() => {
     const restoreState = async () => {
       try {
-        if (Platform.OS !== 'web') {
-          return;
-        }
-
-        const savedState = localStorage.getItem('navState');
-        if (savedState !== null) {
-          setInitialState(JSON.parse(savedState));
+        if (Platform.OS === 'web') {
+          const savedState = localStorage.getItem('navState');
+          if (savedState !== null) {
+            setInitialState(JSON.parse(savedState));
+          }
         }
       } catch (e) {
         console.error('Error restoring navigation state:', e);
@@ -132,10 +143,12 @@ export default function App() {
   const content = (
     <SafeAreaProvider>
       <AuthProvider>
-        <NavigationContainer initialState={initialState} onStateChange={onStateChange}>
-          <MainApp />
-          <StatusBar style="auto" />
-        </NavigationContainer>
+        <MessagingProvider>
+          <NavigationContainer initialState={initialState} onStateChange={onStateChange}>
+            <MainAppContent />
+            <StatusBar style="auto" />
+          </NavigationContainer>
+        </MessagingProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

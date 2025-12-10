@@ -16,16 +16,24 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useAuth } from '../context/AuthContext';
+import { useStorageUrl } from '../hooks/useStorageUrl';
+import { Linking, ActivityIndicator } from 'react-native';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import DeveloperIndicator from '../components/DeveloperIndicator';
 import CustomTabBar from '../components/CustomTabBar';
 import MobileTabBar from '../components/MobileTabBar';
+import MessagingButton from '../components/MessagingButton';
+import { useMessaging } from '../context/MessagingContext';
 
 const CovenantsScreen = () => {
   const { user } = useAuth();
+  const { setShowOverlay } = useMessaging();
+  const isBoardMember = user?.isBoardMember && user?.isActive;
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const hoaInfo = useQuery(api.hoaInfo.get);
+  const ccrsPdfUrl = useStorageUrl(hoaInfo?.ccrsPdfStorageId || null);
 
   // State for dynamic responsive behavior (only for web/desktop)
   const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
@@ -172,12 +180,12 @@ const CovenantsScreen = () => {
       >
         {/* Header with ImageBackground */}
         <View style={Platform.OS === 'ios' ? styles.headerContainerIOS : undefined}>
-          <ImageBackground
-            source={require('../../assets/hoa-4k.jpg')}
-            style={styles.header}
-            imageStyle={styles.headerImage}
+        <ImageBackground
+          source={require('../../assets/hoa-4k.jpg')}
+          style={styles.header}
+          imageStyle={styles.headerImage}
             resizeMode="stretch"
-          >
+        >
           <View style={styles.headerOverlay} />
           <View style={styles.headerTop}>
             {/* Hamburger Menu - Only when mobile nav is shown */}
@@ -202,8 +210,15 @@ const CovenantsScreen = () => {
                 <BoardMemberIndicator />
               </View>
             </View>
+
+            {/* Messaging Button - Board Members Only */}
+            {isBoardMember && (
+              <View style={styles.headerRight}>
+                <MessagingButton onPress={() => setShowOverlay(true)} />
+              </View>
+            )}
           </View>
-          </ImageBackground>
+        </ImageBackground>
         </View>
 
         {/* Custom Tab Bar - Only when screen is wide enough */}
@@ -211,6 +226,26 @@ const CovenantsScreen = () => {
           <CustomTabBar />
         )}
       
+      {/* CC&Rs PDF View Button */}
+      {ccrsPdfUrl && (
+        <View style={styles.ccrsContainer}>
+          <TouchableOpacity
+            style={styles.ccrsButton}
+            onPress={() => {
+              if (ccrsPdfUrl) {
+                Linking.openURL(ccrsPdfUrl).catch((err) => {
+                  console.error('Error opening CC&Rs PDF:', err);
+                  Alert.alert('Error', 'Unable to open PDF. Please try again.');
+                });
+              }
+            }}
+          >
+            <Ionicons name="document-text" size={20} color="#2563eb" />
+            <Text style={styles.ccrsButtonText}>View CC&Rs PDF</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
@@ -410,6 +445,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     zIndex: 1,
+    gap: 12,
+  },
+  headerRight: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   menuButton: {
     padding: 8,
@@ -613,6 +653,29 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     lineHeight: 20,
     marginBottom: 8,
+  },
+  ccrsContainer: {
+    backgroundColor: '#ffffff',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  ccrsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#eff6ff',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2563eb',
+    gap: 8,
+  },
+  ccrsButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2563eb',
   },
 });
 

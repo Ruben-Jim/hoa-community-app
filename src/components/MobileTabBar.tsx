@@ -25,6 +25,8 @@ import CustomAlert from './CustomAlert';
 import { useCustomAlert } from '../hooks/useCustomAlert';
 import ProfileImage from './ProfileImage';
 import { getUploadReadyImage } from '../utils/imageUpload';
+import MessagingButton from './MessagingButton';
+import { useMessaging } from '../context/MessagingContext';
 
 interface TabItem {
   name: string;
@@ -42,6 +44,7 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
   const navigation = useNavigation();
   const route = useRoute();
   const { user, signOut } = useAuth();
+  const { setShowOverlay } = useMessaging();
   const { alertState, showAlert, hideAlert } = useCustomAlert();
   const [internalMenuOpen, setInternalMenuOpen] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -479,24 +482,42 @@ const MobileTabBar = ({ isMenuOpen: externalIsMenuOpen, onMenuClose }: MobileTab
                       {(user.isDev ?? false) ? 'Developer' : user.isBoardMember ? 'Board Member' : user.isRenter ? 'Renter' : 'Resident'}
                     </Text>
                   </View>
-                  <Pressable
-                    style={({ pressed }) => [
-                      styles.settingsButton,
-                      pressed && styles.settingsButtonPressed
-                    ]}
-                    onPress={() => {
-                      // Close the side menu first, then open profile modal when closed
-                      closeMenu(() => {
-                        // Wait longer for iOS to fully close the first modal and cleanup
-                        setTimeout(() => {
-                          setShowProfileModal(true);
-                        }, 500);
-                      });
-                    }}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
-                    <Ionicons name="settings-outline" size={20} color="#6b7280" />
-                  </Pressable>
+                  <View style={styles.userActions}>
+                    {isBoardMember && (
+                      <Pressable
+                        style={({ pressed }) => [
+                          styles.messagingButton,
+                          pressed && styles.messagingButtonPressed
+                        ]}
+                        onPress={() => {
+                          closeMenu(() => {
+                            setShowOverlay(true);
+                          });
+                        }}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                        <Ionicons name="chatbubbles" size={20} color="#2563eb" />
+                      </Pressable>
+                    )}
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.settingsButton,
+                        pressed && styles.settingsButtonPressed
+                      ]}
+                      onPress={() => {
+                        // Close the side menu first, then open profile modal when closed
+                        closeMenu(() => {
+                          // Wait longer for iOS to fully close the first modal and cleanup
+                          setTimeout(() => {
+                            setShowProfileModal(true);
+                          }, 500);
+                        });
+                      }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <Ionicons name="settings-outline" size={20} color="#6b7280" />
+                    </Pressable>
+                  </View>
                 </View>
               </View>
             )}
@@ -794,6 +815,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6b7280',
     marginTop: 2,
+  },
+  userActions: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  messagingButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#eff6ff',
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    elevation: 10,
+  },
+  messagingButtonPressed: {
+    backgroundColor: '#dbeafe',
+    opacity: 0.8,
   },
   settingsButton: {
     padding: 8,

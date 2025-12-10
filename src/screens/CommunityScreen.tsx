@@ -35,9 +35,13 @@ import { useCustomAlert } from '../hooks/useCustomAlert';
 import ProfileImage from '../components/ProfileImage';
 import OptimizedImage from '../components/OptimizedImage';
 import { getUploadReadyImage } from '../utils/imageUpload';
+import MessagingButton from '../components/MessagingButton';
+import { useMessaging } from '../context/MessagingContext';
 
 const CommunityScreen = () => {
   const { user } = useAuth();
+  const { setShowOverlay } = useMessaging();
+  const isBoardMember = user?.isBoardMember && user?.isActive;
   const route = useRoute();
   const { alertState, showAlert, hideAlert } = useCustomAlert();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -108,6 +112,9 @@ const CommunityScreen = () => {
   // Image upload state
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [uploadingImages, setUploadingImages] = useState(false);
+  const [isCreatingPost, setIsCreatingPost] = useState(false);
+  const [isSavingPet, setIsSavingPet] = useState(false);
+  const [uploadingPetImage, setUploadingPetImage] = useState(false);
   
   // Rainbow colors for posts and polls
   const borderColors = [
@@ -191,23 +198,22 @@ const CommunityScreen = () => {
   const userVotes = useQuery(api.polls.getAllUserVotes, user ? { userId: user._id } : "skip");
   
   // Lazy load comments for posts when expanded
-  const postsWithComments = posts.map((post: any) => {
+  const postsWithComments = (posts || []).map((post: any) => {
+    if (!post || !post._id) return post;
     const postId = post._id;
     const hasLoadedComments = loadedComments[postId] !== undefined;
-    const comments = hasLoadedComments ? loadedComments[postId] : (post.comments || []);
+    const comments = hasLoadedComments ? (loadedComments[postId] || []) : (post.comments || []);
     return { ...post, comments };
   });
   const notifications = useQuery(api.residentNotifications.getAllActive);
   const residents = useQuery(api.residents.getAll);
-  const pets = useQuery(api.pets.getAll) ?? [];
-
-  // Check if current user is a board member
-  const isBoardMember = user?.isBoardMember && user?.isActive;
+  const pets = useQuery(api.pets.getAll) || [];
   
   // Helper function to check if a comment author is a board member
   const isCommentAuthorBoardMember = (authorName: string) => {
-    if (!residents || !authorName) return false;
+    if (!residents || !Array.isArray(residents) || !authorName) return false;
     const resident = residents.find((r: any) => {
+      if (!r || !r.firstName || !r.lastName) return false;
       const fullName = `${r.firstName} ${r.lastName}`;
       return fullName === authorName;
     });
@@ -216,8 +222,9 @@ const CommunityScreen = () => {
 
   // Helper function to check if a comment author is a developer
   const isCommentAuthorDeveloper = (authorName: string) => {
-    if (!residents || !authorName) return false;
+    if (!residents || !Array.isArray(residents) || !authorName) return false;
     const resident = residents.find((r: any) => {
+      if (!r || !r.firstName || !r.lastName) return false;
       const fullName = `${r.firstName} ${r.lastName}`;
       return fullName === authorName;
     });
@@ -412,9 +419,9 @@ const CommunityScreen = () => {
 
   // Lazy load comments: Query comments for posts that are expanded
   // We'll query for up to 5 expanded posts at a time to limit concurrent queries
-  const expandedPostIds = Array.from(expandedComments);
+  const expandedPostIds = Array.from(expandedComments || []);
   const postsNeedingComments = expandedPostIds
-    .filter(postId => !loadedComments[postId])
+    .filter(postId => postId && !loadedComments[postId])
     .slice(0, 5); // Limit to 5 concurrent comment queries
   
   // Query comments for posts that need them
@@ -443,9 +450,12 @@ const CommunityScreen = () => {
   
   // Update loadedComments when comments are fetched
   React.useEffect(() => {
+    if (!postsNeedingComments || postsNeedingComments.length === 0) return;
+    
     postsNeedingComments.forEach((postId, index) => {
+      if (!postId) return;
       const comments = commentResults[index];
-      if (comments && !loadedComments[postId]) {
+      if (comments && Array.isArray(comments) && !loadedComments[postId]) {
         setLoadedComments(prev => ({
           ...prev,
           [postId]: comments
@@ -525,6 +535,7 @@ const CommunityScreen = () => {
     }
 
     try {
+      setIsCreatingPost(true);
       // Upload images first
       const uploadedImageUrls = await uploadImages();
 
@@ -544,6 +555,8 @@ const CommunityScreen = () => {
     } catch (error) {
       // Silently handle post creation errors
       Alert.alert('Error', 'Failed to create post');
+    } finally {
+      setIsCreatingPost(false);
     }
   };
 
@@ -1089,6 +1102,7 @@ const CommunityScreen = () => {
 
   const uploadPetImage = async (imageUri: string): Promise<string> => {
     try {
+      setUploadingPetImage(true);
       const uploadUrl = await generateUploadUrl();
       const { blob, mimeType } = await getUploadReadyImage(imageUri);
       const uploadResponse = await fetch(uploadUrl, {
@@ -1101,6 +1115,8 @@ const CommunityScreen = () => {
     } catch (error) {
       console.error('Error uploading image:', error);
       throw new Error('Failed to upload image');
+    } finally {
+      setUploadingPetImage(false);
     }
   };
 
@@ -1229,6 +1245,7 @@ const CommunityScreen = () => {
     }
 
     try {
+      setIsSavingPet(true);
       let petImageId: string | undefined;
       if (petPreviewImage) {
         // If editing, delete the old image before uploading the new one
@@ -1238,6 +1255,7 @@ const CommunityScreen = () => {
         petImageId = await uploadPetImage(petPreviewImage);
       } else if (!petFormData.image) {
         Alert.alert('Error', 'Please add a pet image');
+        setIsSavingPet(false);
         return;
       }
 
@@ -1267,6 +1285,8 @@ const CommunityScreen = () => {
       });
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to save pet');
+    } finally {
+      setIsSavingPet(false);
     }
   };
 
@@ -1376,6 +1396,13 @@ const CommunityScreen = () => {
                 <BoardMemberIndicator />
               </View>
             </View>
+
+            {/* Messaging Button - Board Members Only */}
+            {isBoardMember && (
+              <View style={styles.headerRight}>
+                <MessagingButton onPress={() => setShowOverlay(true)} />
+              </View>
+            )}
           </View>
         </ImageBackground>
       </Animated.View>
@@ -2412,10 +2439,23 @@ const CommunityScreen = () => {
             </TouchableOpacity>
             
             <TouchableOpacity
-              style={styles.createButton}
+              style={[
+                styles.createButton,
+                (isCreatingPost || uploadingImages) && styles.createButtonDisabled
+              ]}
               onPress={handleCreatePost}
+              disabled={isCreatingPost || uploadingImages}
             >
-              <Text style={styles.createButtonText}>Create Post</Text>
+              {(isCreatingPost || uploadingImages) ? (
+                <View style={styles.buttonLoadingContainer}>
+                  <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: 8 }} />
+                  <Text style={styles.createButtonText}>
+                    {uploadingImages ? 'Uploading images...' : 'Creating...'}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={styles.createButtonText}>Create Post</Text>
+              )}
             </TouchableOpacity>
           </View>
           </Animated.View>
@@ -2870,8 +2910,24 @@ const CommunityScreen = () => {
 
                 {/* Show save button if there's a new image selected */}
                 {petPreviewImage ? (
-                  <TouchableOpacity style={styles.submitButton} onPress={handleSubmitPet}>
-                    <Text style={styles.submitButtonText}>Save</Text>
+                  <TouchableOpacity 
+                    style={[
+                      styles.submitButton,
+                      (isSavingPet || uploadingPetImage) && styles.submitButtonDisabled
+                    ]} 
+                    onPress={handleSubmitPet}
+                    disabled={isSavingPet || uploadingPetImage}
+                  >
+                    {(isSavingPet || uploadingPetImage) ? (
+                      <View style={styles.buttonLoadingContainer}>
+                        <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: 8 }} />
+                        <Text style={styles.submitButtonText}>
+                          {uploadingPetImage ? 'Uploading image...' : (showEditPetModal ? 'Updating...' : 'Registering...')}
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.submitButtonText}>Save</Text>
+                    )}
                   </TouchableOpacity>
                 ) : !showEditPetModal || !petFormData.image ? (
                   /* 
@@ -2882,10 +2938,26 @@ const CommunityScreen = () => {
                     Don't show when:
                     - In edit mode with existing image - user needs to remove image first
                   */
-                  <TouchableOpacity style={styles.submitButton} onPress={handleSubmitPet}>
-                    <Text style={styles.submitButtonText}>
-                      {showEditPetModal ? 'Update' : 'Register'} Pet
-                    </Text>
+                  <TouchableOpacity 
+                    style={[
+                      styles.submitButton,
+                      (isSavingPet || uploadingPetImage) && styles.submitButtonDisabled
+                    ]} 
+                    onPress={handleSubmitPet}
+                    disabled={isSavingPet || uploadingPetImage}
+                  >
+                    {(isSavingPet || uploadingPetImage) ? (
+                      <View style={styles.buttonLoadingContainer}>
+                        <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: 8 }} />
+                        <Text style={styles.submitButtonText}>
+                          {uploadingPetImage ? 'Uploading image...' : (showEditPetModal ? 'Updating...' : 'Registering...')}
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.submitButtonText}>
+                        {showEditPetModal ? 'Update' : 'Register'} Pet
+                      </Text>
+                    )}
                   </TouchableOpacity>
                 ) : null}
               </ScrollView>
@@ -3103,6 +3175,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingHorizontal: 10,
+  },
+  headerRight: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   titleContainer: {
     flexDirection: 'row',
@@ -3649,10 +3725,18 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  createButtonDisabled: {
+    opacity: 0.7,
+  },
   createButtonText: {
     fontSize: 16,
     color: '#ffffff',
     fontWeight: '600',
+  },
+  buttonLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   commentModalHeader: {
     flexDirection: 'column',
@@ -4219,6 +4303,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
+  },
+  submitButtonDisabled: {
+    opacity: 0.7,
   },
   submitButtonText: {
     color: '#ffffff',

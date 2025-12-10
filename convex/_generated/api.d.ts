@@ -21,6 +21,7 @@ import type * as fees from "../fees.js";
 import type * as fines from "../fines.js";
 import type * as hoaInfo from "../hoaInfo.js";
 import type * as http from "../http.js";
+import type * as messages from "../messages.js";
 import type * as payments from "../payments.js";
 import type * as pets from "../pets.js";
 import type * as polls from "../polls.js";
@@ -45,6 +46,7 @@ declare const fullApi: ApiFromModules<{
   fines: typeof fines;
   hoaInfo: typeof hoaInfo;
   http: typeof http;
+  messages: typeof messages;
   payments: typeof payments;
   pets: typeof pets;
   polls: typeof polls;

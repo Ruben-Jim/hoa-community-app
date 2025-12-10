@@ -29,14 +29,14 @@ export const getAll = query({
     // Join with resident data using the map
     const petsWithResidentInfo = pets.map((pet) => {
       const resident = residentsById.get(pet.residentId);
-      return {
-        ...pet,
-        residentName: resident ? `${resident.firstName} ${resident.lastName}` : 'Unknown',
-        residentAddress: resident 
-          ? `${resident.address}${resident.unitNumber ? ` #${resident.unitNumber}` : ''}` 
-          : '',
-        profileImage: resident?.profileImage || null,
-      };
+        return {
+          ...pet,
+          residentName: resident ? `${resident.firstName} ${resident.lastName}` : 'Unknown',
+          residentAddress: resident 
+            ? `${resident.address}${resident.unitNumber ? ` #${resident.unitNumber}` : ''}` 
+            : '',
+          profileImage: resident?.profileImage || null,
+        };
     });
     
     return petsWithResidentInfo;

@@ -25,8 +25,8 @@ export const getAll = query({
     // Batch fetch all comments for all posts at once
     const postIds = posts.map(post => post._id);
     const allComments = await ctx.db
-      .query("comments")
-      .collect();
+          .query("comments")
+          .collect();
     
     // Group comments by postId
     const commentsByPostId = new Map();
@@ -43,24 +43,24 @@ export const getAll = query({
     const postsWithComments = posts.map((post) => {
       const comments = (commentsByPostId.get(post._id) || [])
         .sort((a: any, b: any) => a.createdAt - b.createdAt); // Order ascending
-      
-      // Get author profile image for each comment
+        
+        // Get author profile image for each comment
       const commentsWithProfileImages = comments.map((comment: any) => {
-        const authorResident = residentsByName.get(comment.author);
-        return {
-          ...comment,
+          const authorResident = residentsByName.get(comment.author);
+          return {
+            ...comment,
+            authorProfileImage: authorResident?.profileImage || null
+          };
+        });
+        
+        // Get author profile image for the post
+        const authorResident = residentsByName.get(post.author);
+        
+        return { 
+          ...post, 
+          comments: commentsWithProfileImages,
           authorProfileImage: authorResident?.profileImage || null
         };
-      });
-      
-      // Get author profile image for the post
-      const authorResident = residentsByName.get(post.author);
-      
-      return { 
-        ...post, 
-        comments: commentsWithProfileImages,
-        authorProfileImage: authorResident?.profileImage || null
-      };
     });
     
     return postsWithComments;
@@ -152,8 +152,8 @@ export const getByCategory = query({
     // Batch fetch all comments for all posts at once
     const postIds = posts.map(post => post._id);
     const allComments = await ctx.db
-      .query("comments")
-      .collect();
+          .query("comments")
+          .collect();
     
     // Group comments by postId
     const commentsByPostId = new Map();
@@ -170,24 +170,24 @@ export const getByCategory = query({
     const postsWithComments = posts.map((post) => {
       const comments = (commentsByPostId.get(post._id) || [])
         .sort((a: any, b: any) => a.createdAt - b.createdAt); // Order ascending
-      
-      // Get author profile image for each comment
+        
+        // Get author profile image for each comment
       const commentsWithProfileImages = comments.map((comment: any) => {
-        const authorResident = residentsByName.get(comment.author);
-        return {
-          ...comment,
+          const authorResident = residentsByName.get(comment.author);
+          return {
+            ...comment,
+            authorProfileImage: authorResident?.profileImage || null
+          };
+        });
+        
+        // Get author profile image for the post
+        const authorResident = residentsByName.get(post.author);
+        
+        return { 
+          ...post, 
+          comments: commentsWithProfileImages,
           authorProfileImage: authorResident?.profileImage || null
         };
-      });
-      
-      // Get author profile image for the post
-      const authorResident = residentsByName.get(post.author);
-      
-      return { 
-        ...post, 
-        comments: commentsWithProfileImages,
-        authorProfileImage: authorResident?.profileImage || null
-      };
     });
     
     return postsWithComments;

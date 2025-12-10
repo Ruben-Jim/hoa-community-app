@@ -19,6 +19,7 @@ export const upsert = mutation({
     officeHours: v.string(),
     emergencyContact: v.string(),
     eventText: v.optional(v.string()),
+    ccrsPdfStorageId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db.query("hoaInfo").first();
@@ -28,6 +29,36 @@ export const upsert = mutation({
       return existing._id;
     }
     const id = await ctx.db.insert("hoaInfo", { ...args, createdAt: now, updatedAt: now });
+    return id;
+  },
+});
+
+export const updateCcrsPdf = mutation({
+  args: {
+    ccrsPdfStorageId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db.query("hoaInfo").first();
+    const now = Date.now();
+    if (existing) {
+      await ctx.db.patch(existing._id, { 
+        ccrsPdfStorageId: args.ccrsPdfStorageId,
+        updatedAt: now 
+      });
+      return existing._id;
+    }
+    // If no HOA info exists, create it with minimal required fields
+    const id = await ctx.db.insert("hoaInfo", { 
+      name: "HOA Community",
+      address: "",
+      phone: "",
+      email: "",
+      officeHours: "",
+      emergencyContact: "",
+      ccrsPdfStorageId: args.ccrsPdfStorageId,
+      createdAt: now, 
+      updatedAt: now 
+    });
     return id;
   },
 });

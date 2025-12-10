@@ -14,8 +14,10 @@ import {
   Platform,
   Linking,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation } from 'convex/react';
@@ -26,19 +28,30 @@ import DeveloperIndicator from '../components/DeveloperIndicator';
 import CustomTabBar from '../components/CustomTabBar';
 import MobileTabBar from '../components/MobileTabBar';
 import { useStorageUrl } from '../hooks/useStorageUrl';
+import CustomAlert from '../components/CustomAlert';
+import { useCustomAlert } from '../hooks/useCustomAlert';
+import MessagingButton from '../components/MessagingButton';
+import { useMessaging } from '../context/MessagingContext';
 
 const DocumentsScreen = () => {
   const { user } = useAuth();
+  const { setShowOverlay } = useMessaging();
+  const isBoardMember = user?.isBoardMember && user?.isActive;
+  const { alertState, showAlert, hideAlert } = useCustomAlert();
   const [activeType, setActiveType] = useState<'Minutes' | 'Financial'>('Minutes');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState<any>(null);
   const [documentForm, setDocumentForm] = useState({
     title: '',
     description: '',
     type: 'Minutes' as 'Minutes' | 'Financial',
   });
   const [selectedFile, setSelectedFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [fileType, setFileType] = useState<'document' | 'image' | null>(null);
 
   // State for dynamic responsive behavior (only for web/desktop)
   const [screenWidth, setScreenWidth] = useState(Dimensions.get('window').width);
@@ -48,9 +61,6 @@ const DocumentsScreen = () => {
   const isMobileDevice = Platform.OS === 'ios' || Platform.OS === 'android';
   const showMobileNav = isMobileDevice || screenWidth < 1024;
   const showDesktopNav = !isMobileDevice && screenWidth >= 1024;
-
-  // Check if current user is a board member
-  const isBoardMember = user?.isBoardMember && user?.isActive;
 
   // Animation values
   const uploadModalOpacity = useRef(new Animated.Value(0)).current;
@@ -151,10 +161,38 @@ const DocumentsScreen = () => {
 
       if (!result.canceled && result.assets[0]) {
         setSelectedFile(result.assets[0]);
+        setSelectedImage(null);
+        setFileType('document');
       }
     } catch (error) {
       console.error('Error picking document:', error);
       Alert.alert('Error', 'Failed to pick document. Please try again.');
+    }
+  };
+
+  const handlePickImage = async () => {
+    try {
+      // Request permissions
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please grant permission to access your photos.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setSelectedImage(result.assets[0].uri);
+        setSelectedFile(null);
+        setFileType('image');
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
     }
   };
 
@@ -164,8 +202,8 @@ const DocumentsScreen = () => {
       return;
     }
 
-    if (!selectedFile) {
-      Alert.alert('Error', 'Please select a document file.');
+    if (!selectedFile && !selectedImage) {
+      Alert.alert('Error', 'Please select a document or photo.');
       return;
     }
 
@@ -179,13 +217,26 @@ const DocumentsScreen = () => {
 
       // Upload file to Convex storage
       const uploadUrl = await generateUploadUrl();
-      
-      const response = await fetch(selectedFile.uri);
-      const blob = await response.blob();
+      let blob: Blob;
+      let mimeType: string;
+
+      if (selectedFile) {
+        // Handle document upload
+        const response = await fetch(selectedFile.uri);
+        blob = await response.blob();
+        mimeType = blob.type || selectedFile.mimeType || 'application/pdf';
+      } else if (selectedImage) {
+        // Handle image upload
+        const response = await fetch(selectedImage);
+        blob = await response.blob();
+        mimeType = blob.type || 'image/jpeg';
+      } else {
+        throw new Error('No file selected');
+      }
       
       const uploadResponse = await fetch(uploadUrl, {
         method: 'POST',
-        headers: { 'Content-Type': blob.type || selectedFile.mimeType || 'application/pdf' },
+        headers: { 'Content-Type': mimeType },
         body: blob,
       });
 
@@ -213,6 +264,8 @@ const DocumentsScreen = () => {
         type: 'Minutes',
       });
       setSelectedFile(null);
+      setSelectedImage(null);
+      setFileType(null);
       
       animateModalOut(() => {
         setShowUploadModal(false);
@@ -226,25 +279,38 @@ const DocumentsScreen = () => {
   };
 
   const handleDeleteDocument = (document: any) => {
-    Alert.alert(
-      'Confirm Delete',
-      'Are you sure you want to delete this document?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteDocument({ id: document._id });
-              Alert.alert('Success', 'Document deleted successfully.');
-            } catch (error) {
-              Alert.alert('Error', 'Failed to delete document.');
-            }
-          },
-        },
-      ]
-    );
+    setDocumentToDelete(document);
+    setDeleteConfirmVisible(true);
+  };
+
+  const confirmDeleteDocument = async () => {
+    if (!documentToDelete) return;
+    
+    setDeleteConfirmVisible(false);
+    
+    try {
+      await deleteDocument({ id: documentToDelete._id });
+      showAlert({
+        title: 'Success',
+        message: 'Document deleted successfully.',
+        buttons: [{ text: 'OK', onPress: () => {} }],
+        type: 'success'
+      });
+      setDocumentToDelete(null);
+    } catch (error: any) {
+      console.error('Error deleting document:', error);
+      showAlert({
+        title: 'Error',
+        message: error?.message || 'Failed to delete document. Please try again.',
+        buttons: [{ text: 'OK', onPress: () => {} }],
+        type: 'error'
+      });
+    }
+  };
+
+  const cancelDeleteDocument = () => {
+    setDeleteConfirmVisible(false);
+    setDocumentToDelete(null);
   };
 
 
@@ -343,7 +409,7 @@ const DocumentsScreen = () => {
               resizeMode="stretch"
             >
               <View style={styles.headerOverlay} />
-              <View style={styles.headerTop}>
+                <View style={styles.headerTop}>
                 {/* Hamburger Menu - Only when mobile nav is shown */}
                 {showMobileNav && (
                   <TouchableOpacity
@@ -366,6 +432,13 @@ const DocumentsScreen = () => {
                     <BoardMemberIndicator />
                   </View>
                 </View>
+
+                {/* Messaging Button - Board Members Only */}
+                {isBoardMember && (
+                  <View style={styles.headerRight}>
+                    <MessagingButton onPress={() => setShowOverlay(true)} />
+                  </View>
+                )}
               </View>
             </ImageBackground>
           </Animated.View>
@@ -471,6 +544,7 @@ const DocumentsScreen = () => {
                       <TouchableOpacity
                         style={styles.deleteButton}
                         onPress={() => handleDeleteDocument(document)}
+                        activeOpacity={0.7}
                       >
                         <Ionicons name="trash" size={16} color="#ef4444" />
                         <Text style={styles.deleteButtonText}>Delete</Text>
@@ -573,25 +647,57 @@ const DocumentsScreen = () => {
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Document File *</Text>
-                  <TouchableOpacity
-                    style={styles.filePickerButton}
-                    onPress={handlePickDocument}
-                  >
-                    <Ionicons name="document-attach" size={24} color="#2563eb" />
-                    <Text style={styles.filePickerText}>
-                      {selectedFile ? selectedFile.name : 'Choose Document (PDF, DOC, DOCX)'}
-                    </Text>
-                  </TouchableOpacity>
+                  <Text style={styles.inputLabel}>File or Photo *</Text>
+                  <View style={styles.filePickerRow}>
+                    <TouchableOpacity
+                      style={[styles.filePickerButton, styles.filePickerButtonHalf]}
+                      onPress={handlePickDocument}
+                    >
+                      <Ionicons name="document-attach" size={20} color="#2563eb" />
+                      <Text style={styles.filePickerText}>
+                        Document
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.filePickerButton, styles.filePickerButtonHalf]}
+                      onPress={handlePickImage}
+                    >
+                      <Ionicons name="image" size={20} color="#2563eb" />
+                      <Text style={styles.filePickerText}>
+                        Photo
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                   {selectedFile && (
                     <View style={styles.selectedFileContainer}>
                       <Ionicons name="checkmark-circle" size={20} color="#10b981" />
                       <Text style={styles.selectedFileText} numberOfLines={1}>
                         {selectedFile.name}
                       </Text>
-                      <TouchableOpacity onPress={() => setSelectedFile(null)}>
+                      <TouchableOpacity onPress={() => {
+                        setSelectedFile(null);
+                        setFileType(null);
+                      }}>
                         <Ionicons name="close-circle" size={20} color="#ef4444" />
                       </TouchableOpacity>
+                    </View>
+                  )}
+                  {selectedImage && (
+                    <View style={styles.selectedFileContainer}>
+                      <Ionicons name="checkmark-circle" size={20} color="#10b981" />
+                      <Text style={styles.selectedFileText} numberOfLines={1}>
+                        Photo selected
+                      </Text>
+                      <TouchableOpacity onPress={() => {
+                        setSelectedImage(null);
+                        setFileType(null);
+                      }}>
+                        <Ionicons name="close-circle" size={20} color="#ef4444" />
+                      </TouchableOpacity>
+                      <Image
+                        source={{ uri: selectedImage }}
+                        style={styles.selectedImagePreview}
+                      />
                     </View>
                   )}
                 </View>
@@ -626,6 +732,37 @@ const DocumentsScreen = () => {
             </Animated.View>
           </Animated.View>
         </Modal>
+
+        {/* Delete Confirmation Alert */}
+        <CustomAlert
+          visible={deleteConfirmVisible}
+          title="Confirm Delete"
+          message="Are you sure you want to delete this document? This action cannot be undone."
+          type="warning"
+          buttons={[
+            { 
+              text: 'Cancel', 
+              style: 'cancel',
+              onPress: cancelDeleteDocument
+            },
+            {
+              text: 'Delete',
+              style: 'destructive',
+              onPress: confirmDeleteDocument,
+            },
+          ]}
+          onClose={cancelDeleteDocument}
+        />
+
+        {/* Success/Error Alert */}
+        <CustomAlert
+          visible={alertState.visible}
+          title={alertState.title}
+          message={alertState.message}
+          type={alertState.type || 'info'}
+          buttons={alertState.buttons || [{ text: 'OK', onPress: hideAlert }]}
+          onClose={hideAlert}
+        />
       </View>
     </SafeAreaView>
   );
@@ -709,6 +846,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
     zIndex: 1,
+    gap: 12,
+  },
+  headerRight: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   menuButton: {
     padding: 8,
@@ -886,6 +1028,10 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     gap: 6,
+    ...(Platform.OS === 'web' && {
+      cursor: 'pointer' as any,
+      userSelect: 'none' as any,
+    }),
   },
   deleteButtonText: {
     color: '#ef4444',
@@ -1002,6 +1148,10 @@ const styles = StyleSheet.create({
     height: 80,
     textAlignVertical: 'top',
   },
+  filePickerRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
   filePickerButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1014,6 +1164,11 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     backgroundColor: '#f9fafb',
     gap: 8,
+  },
+  filePickerButtonHalf: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
   },
   filePickerText: {
     fontSize: 14,
@@ -1028,6 +1183,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0fdf4',
     borderRadius: 6,
     gap: 8,
+  },
+  selectedImagePreview: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginTop: 8,
+    marginLeft: 8,
   },
   selectedFileText: {
     flex: 1,

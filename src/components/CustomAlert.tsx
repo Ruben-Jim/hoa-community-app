@@ -100,7 +100,7 @@ const CustomAlert: React.FC<CustomAlertProps> = ({
       case 'success':
         return { icon: 'checkmark-circle', color: '#10b981' };
       case 'error':
-        return { icon: 'close-circle', color: '#dc2626' };
+        return { icon: 'close-circle', color: '#ef4444' };
       case 'warning':
         return { icon: 'warning', color: '#f59e0b' };
       default:
@@ -133,7 +133,10 @@ const CustomAlert: React.FC<CustomAlertProps> = ({
           <View style={styles.alertContent}>
             {/* Header */}
             <View style={styles.header}>
-              <View style={[styles.iconContainer, { backgroundColor: `${color}20` }]}>
+              <View style={[
+                styles.iconContainer, 
+                { backgroundColor: type === 'warning' ? '#fef3c7' : type === 'error' ? '#fee2e2' : type === 'success' ? '#d1fae5' : `${color}20` }
+              ]}>
                 <Ionicons name={icon as any} size={24} color={color} />
               </View>
               <Text style={styles.title}>{title}</Text>
@@ -239,7 +242,7 @@ const styles = StyleSheet.create({
     borderColor: '#d1d5db',
   },
   destructiveButton: {
-    backgroundColor: '#dc2626',
+    backgroundColor: '#ef4444',
   },
   buttonText: {
     fontSize: 16,
