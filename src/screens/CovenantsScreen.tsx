@@ -265,45 +265,53 @@ const CovenantsScreen = () => {
       </View>
 
       {/* Category Filter */}
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        style={styles.categoryContainer}
-        contentContainerStyle={styles.categoryContent}
-      >
-        <TouchableOpacity
-          style={[
-            styles.categoryButton,
-            !selectedCategory && styles.categoryButtonActive
-          ]}
-          onPress={() => setSelectedCategory(null)}
-        >
-          <Text style={[
-            styles.categoryButtonText,
-            !selectedCategory && styles.categoryButtonTextActive
-          ]}>
-            All
-          </Text>
-        </TouchableOpacity>
-        
-        {categories.map((category) => (
-          <TouchableOpacity
-            key={category}
-            style={[
-              styles.categoryButton,
-              selectedCategory === category && styles.categoryButtonActive
-            ]}
-            onPress={() => setSelectedCategory(category)}
+      <View style={styles.categoryContainer}>
+        <View style={styles.filterRow}>
+          <View style={styles.filterLabelContainer}>
+            <Ionicons name="filter" size={16} color="#6b7280" style={styles.filterIcon} />
+            <Text style={styles.filterLabel}>Filter:</Text>
+          </View>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryContent}
+            style={styles.categoryScrollView}
           >
-            <Text style={[
-              styles.categoryButtonText,
-              selectedCategory === category && styles.categoryButtonTextActive
-            ]}>
-              {category}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+            <TouchableOpacity
+              style={[
+                styles.categoryButton,
+                !selectedCategory && styles.categoryButtonActive
+              ]}
+              onPress={() => setSelectedCategory(null)}
+            >
+              <Text style={[
+                styles.categoryButtonText,
+                !selectedCategory && styles.categoryButtonTextActive
+              ]}>
+                All
+              </Text>
+            </TouchableOpacity>
+            
+            {categories.map((category) => (
+              <TouchableOpacity
+                key={category}
+                style={[
+                  styles.categoryButton,
+                  selectedCategory === category && styles.categoryButtonActive
+                ]}
+                onPress={() => setSelectedCategory(category)}
+              >
+                <Text style={[
+                  styles.categoryButtonText,
+                  selectedCategory === category && styles.categoryButtonTextActive
+                ]}>
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
 
       {/* Covenants List */}
       <View style={styles.covenantsContainer}>
@@ -516,11 +524,41 @@ const styles = StyleSheet.create({
     color: '#374151',
   },
   categoryContainer: {
-    backgroundColor: '#ffffff',
-    paddingVertical: 10,
+    backgroundColor: '#f9fafb',
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 15,
+  },
+  filterLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 12,
+    paddingRight: 12,
+    borderRightWidth: 1,
+    borderRightColor: '#e5e7eb',
+  },
+  filterIcon: {
+    marginRight: 6,
+  },
+  filterLabel: {
+    fontSize: 13,
+    color: '#6b7280',
+    fontWeight: '600',
+  },
+  categoryScrollView: {
+    flex: 1,
+    marginLeft: 0,
   },
   categoryContent: {
-    paddingHorizontal: 15,
+    paddingHorizontal: 0,
+    alignItems: 'center',
   },
   categoryButton: {
     paddingHorizontal: 16,
