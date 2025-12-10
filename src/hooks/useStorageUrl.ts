@@ -1,5 +1,4 @@
-import { useQuery } from 'convex/react';
-import { api } from '../../convex/_generated/api';
+import { useQuery, api } from '../services/mockConvex';
 import { useEffect, useState, useMemo } from 'react';
 import { Image as ExpoImage } from 'expo-image';
 

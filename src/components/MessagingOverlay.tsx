@@ -17,10 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMessaging } from '../context/MessagingContext';
 import { useAuth } from '../context/AuthContext';
-import { useQuery } from 'convex/react';
-import { api } from '../../convex/_generated/api';
+import { useQuery, api } from '../services/mockConvex';
 import ProfileImage from './ProfileImage';
-import { Id } from '../../convex/_generated/dataModel';
 
 interface MessagingOverlayProps {
   visible: boolean;

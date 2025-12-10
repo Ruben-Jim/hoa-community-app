@@ -1,50 +1,4 @@
 {
-<<<<<<< HEAD
-    "expo": {
-        "name": "HOA Community",
-        "slug": "hoa-community-app",
-        "version": "1.0.0",
-        "orientation": "portrait",
-        "icon": "./assets/icon.png",
-        "userInterfaceStyle": "light",
-        "newArchEnabled": true,
-        "splash": {
-            "image": "./assets/splash-icon.png",
-            "resizeMode": "contain",
-            "backgroundColor": "#ffffff"
-        },
-        "ios": {
-            "supportsTablet": true,
-            "bundleIdentifier": "com.yourcompany.hoacommunityapp",
-            "buildNumber": "1"
-        },
-        "android": {
-            "package": "com.yourcompany.hoacommunityapp",
-            "versionCode": 1,
-            "adaptiveIcon": {
-                "foregroundImage": "./assets/adaptive-icon.png",
-                "backgroundColor": "#ffffff"
-            },
-            "edgeToEdgeEnabled": true
-        },
-        "web": {
-            "favicon": "./assets/favicon.jpg"
-        },
-        "experiments": {
-            "typedRoutes": true,
-            "baseUrl": "/"
-        },
-        "extra": {
-            "convexUrl": "${EXPO_PUBLIC_CONVEX_URL}",
-            "eas": {
-                "projectId": "a30576d8-ca43-4d96-8957-d6080ae9076d"
-            }
-        },
-        "plugins": [
-            "expo-router"
-        ]
-    }
-=======
   "expo": {
     "name": "Shelton Springs",
     "slug": "shelton-springs",
@@ -119,5 +73,4 @@
       "expo-web-browser"
     ]
   }
->>>>>>> master
 }

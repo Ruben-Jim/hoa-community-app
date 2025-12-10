@@ -51,9 +51,6 @@ const SignupScreen = () => {
   // ScrollView ref for better control
   const scrollViewRef = useRef<ScrollView>(null);
 
-<<<<<<< HEAD
-  // Ensure scroll view is properly initialized
-=======
   // Format phone number: +1 (123) 456-7890
   const formatPhoneNumber = (text: string): string => {
     // Remove any non-numeric characters
@@ -74,7 +71,6 @@ const SignupScreen = () => {
   };
 
   // Set initial cursor and cleanup on unmount (web only)
->>>>>>> master
   useEffect(() => {
     // Force a layout update after mount
     setTimeout(() => {
@@ -150,11 +146,8 @@ const SignupScreen = () => {
       });
       
       const { storageId } = await uploadResponse.json();
-<<<<<<< HEAD
       
       // For demo: return storageId directly (no real storage URLs)
-=======
->>>>>>> master
       return storageId;
     } catch (error) {
       console.error('Error uploading image:', error);
@@ -551,14 +544,6 @@ const styles = StyleSheet.create({
   },
   webScrollView: {
     ...(Platform.OS === 'web' && {
-<<<<<<< HEAD
-      overflowY: 'auto' as any,
-      overflowX: 'hidden' as any,
-      WebkitOverflowScrolling: 'touch' as any,
-      // Ensure proper height for web
-      height: '100%' as any,
-      maxHeight: '100vh' as any,
-=======
       cursor: 'grab' as any,
       userSelect: 'none' as any,
       WebkitUserSelect: 'none' as any,
@@ -568,7 +553,6 @@ const styles = StyleSheet.create({
       height: '100vh' as any,
       maxHeight: '100vh' as any,
       position: 'relative' as any,
->>>>>>> master
     }),
   },
   scrollContent: {
@@ -578,14 +562,9 @@ const styles = StyleSheet.create({
   },
   webScrollContent: {
     ...(Platform.OS === 'web' && {
-<<<<<<< HEAD
-      minHeight: '100%' as any,
-      paddingBottom: 120 as any,
-=======
       minHeight: '100vh' as any,
       flexGrow: 1,
       paddingBottom: 100 as any,
->>>>>>> master
     }),
   },
   spacer: {

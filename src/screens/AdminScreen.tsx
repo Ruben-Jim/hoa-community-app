@@ -1221,11 +1221,8 @@ const AdminScreen = () => {
       });
 
       const { storageId } = await uploadResponse.json();
-<<<<<<< HEAD
       
       // For demo: return storageId directly (no real storage URLs)
-=======
->>>>>>> master
       return storageId;
     } catch (error) {
       console.error('Error uploading image:', error);

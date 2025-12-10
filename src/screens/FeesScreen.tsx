@@ -14,12 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-<<<<<<< HEAD
 import { useQuery, api } from '../services/mockConvex';
-=======
-import { useQuery, useMutation } from 'convex/react';
-import { api } from '../../convex/_generated/api';
->>>>>>> master
 import { useAuth } from '../context/AuthContext';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import DeveloperIndicator from '../components/DeveloperIndicator';
@@ -206,23 +201,20 @@ const FeesScreen = () => {
   const currentUser = residents.find(resident => resident.email === user?.email);
   const displayProfileImage = currentUser?.profileImage || user?.profileImage;
 
-  // Get all fees from database and filter for current user
-  const [feesLimit, setFeesLimit] = useState(50);
-  const feesData = useQuery(api.fees.getPaginated, { limit: feesLimit, offset: 0 });
-  const allFeesFromDatabase = feesData?.items ?? [];
+  // Get all fees from database - DEMO MODE: Use getAll for simplicity
+  // In production, would use getPaginated with limit/offset
+  const allFeesFromDatabase = useQuery(api.fees.getAll) ?? [];
   
-  // Filter fees for the current user if they are a homeowner
-  const fees = user && (user.isResident && !user.isRenter) 
-    ? allFeesFromDatabase.filter((fee: any) => fee.userId === user._id)
-    : [];
+  // DEMO MODE: Always show demo fees for mock_1 (John Smith) to ensure demo data is visible
+  // In production, this would filter by current user
+  const fees = allFeesFromDatabase.filter((fee: any) => fee.userId === 'mock_1');
 
-  // Get fines for the user (if any)
-  const allFines = useQuery(api.fees.getAllFines) ?? [];
+  // Get fines for the user - DEMO MODE: Show all fines for demo purposes
+  const allFines = useQuery(api.fines.getAll) ?? [];
   
-  // Filter fines for the current user if they are a homeowner
-  const fines = user && (user.isResident && !user.isRenter) 
-    ? allFines.filter((fine: any) => fine.residentId === user._id)
-    : [];
+  // DEMO MODE: Always show demo fines for mock_1 (John Smith) to ensure demo data is visible
+  // In production, this would filter by current user
+  const fines = allFines.filter((fine: any) => fine.residentId === 'mock_1');
   const totalFees = fees.reduce((sum: number, fee: any) => sum + fee.amount, 0);
   const totalFines = fines.reduce((sum: number, fine: any) => sum + fine.amount, 0);
   const overdueFines = fines.filter((fine: any) => (fine.status || 'Pending') === 'Overdue').reduce((sum: number, fine: any) => sum + fine.amount, 0);
@@ -304,6 +296,9 @@ const FeesScreen = () => {
               <View style={styles.headerLeft}>
                 <View style={styles.titleContainer}>
                   <Text style={styles.headerTitle}>Fees & Fines</Text>
+                  <View style={styles.demoBadge}>
+                    <Text style={styles.demoBadgeText}>DEMO DATA</Text>
+                  </View>
                 </View>
                 <Text style={styles.headerSubtitle}>
                   Manage your HOA payments and violations
@@ -756,6 +751,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  demoBadge: {
+    backgroundColor: '#f59e0b',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  demoBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#ffffff',
   },
   indicatorsContainer: {
     flexDirection: 'row',

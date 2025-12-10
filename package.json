@@ -21,11 +21,7 @@
     "@react-navigation/native": "^7.1.8",
     "@react-navigation/stack": "^7.4.7",
     "convex": "^1.25.4",
-<<<<<<< HEAD
-    "expo": "54.0.23",
-=======
     "expo": "~54.0.25",
->>>>>>> master
     "expo-constants": "~18.0.9",
     "expo-dev-client": "~6.0.20",
     "expo-document-picker": "^14.0.7",
@@ -35,25 +31,16 @@
     "expo-image-manipulator": "~14.0.7",
     "expo-image-picker": "~17.0.8",
     "expo-linear-gradient": "~15.0.7",
-<<<<<<< HEAD
-    "expo-linking": "~8.0.8",
-    "expo-notifications": "~0.32.12",
-    "expo-router": "~6.0.14",
-=======
     "expo-linking": "~8.0.9",
     "expo-notifications": "~0.32.13",
     "expo-router": "~6.0.15",
->>>>>>> master
     "expo-status-bar": "~3.0.8",
     "expo-web-browser": "~15.0.9",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
-<<<<<<< HEAD
-=======
     "react-native-dotenv": "^3.4.11",
     "react-native-draggable-flatlist": "^4.0.3",
->>>>>>> master
     "react-native-gesture-handler": "~2.28.0",
     "react-native-qrcode-svg": "^6.3.15",
     "react-native-reanimated": "~4.1.1",

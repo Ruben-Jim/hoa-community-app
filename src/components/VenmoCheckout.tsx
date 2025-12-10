@@ -1,18 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, Alert, Linking, Image, Platform, Modal, ScrollView, KeyboardAvoidingView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useMutation } from 'convex/react';
-import { api } from '../../convex/_generated/api';
+import { useMutation, api } from '../services/mockConvex';
 import QRCode from 'react-native-qrcode-svg';
-import { Id } from '../../convex/_generated/dataModel';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface VenmoCheckoutProps {
   amount: number;
   feeType: string;
   userId: string;
-  feeId?: Id<"fees">;
-  fineId?: Id<"fines">;
+  feeId?: string;
+  fineId?: string;
   onSuccess: () => void;
   onError: (error: string) => void;
 }

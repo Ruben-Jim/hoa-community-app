@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-import React from 'react';
-=======
 import React, { useMemo, useEffect } from 'react';
->>>>>>> master
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
@@ -83,16 +79,6 @@ const MainAppContent = () => {
 };
 
 export default function App() {
-<<<<<<< HEAD
-  return (
-=======
-  const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
-
-  const convex = useMemo(() => {
-    if (!convexUrl) return null;
-    return new ConvexReactClient(convexUrl);
-  }, [convexUrl]);
-
   // Initialize notifications when app starts
   useEffect(() => {
     const initializeNotifications = async () => {
@@ -146,8 +132,7 @@ export default function App() {
     );
   }
 
-  const content = (
->>>>>>> master
+  return (
     <SafeAreaProvider>
       <AuthProvider>
         <MessagingProvider>

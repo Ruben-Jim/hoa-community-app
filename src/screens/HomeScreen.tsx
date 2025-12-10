@@ -16,14 +16,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-<<<<<<< HEAD
-import { useQuery, api } from '../services/mockConvex';
-=======
 import { useNavigation } from '@react-navigation/native';
-import { useQuery, useMutation } from 'convex/react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { api } from '../../convex/_generated/api';
->>>>>>> master
+import { useQuery, useMutation, api } from '../services/mockConvex';
 import { useAuth } from '../context/AuthContext';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import DeveloperIndicator from '../components/DeveloperIndicator';

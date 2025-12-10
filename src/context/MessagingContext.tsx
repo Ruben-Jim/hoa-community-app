@@ -1,18 +1,20 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { useQuery, useMutation } from 'convex/react';
-import { api } from '../../convex/_generated/api';
+import { useQuery, useMutation, api } from '../services/mockConvex';
 import { useAuth } from './AuthContext';
-import { Id } from '../../convex/_generated/dataModel';
+
+// Use string for demo mode instead of Id types
+type ConversationId = string;
+type MessageId = string;
 
 interface Conversation {
-  _id: Id<"conversations">;
+  _id: ConversationId;
   participants: string[];
   createdBy: string;
   createdAt: number;
   updatedAt: number;
   latestMessage?: {
-    _id: Id<"messages">;
-    conversationId: Id<"conversations">;
+    _id: MessageId;
+    conversationId: ConversationId;
     senderId: string;
     senderName: string;
     senderRole: string;
@@ -29,8 +31,8 @@ interface Conversation {
 }
 
 interface Message {
-  _id: Id<"messages">;
-  conversationId: Id<"conversations">;
+  _id: MessageId;
+  conversationId: ConversationId;
   senderId: string;
   senderName: string;
   senderRole: string;
@@ -41,11 +43,11 @@ interface Message {
 interface MessagingContextType {
   conversations: Conversation[];
   isLoading: boolean;
-  openConversation: (conversationId: Id<"conversations"> | null) => void;
-  activeConversationId: Id<"conversations"> | null;
+  openConversation: (conversationId: ConversationId | null) => void;
+  activeConversationId: ConversationId | null;
   activeConversationMessages: Message[];
   sendMessage: (content: string) => Promise<void>;
-  createConversationWithUser: (recipientId: string) => Promise<Id<"conversations"> | null>;
+  createConversationWithUser: (recipientId: string) => Promise<ConversationId | null>;
   hasUnreadMessages: boolean;
   latestMessagePreview: string | null;
   showOverlay: boolean;
@@ -56,7 +58,7 @@ const MessagingContext = createContext<MessagingContextType | undefined>(undefin
 
 export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const [activeConversationId, setActiveConversationId] = useState<Id<"conversations"> | null>(null);
+  const [activeConversationId, setActiveConversationId] = useState<ConversationId | null>(null);
   const [showOverlay, setShowOverlay] = useState(false);
 
   // Queries
@@ -87,11 +89,11 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return latestConv.latestMessage?.content || null;
   }, [conversations]);
 
-  const openConversation = useCallback((conversationId: Id<"conversations"> | null) => {
+  const openConversation = useCallback((conversationId: ConversationId | null) => {
     setActiveConversationId(conversationId);
   }, []);
 
-  const createConversationWithUser = useCallback(async (recipientId: string): Promise<Id<"conversations"> | null> => {
+  const createConversationWithUser = useCallback(async (recipientId: string): Promise<ConversationId | null> => {
     if (!user || !user.isBoardMember) return null;
 
     try {

@@ -14,6 +14,7 @@ import {
   getHOAInfo,
   getEmergencyNotifications,
   getDocuments,
+  getMockState,
 } from './mockData';
 
 export const mockApi = {
@@ -99,6 +100,14 @@ export const resolveQuery = (queryPath: string, args?: any): any => {
       return getBoardMembers();
     case 'communityPosts.getAll':
       return getCommunityPosts();
+    case 'communityPosts.getPaginated':
+      const allPosts = getCommunityPosts();
+      const limit = args?.limit || 20;
+      const offset = args?.offset || 0;
+      return {
+        items: allPosts.slice(offset, offset + limit),
+        total: allPosts.length,
+      };
     case 'communityPosts.getAllComments':
       const posts = getCommunityPosts();
       const allComments: any[] = [];
@@ -110,6 +119,14 @@ export const resolveQuery = (queryPath: string, args?: any): any => {
       return allComments;
     case 'polls.getAll':
       return getPolls();
+    case 'polls.getPaginated':
+      const allPolls = getPolls();
+      const pollsLimit = args?.limit || 20;
+      const pollsOffset = args?.offset || 0;
+      return {
+        items: allPolls.slice(pollsOffset, pollsOffset + pollsLimit),
+        total: allPolls.length,
+      };
     case 'polls.getAllUserVotes':
       return {};
     case 'residentNotifications.getAllActive':
@@ -118,8 +135,27 @@ export const resolveQuery = (queryPath: string, args?: any): any => {
       return getPets();
     case 'covenants.getAll':
       return getCovenants();
+    case 'covenants.getPaginated':
+      const allCovenants = getCovenants();
+      const covenantsLimit = args?.limit || 50;
+      const covenantsOffset = args?.offset || 0;
+      return {
+        items: allCovenants.slice(covenantsOffset, covenantsOffset + covenantsLimit),
+        total: allCovenants.length,
+      };
     case 'fees.getAll':
       return getFees();
+    case 'fees.getPaginated':
+      const allFees = getFees();
+      const feesLimit = args?.limit || 50;
+      const feesOffset = args?.offset || 0;
+      return {
+        items: allFees.slice(feesOffset, feesOffset + feesLimit),
+        total: allFees.length,
+      };
+    case 'fees.getAllFines':
+      // Return all fines (same as fines.getAll)
+      return getFines();
     case 'fines.getAll':
       return getFines();
     case 'hoaInfo.get':
@@ -132,6 +168,22 @@ export const resolveQuery = (queryPath: string, args?: any): any => {
       return getDocuments();
     case 'storage.getUrl':
       return undefined;
+    case 'messages.getUserConversations':
+      // Get conversations from state where user is a participant
+      const state = getMockState();
+      const userId = args?.userId;
+      if (!userId) return [];
+      return (state.conversations || []).filter((conv: any) =>
+        conv.participants.includes(userId)
+      );
+    case 'messages.getConversationMessages':
+      // Get messages for a conversation
+      const mockState = getMockState();
+      const conversationId = args?.conversationId;
+      if (!conversationId) return [];
+      return (mockState.messages || []).filter(
+        (msg: any) => msg.conversationId === conversationId
+      ).sort((a: any, b: any) => a.createdAt - b.createdAt);
     default:
       return undefined;
   }

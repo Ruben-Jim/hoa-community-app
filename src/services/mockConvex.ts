@@ -26,6 +26,7 @@ export const api = {
   },
   communityPosts: {
     getAll: 'communityPosts.getAll',
+    getPaginated: 'communityPosts.getPaginated',
     getAllComments: 'communityPosts.getAllComments',
     create: 'communityPosts.create',
     addComment: 'communityPosts.addComment',
@@ -35,8 +36,11 @@ export const api = {
   },
   polls: {
     getAll: 'polls.getAll',
+    getPaginated: 'polls.getPaginated',
     getAllUserVotes: 'polls.getAllUserVotes',
     vote: 'polls.vote',
+    create: 'polls.create',
+    toggleActive: 'polls.toggleActive',
   },
   residentNotifications: {
     getAllActive: 'residentNotifications.getAllActive',
@@ -52,10 +56,13 @@ export const api = {
   },
   covenants: {
     getAll: 'covenants.getAll',
+    getPaginated: 'covenants.getPaginated',
     remove: 'covenants.remove',
   },
   fees: {
     getAll: 'fees.getAll',
+    getPaginated: 'fees.getPaginated',
+    getAllFines: 'fees.getAllFines',
   },
   fines: {
     getAll: 'fines.getAll',
@@ -80,6 +87,15 @@ export const api = {
     getUrl: 'storage.getUrl',
     generateUploadUrl: 'storage.generateUploadUrl',
     deleteStorageFile: 'storage.deleteStorageFile',
+  },
+  messages: {
+    getUserConversations: 'messages.getUserConversations',
+    getConversationMessages: 'messages.getConversationMessages',
+    createConversation: 'messages.createConversation',
+    sendMessage: 'messages.sendMessage',
+  },
+  payments: {
+    createVenmoPayment: 'payments.createVenmoPayment',
   },
 };
 
@@ -261,6 +277,69 @@ export function useMutation<T = any>(
         });
         updateMockState({ polls });
         result = undefined as T;
+      } else if (mutationPath.includes('polls.create') || mutationPath === 'polls.create') {
+        const newPoll = {
+          _id: generateId(),
+          ...args,
+          optionVotes: {},
+          totalVotes: 0,
+          isActive: true,
+          winningOption: undefined,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        updateMockState({
+          polls: [...state.polls, newPoll],
+        });
+        result = newPoll._id as T;
+      } else if (mutationPath.includes('polls.toggleActive') || mutationPath === 'polls.toggleActive') {
+        const polls = state.polls.map((p: any) => {
+          if (p._id === args.id) {
+            const newIsActive = !p.isActive;
+            let winningOption = p.winningOption;
+            
+            // Calculate winner when deactivating
+            if (!newIsActive && p.optionVotes && Object.keys(p.optionVotes).length > 0) {
+              const totalVotes = p.totalVotes || 0;
+              const votes = Object.entries(p.optionVotes).map(([idx, count]) => ({
+                index: parseInt(idx),
+                votes: count as number,
+              }));
+              
+              // Find the maximum vote count
+              const maxVotes = Math.max(...votes.map(v => v.votes));
+              
+              // Find all options with the maximum votes (for ties)
+              const winningIndices = votes
+                .filter(v => v.votes === maxVotes)
+                .map(v => v.index);
+              
+              const isTied = winningIndices.length > 1;
+              
+              // Calculate percentage for the winning option(s)
+              const percentage = totalVotes > 0 ? (maxVotes / totalVotes) * 100 : 0;
+              
+              winningOption = {
+                tiedIndices: winningIndices,
+                isTied,
+                percentage,
+              };
+            } else if (newIsActive) {
+              // Clear winner when reactivating
+              winningOption = undefined;
+            }
+            
+            return {
+              ...p,
+              isActive: newIsActive,
+              winningOption,
+              updatedAt: Date.now(),
+            };
+          }
+          return p;
+        });
+        updateMockState({ polls });
+        result = undefined as T;
       } else if (mutationPath.includes('residentNotifications.create') || mutationPath === 'residentNotifications.create') {
         const newNotif = {
           _id: generateId(),
@@ -349,6 +428,41 @@ export function useMutation<T = any>(
         const documents = state.documents.filter((d: any) => d._id !== args.id);
         updateMockState({ documents });
         result = undefined as T;
+      } else if (mutationPath.includes('messages.createConversation') || mutationPath === 'messages.createConversation') {
+        const newConversation = {
+          _id: generateId(),
+          participants: [args.boardMemberId, args.recipientId],
+          createdBy: args.boardMemberId,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          latestMessage: null,
+          otherParticipant: null,
+        };
+        const conversations = [...(state.conversations || []), newConversation];
+        updateMockState({ conversations });
+        result = newConversation._id as T;
+      } else if (mutationPath.includes('messages.sendMessage') || mutationPath === 'messages.sendMessage') {
+        const newMessage = {
+          _id: generateId(),
+          conversationId: args.conversationId,
+          senderId: args.senderId,
+          senderName: args.senderName,
+          senderRole: args.senderRole,
+          content: args.content,
+          createdAt: Date.now(),
+        };
+        const messages = [...(state.messages || []), newMessage];
+        // Update conversation's latest message
+        const conversations = (state.conversations || []).map((conv: any) =>
+          conv._id === args.conversationId
+            ? { ...conv, latestMessage: newMessage, updatedAt: Date.now() }
+            : conv
+        );
+        updateMockState({ messages, conversations });
+        result = undefined as T;
+      } else if (mutationPath.includes('payments.createVenmoPayment') || mutationPath === 'payments.createVenmoPayment') {
+        // Mock payment creation - just return success
+        result = generateId() as T;
       } else if (mutationPath.includes('storage.generateUploadUrl') || mutationPath === 'storage.generateUploadUrl') {
         // Return a mock upload URL
         result = `https://mock-upload-url.com/${generateId()}` as T;

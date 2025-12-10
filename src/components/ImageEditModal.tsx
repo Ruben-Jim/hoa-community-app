@@ -14,8 +14,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { useMutation } from 'convex/react';
-import { api } from '../../convex/_generated/api';
+import { useMutation, api } from '../services/mockConvex';
 import { getUploadReadyImage } from '../utils/imageUpload';
 
 interface ImageEditModalProps {

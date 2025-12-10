@@ -21,14 +21,8 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-<<<<<<< HEAD
-import { useQuery, useMutation, api } from '../services/mockConvex';
-=======
 import { useRoute } from '@react-navigation/native';
-import { useQuery, useMutation } from 'convex/react';
-import { useConvex } from 'convex/react';
-import { api } from '../../convex/_generated/api';
->>>>>>> master
+import { useQuery, useMutation, api } from '../services/mockConvex';
 import { useAuth } from '../context/AuthContext';
 import BoardMemberIndicator from '../components/BoardMemberIndicator';
 import DeveloperIndicator from '../components/DeveloperIndicator';
