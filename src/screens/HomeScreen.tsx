@@ -359,6 +359,34 @@ const HomeScreen = () => {
         </ImageBackground>
       </Animated.View>
 
+      {/* Beta Notice Banner */}
+      <Animated.View style={[
+        styles.betaBanner,
+        {
+          opacity: fadeAnim,
+        }
+      ]}>
+        <View style={styles.betaBannerContent}>
+          <View style={styles.betaBadge}>
+            <Ionicons name="construct" size={16} color="#ffffff" />
+            <Text style={styles.betaBadgeText}>BETA</Text>
+          </View>
+          <View style={styles.betaTextContainer}>
+            <Text style={styles.betaTitle}>App is Currently in Beta</Text>
+            <Text style={styles.betaMessage}>
+              You'll see frequent updates as we continue to improve. If you encounter any problems or have feedback, please contact the developer.
+            </Text>
+            <TouchableOpacity
+              style={styles.betaContactButton}
+              onPress={() => Linking.openURL('mailto:ruben.jim.co@gmail.com')}
+            >
+              <Ionicons name="mail" size={16} color="#2563eb" />
+              <Text style={styles.betaContactText}>Contact Developer</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Animated.View>
+
       {/* Custom Tab Bar - Only when screen is wide enough */}
       {showDesktopNav && (
         <Animated.View style={{
@@ -1187,8 +1215,73 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
-    marginTop: 12,
-    gap: 4,
+  },
+  betaBanner: {
+    marginHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 8,
+    backgroundColor: '#fef3c7',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fbbf24',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  betaBannerContent: {
+    flexDirection: 'row',
+    padding: 16,
+    alignItems: 'flex-start',
+  },
+  betaBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f59e0b',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginRight: 12,
+  },
+  betaBadgeText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '700',
+    marginLeft: 4,
+    letterSpacing: 0.5,
+  },
+  betaTextContainer: {
+    flex: 1,
+  },
+  betaTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#92400e',
+    marginBottom: 6,
+  },
+  betaMessage: {
+    fontSize: 13,
+    color: '#78350f',
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  betaContactButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: '#ffffff',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#fbbf24',
+  },
+  betaContactText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2563eb',
+    marginLeft: 6,
   },
   infoCard: {
     backgroundColor: '#ffffff',

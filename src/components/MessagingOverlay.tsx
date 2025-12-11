@@ -12,6 +12,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   ActivityIndicator,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -54,6 +55,8 @@ const MessagingOverlay: React.FC<MessagingOverlayProps> = ({ visible, onClose })
   // Animation values
   const slideAnim = useRef(new Animated.Value(isDesktop ? screenWidth : Dimensions.get('window').height)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
+  const keyboardOffset = useRef(new Animated.Value(0)).current;
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -102,6 +105,48 @@ const MessagingOverlay: React.FC<MessagingOverlayProps> = ({ visible, onClose })
       }, 100);
     }
   }, [activeConversationMessages.length]);
+
+  // Handle keyboard show/hide for mobile
+  useEffect(() => {
+    if (isDesktop || Platform.OS === 'web') return;
+
+    const keyboardWillShow = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardVisible(true);
+        // Use negative value to move up (translateY moves down with positive values)
+        Animated.timing(keyboardOffset, {
+          toValue: -e.endCoordinates.height,
+          duration: Platform.OS === 'ios' ? (e.duration || 250) : 250,
+          useNativeDriver: Platform.OS !== 'web',
+        }).start(() => {
+          // Scroll to bottom when keyboard appears
+          if (scrollViewRef.current && activeConversationId) {
+            setTimeout(() => {
+              scrollViewRef.current?.scrollToEnd({ animated: true });
+            }, 100);
+          }
+        });
+      }
+    );
+
+    const keyboardWillHide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      (e) => {
+        setKeyboardVisible(false);
+        Animated.timing(keyboardOffset, {
+          toValue: 0,
+          duration: Platform.OS === 'ios' ? (e.duration || 250) : 250,
+          useNativeDriver: Platform.OS !== 'web',
+        }).start();
+      }
+    );
+
+    return () => {
+      keyboardWillShow.remove();
+      keyboardWillHide.remove();
+    };
+  }, [keyboardOffset, isDesktop, activeConversationId]);
 
   const handleSendMessage = async () => {
     if (!messageText.trim() || !activeConversationId) return;
@@ -190,15 +235,21 @@ const MessagingOverlay: React.FC<MessagingOverlayProps> = ({ visible, onClose })
             styles.container,
             isDesktop ? styles.desktopContainer : styles.mobileContainer,
             {
-              transform: [
-                isDesktop
-                  ? { translateX: slideAnim }
-                  : { translateY: slideAnim },
-              ],
+              transform: isDesktop
+                ? [{ translateX: slideAnim }]
+                : [
+                    { translateY: slideAnim },
+                    { translateY: keyboardOffset },
+                  ],
               maxHeight: isDesktop ? '80vh' : '90%',
               bottom: isDesktop ? 0 : 0,
               right: isDesktop ? 0 : undefined,
               paddingBottom: Platform.OS === 'ios' ? insets.bottom : 0,
+              ...(Platform.OS === 'ios' && {
+                position: 'absolute' as any,
+                left: 0,
+                right: 0,
+              }),
             },
           ]}
         >
@@ -392,9 +443,10 @@ const MessagingOverlay: React.FC<MessagingOverlayProps> = ({ visible, onClose })
             {/* Messages View */}
             {activeConversationId && (
               <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 style={styles.messagesContainer}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+                keyboardVerticalOffset={0}
+                enabled={Platform.OS === 'ios'}
               >
                 <ScrollView
                   ref={scrollViewRef}
@@ -577,6 +629,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 8,
+    ...(Platform.OS === 'ios' && {
+      position: 'absolute' as any,
+      bottom: 0,
+      left: 0,
+      right: 0,
+    }),
   },
   safeArea: {
     flex: 1,

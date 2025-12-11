@@ -1718,7 +1718,7 @@ const AdminScreen = () => {
           <View style={styles.tabContent}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Covenants & Rules</Text>
-              <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={styles.covenantButtonsContainer}>
                 <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
                   <TouchableOpacity
                     style={[styles.addButton, { backgroundColor: '#2563eb' }]}
@@ -4874,6 +4874,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     gap: 6,
+    minWidth: 0, // Allow button to shrink if needed
+  },
+  covenantButtonsContainer: {
+    flexDirection: 'column',
+    gap: 10,
+    alignItems: 'flex-end',
   },
   addButtonText: {
     color: '#ffffff',
