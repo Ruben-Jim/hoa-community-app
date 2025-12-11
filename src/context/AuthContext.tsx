@@ -33,7 +33,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isLoading: true,
   });
 
-  // Convex mutations
+  // Convex mutations - these require ConvexProvider to be available
+  // We ensure ConvexProvider wraps AuthProvider in App.tsx
+  // If ConvexProvider is missing, these hooks will throw errors that will be caught by ErrorBoundary
   const createResident = useMutation(api.residents.create);
   const updateResident = useMutation(api.residents.update);
 
@@ -91,21 +93,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const signUp = async (userData: Omit<User, '_id' | 'createdAt' | 'updatedAt' | 'isActive'>) => {
     try {
       console.log('👤 Creating resident with profile image:', userData.profileImage);
-      const residentId = await createResident({
-        firstName: userData.firstName,
-        lastName: userData.lastName,
-        email: userData.email,
-        password: userData.password,
-        phone: userData.phone,
-        address: userData.address,
-        unitNumber: userData.unitNumber,
-        isResident: userData.isResident,
-        isBoardMember: userData.isBoardMember,
-        isRenter: userData.isRenter,
-        isDev: userData.isDev ?? false, // Default to false if not provided
-        profileImage: userData.profileImage,
-      });
-      console.log('✅ Resident created with ID:', residentId);
+      
+      let residentId: string;
+      try {
+        residentId = await createResident({
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          email: userData.email,
+          password: userData.password,
+          phone: userData.phone,
+          address: userData.address,
+          unitNumber: userData.unitNumber,
+          isResident: userData.isResident,
+          isBoardMember: userData.isBoardMember,
+          isRenter: userData.isRenter,
+          isDev: userData.isDev ?? false, // Default to false if not provided
+          profileImage: userData.profileImage,
+        });
+        console.log('✅ Resident created with ID:', residentId);
+      } catch (convexError) {
+        console.error('Failed to create resident in Convex:', convexError);
+        // Re-throw with a more user-friendly message
+        throw new Error('Failed to create account. Please check your connection and try again.');
+      }
 
       const newUser: User = {
         ...userData,
@@ -156,10 +166,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       if (!authState.user) return;
       
-      await updateResident({
-        id: authState.user._id as any,
-        ...updates,
-      });
+      try {
+        await updateResident({
+          id: authState.user._id as any,
+          ...updates,
+        });
+      } catch (convexError) {
+        console.error('Failed to update resident in Convex:', convexError);
+        // Still update local state even if Convex update fails
+        // This allows offline functionality
+        console.warn('Updating local state only - Convex update failed');
+      }
 
       const updatedUser = { ...authState.user, ...updates, updatedAt: Date.now() };
       
@@ -171,6 +188,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         user: updatedUser,
       });
     } catch (error) {
+      console.error('Error updating user:', error);
       throw error;
     }
   };

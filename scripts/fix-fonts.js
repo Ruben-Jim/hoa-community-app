@@ -67,3 +67,14 @@ if (fs.existsSync(htmlPath)) {
 } else {
   console.log('❌ dist/index.html not found');
 }
+
+// Copy privacy-policy.html to dist folder
+const privacyPolicyPath = path.join(__dirname, '../privacy-policy.html');
+const distPrivacyPolicyPath = path.join(distDir, 'privacy-policy.html');
+
+if (fs.existsSync(privacyPolicyPath)) {
+  fs.copyFileSync(privacyPolicyPath, distPrivacyPolicyPath);
+  console.log('✅ Privacy policy copied to dist folder');
+} else {
+  console.log('⚠️ privacy-policy.html not found in project root');
+}

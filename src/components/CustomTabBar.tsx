@@ -3,8 +3,6 @@ import { View, TouchableOpacity, StyleSheet, Text, Dimensions } from 'react-nati
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
-import MessagingButton from './MessagingButton';
-import { useMessaging } from '../context/MessagingContext';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isMobile = screenWidth < 768;
@@ -20,7 +18,6 @@ const CustomTabBar = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { user } = useAuth();
-  const { setShowOverlay } = useMessaging();
 
   const isBoardMember = user?.isBoardMember && user?.isActive;
   const isRenter = user?.isRenter;
@@ -68,11 +65,6 @@ const CustomTabBar = () => {
           </TouchableOpacity>
         );
       })}
-      {isBoardMember && (
-        <View style={styles.messagingButtonContainer}>
-          <MessagingButton onPress={() => setShowOverlay(true)} />
-        </View>
-      )}
     </View>
   );
 };
@@ -116,10 +108,6 @@ const styles = StyleSheet.create({
   activeTabLabel: {
     color: '#1e293b',
     fontWeight: '600',
-  },
-  messagingButtonContainer: {
-    marginLeft: 'auto',
-    paddingLeft: 16,
   },
 });
 

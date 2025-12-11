@@ -22,6 +22,12 @@ const MinimizedMessageBubble: React.FC<MinimizedMessageBubbleProps> = ({ onPress
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
   const screenWidth = Dimensions.get('window').width;
 
+  // Debug logging for iOS
+  const handlePress = React.useCallback(() => {
+    console.log('[MinimizedMessageBubble] Pressed, opening overlay');
+    onPress();
+  }, [onPress]);
+
   React.useEffect(() => {
     if (hasUnreadMessages) {
       // Pulse animation when new message arrives
@@ -61,8 +67,10 @@ const MinimizedMessageBubble: React.FC<MinimizedMessageBubbleProps> = ({ onPress
     >
       <TouchableOpacity
         style={styles.bubble}
-        onPress={onPress}
+        onPress={handlePress}
         activeOpacity={0.8}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        delayPressIn={0}
       >
         <View style={styles.iconContainer}>
           <Ionicons name="chatbubble-ellipses" size={24} color="#2563eb" />

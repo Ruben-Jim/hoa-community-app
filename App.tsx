@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
@@ -12,6 +12,8 @@ import AuthNavigator from './src/navigation/AuthNavigator';
 import enhancedUnifiedNotificationManager from './src/services/EnhancedUnifiedNotificationManager';
 import MessagingOverlay from './src/components/MessagingOverlay';
 import MinimizedMessageBubble from './src/components/MinimizedMessageBubble';
+import ErrorBoundary from './src/components/ErrorBoundary';
+import AnimatedSplashScreen from './src/components/AnimatedSplashScreen';
 
 import HomeScreen from './src/screens/HomeScreen';
 import BoardScreen from './src/screens/BoardScreen';
@@ -79,31 +81,76 @@ const MainAppContent = () => {
   );
 };
 
+// Environment variable validation component
+const EnvironmentErrorScreen = () => (
+  <View style={styles.setupContainer}>
+    <Text style={styles.setupTitle}>Configuration Error</Text>
+    <Text style={styles.setupText}>
+      The app is missing required configuration. Please ensure EXPO_PUBLIC_CONVEX_URL is set.
+    </Text>
+    <Text style={styles.setupText}>
+      For production builds, set this as an EAS secret:
+    </Text>
+    <Text style={styles.setupCode}>
+      eas secret:create --scope project --name EXPO_PUBLIC_CONVEX_URL --value {'<your-convex-url>'}
+    </Text>
+  </View>
+);
+
 export default function App() {
   const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
-
-  const convex = useMemo(() => {
-    if (!convexUrl) return null;
-    return new ConvexReactClient(convexUrl);
-  }, [convexUrl]);
-
-  // Initialize notifications when app starts
-  useEffect(() => {
-    const initializeNotifications = async () => {
-      try {
-        await enhancedUnifiedNotificationManager.initialize();
-        console.log('Notifications initialized successfully');
-      } catch (error) {
-        console.error('Failed to initialize notifications:', error);
-      }
-    };
-
-    initializeNotifications();
-  }, []);
-
+  const [notificationInitAttempted, setNotificationInitAttempted] = useState(false);
+  // Only show splash screen on iOS and Android, not on web
+  const [showSplash, setShowSplash] = useState(Platform.OS !== 'web');
+  
   // Persistent navigation state
   const [isReady, setIsReady] = React.useState(false);
   const [initialState, setInitialState] = React.useState<any>();
+
+  // Validate environment variables
+  const hasRequiredEnvVars = !!convexUrl;
+
+  const convex = useMemo(() => {
+    if (!convexUrl) return null;
+    try {
+      return new ConvexReactClient(convexUrl);
+    } catch (error) {
+      console.error('Failed to create Convex client:', error);
+      return null;
+    }
+  }, [convexUrl]);
+
+  // Initialize notifications when app starts (non-blocking)
+  useEffect(() => {
+    let isMounted = true;
+    
+    const initializeNotifications = async () => {
+      // Don't block app startup - initialize in background
+      setNotificationInitAttempted(true);
+      
+      try {
+        // Add a small delay to not interfere with app startup
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        if (!isMounted) return;
+        
+        await enhancedUnifiedNotificationManager.initialize();
+        console.log('Notifications initialized successfully');
+      } catch (error) {
+        // Log but don't crash - notifications are not critical for app startup
+        console.error('Failed to initialize notifications (non-critical):', error);
+      }
+    };
+
+    // Initialize notifications asynchronously without blocking
+    initializeNotifications().catch(err => {
+      console.error('Notification initialization error:', err);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   React.useEffect(() => {
     const restoreState = async () => {
@@ -130,6 +177,28 @@ export default function App() {
     }
   };
 
+  // Show animated splash screen first (only on iOS and Android)
+  // This must be after all hooks are called
+  if (showSplash && Platform.OS !== 'web') {
+    return (
+      <AnimatedSplashScreen
+        videoSource={require('./assets/splash-icon.mp4')}
+        onFinish={() => setShowSplash(false)}
+      />
+    );
+  }
+
+  // Show error screen if required environment variables are missing
+  if (!hasRequiredEnvVars) {
+    return (
+      <SafeAreaProvider>
+        <ErrorBoundary>
+          <EnvironmentErrorScreen />
+        </ErrorBoundary>
+      </SafeAreaProvider>
+    );
+  }
+
   if (!isReady) {
     return (
       <SafeAreaProvider>
@@ -140,23 +209,37 @@ export default function App() {
     );
   }
 
+  // Ensure ConvexProvider wraps AuthProvider (required for Convex hooks)
   const content = (
     <SafeAreaProvider>
-      <AuthProvider>
-        <MessagingProvider>
-          <NavigationContainer initialState={initialState} onStateChange={onStateChange}>
-            <MainAppContent />
-            <StatusBar style="auto" />
-          </NavigationContainer>
-        </MessagingProvider>
-      </AuthProvider>
+      {convex ? (
+        <ConvexProvider client={convex}>
+          <AuthProvider>
+            <MessagingProvider>
+              <NavigationContainer initialState={initialState} onStateChange={onStateChange}>
+                <MainAppContent />
+                <StatusBar style="auto" />
+              </NavigationContainer>
+            </MessagingProvider>
+          </AuthProvider>
+        </ConvexProvider>
+      ) : (
+        <AuthProvider>
+          <MessagingProvider>
+            <NavigationContainer initialState={initialState} onStateChange={onStateChange}>
+              <MainAppContent />
+              <StatusBar style="auto" />
+            </NavigationContainer>
+          </MessagingProvider>
+        </AuthProvider>
+      )}
     </SafeAreaProvider>
   );
 
-  return convex ? (
-    <ConvexProvider client={convex}>{content}</ConvexProvider>
-  ) : (
-    content
+  return (
+    <ErrorBoundary>
+      {content}
+    </ErrorBoundary>
   );
 }
 

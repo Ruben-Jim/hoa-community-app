@@ -179,12 +179,37 @@ npm start
 
 ## 🔑 Environment Variables
 
-### Required (Auto-configured by Convex)
-- `EXPO_PUBLIC_CONVEX_URL`: Your Convex deployment URL
-- `CONVEX_DEPLOYMENT`: Your Convex deployment name
+### Development Setup
 
-### Optional
-- Additional environment variables can be configured as needed for future features
+For local development, create a `.env.local` file:
+
+```bash
+EXPO_PUBLIC_CONVEX_URL=your-convex-url-here
+```
+
+### Production Builds
+
+**Important:** For production builds (EAS Build), environment variables must be set as EAS secrets, not in `.env` files:
+
+```bash
+# Set required secrets
+eas secret:create --scope project --name EXPO_PUBLIC_CONVEX_URL --value <your-convex-url>
+
+# Verify secrets
+eas secret:list
+```
+
+### Required Variables
+
+- `EXPO_PUBLIC_CONVEX_URL`: Your Convex deployment URL (required for all builds)
+- `CONVEX_DEPLOYMENT`: Your Convex deployment name (auto-configured by Convex)
+
+### Optional Variables
+
+- `EXPO_PUBLIC_PAYPAL_CLIENT_ID`: PayPal client ID (if using PayPal payments)
+- `EXPO_PUBLIC_PAYPAL_MODE`: PayPal mode (`sandbox` or `production`)
+
+**See [PRODUCTION_BUILD_CHECKLIST.md](./PRODUCTION_BUILD_CHECKLIST.md) for complete production setup instructions.**
 
 ## 📁 Project Structure
 
@@ -295,29 +320,56 @@ The app uses Convex's real-time capabilities to provide instant updates across a
 
 ## 🚀 Deployment
 
-### Expo Build
-```bash
-# Build for production
-npx expo build:ios
-npx expo build:android
+### Production Build Setup
 
-# Or use EAS Build (recommended)
-npx eas build --platform ios
-npx eas build --platform android
+Before building for production, you must configure environment variables as EAS secrets:
+
+```bash
+# Set required environment variables
+eas secret:create --scope project --name EXPO_PUBLIC_CONVEX_URL --value <your-convex-url>
+
+# Verify secrets are set
+eas secret:list
+```
+
+**See [PRODUCTION_BUILD_CHECKLIST.md](./PRODUCTION_BUILD_CHECKLIST.md) for a complete checklist of requirements for App Store submission.**
+
+### EAS Build (Recommended)
+
+```bash
+# iOS Production Build
+eas build --platform ios --profile production
+
+# Android Production Build
+eas build --platform android --profile production
+```
+
+### Submit to App Stores
+
+```bash
+# Submit iOS build to App Store
+eas submit --platform ios --profile production
+
+# Submit Android build to Play Store
+eas submit --platform android --profile production
 ```
 
 ### Convex Deployment
+
 ```bash
 # Deploy to production
 npx convex deploy --prod
 ```
 
+### Environment Variables for Production
 
-### Environment Setup for Production
-```bash
-# Production environment variables
-# Additional environment variables can be added as needed for future features
-```
+Required environment variables must be set as EAS secrets (not in `.env` files):
+
+- `EXPO_PUBLIC_CONVEX_URL` - Your Convex deployment URL (required)
+- `EXPO_PUBLIC_PAYPAL_CLIENT_ID` - PayPal client ID (if using PayPal)
+- `EXPO_PUBLIC_PAYPAL_MODE` - PayPal mode: `sandbox` or `production`
+
+**Important:** Environment variables set via `eas secret:create` are automatically included in production builds. Local `.env` files are NOT used in production builds.
 
 ## 🛠 Recent Updates & Improvements
 

@@ -4,7 +4,7 @@
     "slug": "shelton-springs",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.jpg",
+    "icon": "./assets/icon.png",
     "scheme": "sheltonsprings",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
@@ -28,7 +28,7 @@
       "package": "com.rubenjim.sheltonsprings",
       "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.jpg",
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
@@ -65,12 +65,14 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.jpg",
+          "icon": "./assets/icon.png",
           "color": "#ffffff",
           "defaultChannel": "default"
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-font",
+      "expo-video"
     ]
   }
 }

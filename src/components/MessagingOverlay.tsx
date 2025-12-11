@@ -149,7 +149,16 @@ const MessagingOverlay: React.FC<MessagingOverlayProps> = ({ visible, onClose })
   const currentConversation = conversations.find((c) => c._id === activeConversationId);
   const otherParticipant = currentConversation?.otherParticipant;
 
-  if (!visible) return null;
+  // Add console log for debugging on iOS
+  useEffect(() => {
+    if (visible) {
+      console.log('[MessagingOverlay] Modal should be visible, showOverlay:', visible);
+    }
+  }, [visible]);
+
+  if (!visible) {
+    return null;
+  }
 
   return (
     <Modal
@@ -157,7 +166,9 @@ const MessagingOverlay: React.FC<MessagingOverlayProps> = ({ visible, onClose })
       visible={visible}
       animationType="none"
       onRequestClose={onClose}
-      statusBarTranslucent
+      statusBarTranslucent={Platform.OS === 'android'}
+      presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : undefined}
+      hardwareAccelerated={Platform.OS === 'android'}
     >
       <Animated.View
         style={[
@@ -171,6 +182,8 @@ const MessagingOverlay: React.FC<MessagingOverlayProps> = ({ visible, onClose })
           style={StyleSheet.absoluteFill}
           activeOpacity={1}
           onPress={isDesktop ? undefined : onClose}
+          accessible={false}
+          importantForAccessibility="no"
         />
         <Animated.View
           style={[
@@ -523,6 +536,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     ...(Platform.OS === 'web' && {
       position: 'fixed' as any,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+    }),
+    ...(Platform.OS === 'ios' && {
+      position: 'absolute' as any,
       top: 0,
       left: 0,
       right: 0,
